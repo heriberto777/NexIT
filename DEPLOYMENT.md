@@ -94,10 +94,34 @@ Esto crea los clientes, usuarios (admin/coordinador/técnico/cliente) y tickets 
 ejemplo — útil para verificar el despliegue, no estrictamente necesario si vas a
 cargar datos reales desde cero vía la UI.
 
-## d) Nginx como reverse proxy (SSL, WebSockets, uploads grandes)
+## d) Reverse proxy (SSL, WebSockets, uploads grandes)
 
-Puedes usar Nginx directo o Nginx Proxy Manager (NPM) — la configuración efectiva es
-la misma. Si usas Nginx directo con Certbot:
+`nexit` **no publica ningún puerto al host** a propósito (ver comentario en
+`docker-compose.prod.yml`) — mismo patrón que el resto de los backends en este
+servidor. El reverse proxy debe alcanzarlo por nombre de contenedor dentro de
+`dev-network`, no por `127.0.0.1:<puerto>`.
+
+**Con Nginx Proxy Manager (el caso real de este servidor)**: en el Proxy Host,
+**Forward Hostname/IP** = `nexit`, **Forward Port** = `3000` (NPM resuelve el nombre
+del contenedor porque comparte la red `dev-network`). Activa "Websockets Support",
+pide el certificado Let's Encrypt desde la misma pantalla, y en la pestaña "Advanced"
+agrega:
+
+```nginx
+client_max_body_size 20M;
+```
+
+Sin esto, las evidencias fotográficas y PDFs generados (pueden pesar varios MB) se
+rechazan con 413 antes de llegar a la app.
+
+<details>
+<summary>Alternativa: Nginx corriendo directo en el host (no en un contenedor)</summary>
+
+Solo aplica si tu reverse proxy vive fuera de Docker. En ese caso sí necesitas volver
+a publicar el puerto en `docker-compose.prod.yml` (descomentar el bloque `ports:`,
+eligiendo un puerto de host libre — revisa `docker ps` para no chocar con otro
+proyecto) y apuntar `proxy_pass` a `127.0.0.1:<ese puerto>` en vez de al nombre del
+contenedor.
 
 ```nginx
 server {
@@ -137,13 +161,7 @@ Certificado con Certbot (modo webroot, sin bajar Nginx):
 certbot certonly --webroot -w /var/www/certbot -d nexit.tuempresa.com
 ```
 
-**Si usas Nginx Proxy Manager**: en el Proxy Host apunta a `nexit:3000` (o la IP del
-host + puerto publicado), activa "Websockets Support", pide el certificado Let's
-Encrypt desde la misma pantalla, y en la pestaña "Advanced" agrega:
-
-```nginx
-client_max_body_size 20M;
-```
+</details>
 
 ## e) Mantenimiento
 
