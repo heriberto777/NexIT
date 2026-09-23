@@ -60,8 +60,8 @@ export function SmtpForm({ valores }: { valores: SmtpValues }) {
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {guardado && <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">Guardado correctamente.</p>}
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="sm:col-span-2">
           <label className="mb-1 block text-sm font-medium text-gray-700">Host SMTP</label>
           <input {...register("smtpHost")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="smtp.tuproveedor.com" />
         </div>
@@ -71,7 +71,7 @@ export function SmtpForm({ valores }: { valores: SmtpValues }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Usuario</label>
           <input {...register("smtpUser")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
@@ -84,7 +84,7 @@ export function SmtpForm({ valores }: { valores: SmtpValues }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Correo remitente</label>
           <input type="email" {...register("smtpFromEmail")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

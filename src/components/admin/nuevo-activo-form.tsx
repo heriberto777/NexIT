@@ -142,7 +142,7 @@ export function NuevoActivoForm({ sucursales, categorias: categoriasIniciales }:
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Marca</label>
             <input {...register("marca")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="APC" />
@@ -166,7 +166,7 @@ export function NuevoActivoForm({ sucursales, categorias: categoriasIniciales }:
           <input {...register("ubicacionEspecifica")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Sala de servidores, rack 2" />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Fecha de instalación (opcional)</label>
             <input type="date" {...register("fechaInstalacion")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

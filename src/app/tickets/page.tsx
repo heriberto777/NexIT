@@ -8,6 +8,7 @@ import { SlaBadge } from "@/components/tickets/sla-badge";
 import { calcularEstadoSla } from "@/lib/utils/sla";
 import { obtenerConfiguracion, slaHorasPorPrioridad } from "@/server/services/configuracion.service";
 import { ESTADOS_CON_WIZARD_ACTIVO } from "@/lib/utils/ticket-estado";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +111,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
         )}
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <TableScroll>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
@@ -175,7 +176,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
             )}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 }

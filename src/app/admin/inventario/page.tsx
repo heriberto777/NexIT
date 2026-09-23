@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency } from "@/lib/utils/currency";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function InventarioPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <TableScroll>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
@@ -89,7 +90,7 @@ export default async function InventarioPage() {
             )}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 }

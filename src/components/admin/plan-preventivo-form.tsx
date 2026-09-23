@@ -115,7 +115,7 @@ export function PlanPreventivoForm({ activos, sucursales, tecnicos, valoresInici
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Frecuencia</label>
             <select {...register("frecuencia")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -138,7 +138,7 @@ export function PlanPreventivoForm({ activos, sucursales, tecnicos, valoresInici
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Técnico asignado por defecto</label>
             <select {...register("tecnicoAsignadoId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">

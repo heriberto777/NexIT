@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSesionActual } from "@/server/auth/session";
 import { DevUserSwitcher } from "@/components/portal/dev-user-switcher";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { MainNav } from "@/components/layout/main-nav";
 
 export default async function PortalLayout({ children }: { children: ReactNode }) {
   const sesion = await getSesionActual();
@@ -45,31 +46,22 @@ export default async function PortalLayout({ children }: { children: ReactNode }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="border-b border-gray-200 bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-semibold text-gray-900">{cliente?.nombre ?? "Portal"}</span>
-            <Link href="/portal" className="text-sm text-gray-600 hover:text-blue-600">
-              Inicio
-            </Link>
-            <Link href="/portal/tickets" className="text-sm text-gray-600 hover:text-blue-600">
-              Mis tickets
-            </Link>
-            <Link href="/portal/tickets/nuevo" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-              + Reportar falla
-            </Link>
-          </div>
-          <div className="flex items-center gap-3">
-            {clientesDisponibles.length > 0 && (
-              <DevUserSwitcher
-                usuarios={clientesDisponibles.map((u) => ({ email: u.email, nombre: u.nombre, clienteNombre: u.cliente?.nombre ?? "—" }))}
-                emailActual={sesion.email}
-              />
-            )}
-            <LogoutButton />
-          </div>
-        </div>
-      </nav>
+      <MainNav
+        brand={cliente?.nombre ?? "Portal"}
+        links={[
+          { href: "/portal", label: "Inicio" },
+          { href: "/portal/tickets", label: "Mis tickets" },
+          { href: "/portal/tickets/nuevo", label: "+ Reportar falla", primary: true },
+        ]}
+      >
+        {clientesDisponibles.length > 0 && (
+          <DevUserSwitcher
+            usuarios={clientesDisponibles.map((u) => ({ email: u.email, nombre: u.nombre, clienteNombre: u.cliente?.nombre ?? "—" }))}
+            emailActual={sesion.email}
+          />
+        )}
+        <LogoutButton />
+      </MainNav>
       {children}
     </div>
   );

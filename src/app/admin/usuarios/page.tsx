@@ -5,6 +5,7 @@ import { UsuarioFormModal } from "@/components/admin/usuario-form-modal";
 import { UsuarioEstadoToggle } from "@/components/admin/usuario-estado-toggle";
 import { ResetearPasswordButton } from "@/components/admin/resetear-password-button";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +100,7 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
         )}
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <TableScroll>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
@@ -157,7 +158,7 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
             )}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 }

@@ -175,7 +175,7 @@ export function NuevoTicketWizard({ sucursales, activos }: { sucursales: Sucursa
               {errors.descripcion && <p className="mt-1 text-xs text-red-600">{errors.descripcion.message}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Tipo</label>
                 <select {...register("categoriaSoporte")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">

@@ -43,7 +43,7 @@ export function ParametrosForm({ valores }: { valores: ParametrosValues }) {
         <p className="mb-3 text-xs text-gray-400">
           Se usa solo cuando el ticket no tiene un contrato de SLA propio asignado — un ticket con contrato sigue usando el tiempo pactado con ese cliente.
         </p>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-red-700">Crítica</label>
             <input type="number" {...register("slaHorasCritica")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
@@ -78,7 +78,7 @@ export function ParametrosForm({ valores }: { valores: ParametrosValues }) {
         <p className="mb-3 text-xs text-gray-400">
           Usado en montos de cotizaciones/repuestos, PDFs de informe de servicio y fechas mostradas en toda la aplicación.
         </p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500">Código (ISO 4217)</label>
             <input type="text" maxLength={3} placeholder="DOP" {...register("monedaCodigo")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase" />

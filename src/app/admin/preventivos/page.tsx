@@ -4,6 +4,7 @@ import { calcularVigenciaPlan, type EstadoVigenciaPlan } from "@/lib/utils/plan-
 import { GenerarTicketsPreventivosButton } from "@/components/admin/generar-tickets-preventivos-button";
 import { TogglePlanEstadoButton } from "@/components/admin/toggle-plan-estado-button";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,7 @@ export default async function PreventivosPage() {
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <TableScroll>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
@@ -136,7 +137,7 @@ export default async function PreventivosPage() {
             )}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 }

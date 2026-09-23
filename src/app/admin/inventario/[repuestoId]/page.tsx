@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils/cn";
 import { RepuestoForm } from "@/components/admin/repuesto-form";
 import { RegistrarMovimientoModal } from "@/components/admin/registrar-movimiento-modal";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,7 @@ export default async function RepuestoDetailPage({ params }: PageProps) {
 
       <section className="rounded-xl border border-gray-200 bg-white p-4">
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Kardex — historial de movimientos</h2>
-        <div className="overflow-x-auto">
+        <TableScroll bordered={false}>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
@@ -137,7 +138,7 @@ export default async function RepuestoDetailPage({ params }: PageProps) {
               )}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </section>
     </div>
   );

@@ -106,7 +106,7 @@ export function BrandingForm({ valores, logoUrl }: { valores: BrandingValues; lo
           <input {...register("empresaRnc")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Teléfono</label>
             <input {...register("empresaTelefono")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

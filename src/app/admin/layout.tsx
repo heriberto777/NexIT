@@ -1,6 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { MainNav } from "@/components/layout/main-nav";
 
 const NAV = [
   { href: "/tickets", label: "Tickets" },
@@ -16,19 +16,9 @@ const NAV = [
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="border-b border-gray-200 bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-semibold text-gray-900">NexIT Admin</span>
-            {NAV.map((item) => (
-              <Link key={item.href} href={item.href} className="text-sm text-gray-600 hover:text-blue-600">
-                {item.label}
-              </Link>
-            ))}
-          </div>
-          <LogoutButton />
-        </div>
-      </nav>
+      <MainNav brand="NexIT Admin" links={NAV}>
+        <LogoutButton />
+      </MainNav>
       {children}
     </div>
   );
