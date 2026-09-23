@@ -1,0 +1,72 @@
+# syntax=docker/dockerfile:1
+
+FROM node:22-alpine AS base
+
+# DATABASE_URL no se conecta durante el build (solo la usa `prisma generate`, que
+# únicamente lee schema.prisma), pero el schema referencia env("DATABASE_URL") y
+# Prisma exige la variable presente incluso para generar el cliente — en CUALQUIER
+# stage donde corra `npm ci` o `prisma generate` (el postinstall corre en "deps").
+ARG DATABASE_URL="postgresql://user:pass@localhost:5432/db"
+ENV DATABASE_URL=${DATABASE_URL}
+# Auth.js valida que exista un secreto al inicializarse (import de src/auth.ts, que el
+# middleware siempre importa) — un valor dummy alcanza para que `next build` compile;
+# el valor real de runtime lo inyecta docker-compose vía env_file.
+ARG AUTH_SECRET="build-time-placeholder-not-used-at-runtime"
+ENV AUTH_SECRET=${AUTH_SECRET}
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# ---------- deps: instala dependencias (con cache de capa separada del código) ----------
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+COPY package.json package-lock.json ./
+# `npm ci` dispara el hook postinstall (`prisma generate`), que exige el schema presente.
+COPY prisma ./prisma
+RUN npm ci
+
+# ---------- builder: genera el cliente de Prisma y compila Next.js ----------
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN npx prisma generate
+RUN npm run build
+
+# ---------- runner: imagen final mínima, sirve el bundle standalone ----------
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs
+
+# El output "standalone" de Next.js solo empaqueta (por tracing estático) lo que el
+# propio servidor necesita para responder requests — el CLI de Prisma (`prisma migrate
+# deploy`, que corremos aparte en el entrypoint antes de arrancar) queda fuera de ese
+# tracing. Copiamos el node_modules completo del builder para tenerlo disponible.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# El standalone trae su propio package.json minimal (sin el campo "prisma.seed"); el
+# original, copiado después, lo sobreescribe para que `prisma db seed` funcione.
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+
+# StorageService (LocalStorageProvider) escribe evidencias/firmas aquí; se monta como
+# volumen en docker-compose.yml para que sobrevivan a un restart/rebuild del contenedor.
+RUN mkdir -p ./public/uploads && chown -R nextjs:nodejs ./public/uploads
+
+COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+USER nextjs
+
+EXPOSE 3000
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

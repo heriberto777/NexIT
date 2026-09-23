@@ -1,0 +1,530 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum EstadoCliente {
+  ACTIVO
+  INACTIVO
+}
+
+enum RolUsuario {
+  CLIENTE
+  TECNICO
+  COORDINADOR
+  ADMIN
+}
+
+enum EstadoUsuario {
+  ACTIVO
+  INACTIVO
+}
+
+enum EstadoContrato {
+  ACTIVO
+  VENCIDO
+  CANCELADO
+}
+
+enum Prioridad {
+  CRITICA
+  ALTA
+  MEDIA
+  BAJA
+}
+
+enum EstadoActivo {
+  ACTIVO
+  EN_MANTENIMIENTO
+  FUERA_DE_SERVICIO
+  DADO_DE_BAJA
+}
+
+enum TipoRespuestaChecklist {
+  BOOLEANO
+  TEXTO
+  NUMERO
+  SELECCION
+}
+
+enum TipoTicket {
+  CORRECTIVO
+  PREVENTIVO
+  INSTALACION
+}
+
+enum CategoriaSoporte {
+  SOFTWARE
+  HARDWARE
+  INFRAESTRUCTURA
+}
+
+enum EstadoTicket {
+  ABIERTO
+  ASIGNADO
+  EN_DIAGNOSTICO
+  ESPERANDO_REPUESTO
+  EN_EJECUCION
+  ESPERANDO_VALIDACION
+  RESUELTO
+  REABIERTO
+  CERRADO
+  CANCELADO
+}
+
+enum OrigenTicket {
+  PORTAL
+  CORREO
+  TELEFONO
+  PROGRAMADO
+}
+
+enum TipoEvidencia {
+  FOTO_ANTES
+  FOTO_DESPUES
+  DOCUMENTO
+  OTRO
+}
+
+enum EstadoAprobacion {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+enum FrecuenciaMantenimiento {
+  SEMANAL
+  MENSUAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+}
+
+enum EstadoPlanPreventivo {
+  ACTIVO
+  PAUSADO
+}
+
+// ---------- Configuración global del sistema ----------
+
+// Singleton: siempre hay como máximo una fila, con id fijo "singleton" (no un
+// @@unique sobre una columna booleana ni una tabla con una sola fila implícita) — el
+// service que la lee/escribe (configuracion.service.ts) siempre apunta a ese mismo id,
+// así que un upsert basta para "crear si no existe, actualizar si ya existe".
+model ConfiguracionSistema {
+  id String @id @default("singleton")
+
+  // Branding / perfil de la empresa (aparece en la interfaz y en el header del PDF)
+  empresaNombre    String  @default("NexIT")
+  empresaRnc       String?
+  // Igual que Evidencia.urlArchivo / FirmaDigital.urlFirmaImagen: guarda la KEY del
+  // StorageProvider, no una URL resuelta — se resuelve al leer, nunca se persiste una
+  // URL firmada que puede expirar.
+  empresaLogoUrl   String?
+  empresaTelefono  String?
+  empresaEmail     String?
+  empresaDireccion String?
+
+  // Integraciones — webhooks salientes hacia n8n
+  webhookUrl          String?
+  webhookSecret       String?
+  webhooksHabilitados Boolean @default(false)
+
+  // Servidor SMTP para envío de correo
+  smtpHost      String?
+  smtpPort      Int?
+  smtpUser      String?
+  smtpPass      String?
+  smtpFromEmail String?
+  smtpFromName  String?
+  smtpSsl       Boolean @default(true)
+
+  // Parámetros operativos — default global de SLA para tickets sin contrato asignado,
+  // y ventana de anticipación por defecto al generar tickets preventivos
+  slaHorasCritica             Int @default(4)
+  slaHorasAlta                Int @default(8)
+  slaHorasMedia               Int @default(24)
+  slaHorasBaja                Int @default(48)
+  diasAnticipacionPreventivos Int @default(7)
+
+  actualizadoEn DateTime @updatedAt
+
+  @@map("configuracion_sistema")
+}
+
+// ---------- Multi-tenant: clientes y sucursales ----------
+
+model Cliente {
+  id                   String        @id @default(cuid())
+  nombre               String
+  identificacionFiscal String?       @unique
+  estado               EstadoCliente @default(ACTIVO)
+  fechaRegistro        DateTime      @default(now())
+
+  sucursales Sucursal[]
+  usuarios   Usuario[]
+  contratos  Contrato[]
+  tickets    Ticket[]
+
+  @@map("clientes")
+}
+
+model Sucursal {
+  id               String   @id @default(cuid())
+  clienteId        String
+  cliente          Cliente  @relation(fields: [clienteId], references: [id])
+  nombre           String
+  direccion        String
+  ciudad           String
+  latitud          Decimal? @db.Decimal(9, 6)
+  longitud         Decimal? @db.Decimal(9, 6)
+  contactoNombre   String?
+  contactoTelefono String?
+
+  activos           Activo[]
+  tickets           Ticket[]
+  planesPreventivos PlanMantenimientoPreventivo[]
+
+  @@index([clienteId])
+  @@map("sucursales")
+}
+
+model Usuario {
+  id             String        @id @default(cuid())
+  nombre         String
+  email          String        @unique
+  passwordHash   String
+  rol            RolUsuario
+  clienteId      String?
+  cliente        Cliente?      @relation(fields: [clienteId], references: [id])
+  especialidad   String?
+  estado         EstadoUsuario @default(ACTIVO)
+  ultimoAccesoAt DateTime?
+
+  ticketsCreados        Ticket[]                      @relation("TicketCreador")
+  ticketsAsignados      Ticket[]                      @relation("TicketTecnico")
+  historial             TicketHistorial[]
+  evidencias            Evidencia[]
+  repuestosAprobados    TicketRepuesto[]              @relation("RepuestoAprobador")
+  cotizacionesAprobadas Cotizacion[]                  @relation("CotizacionAprobador")
+  planesPreventivos     PlanMantenimientoPreventivo[]
+  movimientosInventario MovimientoInventario[]
+
+  @@index([clienteId])
+  @@map("usuarios")
+}
+
+// ---------- Contratos y SLA ----------
+
+model Contrato {
+  id             String         @id @default(cuid())
+  clienteId      String
+  cliente        Cliente        @relation(fields: [clienteId], references: [id])
+  tipoContrato   String
+  fechaInicio    DateTime
+  fechaFin       DateTime?
+  horasIncluidas Int?
+  estado         EstadoContrato @default(ACTIVO)
+
+  slas ContratoSla[]
+
+  @@index([clienteId])
+  @@map("contratos")
+}
+
+model ContratoSla {
+  id                  String    @id @default(cuid())
+  contratoId          String
+  contrato            Contrato  @relation(fields: [contratoId], references: [id])
+  prioridad           Prioridad
+  tiempoRespuestaMin  Int
+  tiempoResolucionMin Int
+
+  tickets Ticket[]
+
+  @@unique([contratoId, prioridad])
+  @@map("contrato_sla")
+}
+
+// ---------- Activos ----------
+
+model CategoriaActivo {
+  id     String @id @default(cuid())
+  nombre String @unique
+
+  activos            Activo[]
+  checklistTemplates ChecklistTemplate[]
+
+  @@map("categorias_activo")
+}
+
+model Activo {
+  id                  String          @id @default(cuid())
+  sucursalId          String
+  sucursal            Sucursal        @relation(fields: [sucursalId], references: [id])
+  categoriaId         String
+  categoria           CategoriaActivo @relation(fields: [categoriaId], references: [id])
+  marca               String
+  modelo              String
+  numeroSerie         String
+  fechaInstalacion    DateTime?
+  fechaFinGarantia    DateTime?
+  ubicacionEspecifica String?
+  estado              EstadoActivo    @default(ACTIVO)
+
+  tickets           Ticket[]
+  planesPreventivos PlanMantenimientoPreventivo[]
+
+  @@unique([sucursalId, numeroSerie])
+  @@index([categoriaId])
+  @@map("activos")
+}
+
+// ---------- Checklists ----------
+
+model ChecklistTemplate {
+  id                String          @id @default(cuid())
+  categoriaActivoId String
+  categoriaActivo   CategoriaActivo @relation(fields: [categoriaActivoId], references: [id])
+  nombre            String
+  version           Int             @default(1)
+
+  items ChecklistItemTemplate[]
+
+  @@index([categoriaActivoId])
+  @@map("checklist_templates")
+}
+
+model ChecklistItemTemplate {
+  id                     String                 @id @default(cuid())
+  templateId             String
+  template               ChecklistTemplate      @relation(fields: [templateId], references: [id])
+  descripcion            String
+  tipoRespuesta          TipoRespuestaChecklist
+  opciones               String[]               @default([]) // solo aplica cuando tipoRespuesta = SELECCION
+  orden                  Int
+  observacionObligatoria Boolean                @default(false) // exige observación cuando la respuesta señala una falla (ej. BOOLEANO=NO)
+
+  respuestas TicketChecklistRespuesta[]
+
+  @@index([templateId])
+  @@map("checklist_item_templates")
+}
+
+// El checklist a aplicar en cada ticket generado se deriva de activo.categoriaId al
+// momento de generar el ticket (misma resolución que usa la pantalla de ejecución:
+// última versión del ChecklistTemplate de esa categoría) — por eso este modelo no
+// guarda su propio checklistTemplateId, evitando que quede desincronizado si la
+// plantilla de la categoría cambia de versión entre una ejecución y la siguiente.
+model PlanMantenimientoPreventivo {
+  id                       String                  @id @default(cuid())
+  activoId                 String?
+  activo                   Activo?                 @relation(fields: [activoId], references: [id])
+  sucursalId               String?
+  sucursal                 Sucursal?               @relation(fields: [sucursalId], references: [id])
+  titulo                   String
+  descripcion              String?
+  frecuencia               FrecuenciaMantenimiento
+  fechaUltimoMantenimiento DateTime?
+  proximaFecha             DateTime
+  tecnicoAsignadoId        String?
+  tecnicoAsignado          Usuario?                @relation(fields: [tecnicoAsignadoId], references: [id])
+  prioridad                Prioridad               @default(MEDIA)
+  estado                   EstadoPlanPreventivo    @default(ACTIVO)
+
+  ticketsGenerados Ticket[]
+
+  @@index([activoId])
+  @@index([sucursalId])
+  @@index([proximaFecha])
+  @@map("planes_mantenimiento_preventivo")
+}
+
+// ---------- Tickets ----------
+
+model Ticket {
+  id                  String                       @id @default(cuid())
+  numeroTicket        String                       @unique
+  clienteId           String
+  cliente             Cliente                      @relation(fields: [clienteId], references: [id])
+  sucursalId          String
+  sucursal            Sucursal                     @relation(fields: [sucursalId], references: [id])
+  activoId            String?
+  activo              Activo?                      @relation(fields: [activoId], references: [id])
+  planPreventivoId    String?
+  planPreventivo      PlanMantenimientoPreventivo? @relation(fields: [planPreventivoId], references: [id])
+  tipo                TipoTicket
+  categoriaSoporte    CategoriaSoporte
+  prioridad           Prioridad
+  estado              EstadoTicket                 @default(ABIERTO)
+  titulo              String
+  descripcion         String
+  creadoPorId         String
+  creadoPor           Usuario                      @relation("TicketCreador", fields: [creadoPorId], references: [id])
+  tecnicoAsignadoId   String?
+  tecnicoAsignado     Usuario?                     @relation("TicketTecnico", fields: [tecnicoAsignadoId], references: [id])
+  slaId               String?
+  sla                 ContratoSla?                 @relation(fields: [slaId], references: [id])
+  origen              OrigenTicket                 @default(PORTAL)
+  fechaCreacion       DateTime                     @default(now())
+  fechaAsignacion     DateTime?
+  fechaInicioAtencion DateTime?
+  fechaResolucion     DateTime?
+  fechaCierre         DateTime?
+
+  historial           TicketHistorial[]
+  checklistRespuestas TicketChecklistRespuesta[]
+  evidencias          Evidencia[]
+  firmas              FirmaDigital[]
+  repuestos           TicketRepuesto[]
+  cotizaciones        Cotizacion[]
+
+  @@index([clienteId, estado])
+  @@index([tecnicoAsignadoId, estado])
+  @@index([fechaCreacion])
+  @@map("tickets")
+}
+
+model TicketHistorial {
+  id             String   @id @default(cuid())
+  ticketId       String
+  ticket         Ticket   @relation(fields: [ticketId], references: [id])
+  usuarioId      String
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
+  estadoAnterior String?
+  estadoNuevo    String
+  comentario     String?
+  fecha          DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_historial")
+}
+
+model TicketChecklistRespuesta {
+  id              String                @id @default(cuid())
+  ticketId        String
+  ticket          Ticket                @relation(fields: [ticketId], references: [id])
+  checklistItemId String
+  checklistItem   ChecklistItemTemplate @relation(fields: [checklistItemId], references: [id])
+  respuesta       String
+  observacion     String?
+
+  @@unique([ticketId, checklistItemId])
+  @@map("ticket_checklist_respuestas")
+}
+
+model Evidencia {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     Ticket        @relation(fields: [ticketId], references: [id])
+  tipo       TipoEvidencia
+  urlArchivo String
+  usuarioId  String
+  usuario    Usuario       @relation(fields: [usuarioId], references: [id])
+  fechaCarga DateTime      @default(now())
+
+  @@index([ticketId])
+  @@map("evidencias")
+}
+
+model FirmaDigital {
+  id             String   @id @default(cuid())
+  ticketId       String
+  ticket         Ticket   @relation(fields: [ticketId], references: [id])
+  nombreFirmante String
+  cargoFirmante  String?
+  urlFirmaImagen String
+  ipDispositivo  String?
+  fecha          DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("firmas_digitales")
+}
+
+// ---------- Repuestos, inventario y cotizaciones ----------
+
+enum TipoMovimientoInventario {
+  ENTRADA
+  SALIDA
+  AJUSTE
+  CONSUMO_TICKET
+}
+
+model Repuesto {
+  id           String  @id @default(cuid())
+  codigo       String  @unique
+  nombre       String
+  descripcion  String?
+  marca        String?
+  stockActual  Int     @default(0)
+  stockMinimo  Int     @default(0)
+  unidadMedida String
+  costoUnidad  Decimal @db.Decimal(10, 2)
+  ubicacion    String?
+
+  consumos    TicketRepuesto[]
+  movimientos MovimientoInventario[]
+
+  @@map("repuestos")
+}
+
+// `cantidad` viaja con signo: positivo para ENTRADA, negativo para SALIDA/CONSUMO_TICKET;
+// AJUSTE puede ser cualquiera de los dos (una corrección de conteo físico). El saldo del
+// Kardex es la suma acumulada de `cantidad` en orden cronológico — nunca se recalcula
+// aparte de `Repuesto.stockActual`, que es la fuente de verdad actualizada en cada
+// movimiento dentro de la misma transacción.
+model MovimientoInventario {
+  id               String                   @id @default(cuid())
+  repuestoId       String
+  repuesto         Repuesto                 @relation(fields: [repuestoId], references: [id])
+  tipo             TipoMovimientoInventario
+  cantidad         Int
+  motivo           String?
+  usuarioId        String
+  usuario          Usuario                  @relation(fields: [usuarioId], references: [id])
+  ticketRepuestoId String?                  @unique
+  ticketRepuesto   TicketRepuesto?          @relation(fields: [ticketRepuestoId], references: [id])
+  fecha            DateTime                 @default(now())
+
+  @@index([repuestoId, fecha])
+  @@map("movimientos_inventario")
+}
+
+model TicketRepuesto {
+  id               String           @id @default(cuid())
+  ticketId         String
+  ticket           Ticket           @relation(fields: [ticketId], references: [id])
+  repuestoId       String
+  repuesto         Repuesto         @relation(fields: [repuestoId], references: [id])
+  cantidad         Int
+  costoTotal       Decimal          @db.Decimal(10, 2)
+  aprobadoPorId    String?
+  aprobadoPor      Usuario?         @relation("RepuestoAprobador", fields: [aprobadoPorId], references: [id])
+  estadoAprobacion EstadoAprobacion @default(PENDIENTE)
+
+  movimientoInventario MovimientoInventario?
+
+  @@index([ticketId])
+  @@map("ticket_repuestos")
+}
+
+model Cotizacion {
+  id            String           @id @default(cuid())
+  ticketId      String
+  ticket        Ticket           @relation(fields: [ticketId], references: [id])
+  monto         Decimal          @db.Decimal(10, 2)
+  descripcion   String
+  estado        EstadoAprobacion @default(PENDIENTE)
+  aprobadoPorId String?
+  aprobadoPor   Usuario?         @relation("CotizacionAprobador", fields: [aprobadoPorId], references: [id])
+  fecha         DateTime         @default(now())
+
+  @@index([ticketId])
+  @@map("cotizaciones")
+}

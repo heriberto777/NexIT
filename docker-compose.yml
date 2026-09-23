@@ -1,0 +1,31 @@
+services:
+  # Postgres/Redis viven en el entorno compartido de C:\dev-infra (dev-postgres/
+  # dev-redis en los puertos estándar del host) — este compose no los declara, se
+  # alcanzan desde el contenedor vía host.docker.internal. Ver
+  # C:\dev-infra\docker-compose.yml y el rol/base propios de NexIT documentados en .env.
+  nexit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexit-dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # .env trae DATABASE_URL con 127.0.0.1 (para `npm run dev` directo en el host)
+      # — DENTRO de este contenedor eso apuntaría al contenedor mismo, no al host, así
+      # que se arma de nuevo aquí con host.docker.internal. Mismo criterio que el
+      # servicio `api` en sistema-del-sol.
+      DATABASE_URL: postgresql://${NEXIT_DB_USER:-nexit_user}:${NEXIT_DB_PASSWORD}@host.docker.internal:5432/${NEXIT_DB_NAME:-nexit_db}?schema=public
+      REDIS_URL: redis://host.docker.internal:6379
+    ports:
+      - "${NEXIT_PORT:-3001}:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      # .next es el cache de build de Turbopack — si se deja como parte del bind mount
+      # de arriba, el .next del host (Windows) y el del contenedor (Linux) se pisan y
+      # generan errores de build intermitentes; un volumen anónimo aparte lo evita.
+      - /app/.next
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

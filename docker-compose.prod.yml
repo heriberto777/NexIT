@@ -1,0 +1,43 @@
+name: nexit
+
+# Despliegue de producción — mismo patrón que sistema-del-sol/bonifapp/ciguacash/
+# ciguainv en este servidor: imagen ya construida y publicada en GHCR por CI (ver
+# .github/workflows/deploy-prod.yml), NO build local. Postgres vive en el stack
+# compartido del servidor (red "dev-network", servicio "postgres-core") — este
+# compose no lo declara, solo se conecta vía la DATABASE_URL que trae `.env`
+# completa desde afuera (ver .env.example).
+#
+# Uso en el servidor:
+#   cp .env.example .env   # completar con los valores reales de producción
+#   docker network create dev-network   # solo si aún no existe
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml exec nexit npx prisma db seed
+#     ↑ solo la primera vez, en un entorno limpio — las migraciones ya corren
+#     solas al arrancar el contenedor (ver docker-entrypoint.sh); no hace falta
+#     correr `prisma migrate deploy` a mano después de cada despliegue.
+#
+# Actualizar a una versión nueva:
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+
+services:
+  nexit:
+    image: ${REGISTRY:-ghcr.io}/${GITHUB_REPOSITORY_OWNER:-heriberto777}/nexit:${IMAGE_TAG:-latest}
+    container_name: nexit
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    volumes:
+      # Evidencias/firmas del StorageService local sobreviven a un pull/restart.
+      - nexit_uploads:/app/public/uploads
+    networks:
+      - dev-network
+
+volumes:
+  nexit_uploads:
+
+networks:
+  dev-network:
+    external: true

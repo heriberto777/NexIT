@@ -1,0 +1,58 @@
+name: Build & publish (GHCR)
+
+# Mismo patrón que bonifapp/ciguacash/ciguainv/sistema-del-sol: CI construye la
+# imagen y la publica en GHCR; el servidor de producción solo hace `docker compose
+# pull && up -d` contra docker-compose.yml (ver ese archivo) — nunca build local.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata de la imagen (tags/labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=sha,prefix=
+
+      # ARG DATABASE_URL/AUTH_SECRET del Dockerfile traen defaults de build-time
+      # (Prisma solo lee schema.prisma para `generate`, nunca se conecta) — no hace
+      # falta pasarlos aquí ni guardarlos como secrets de este workflow.
+      - name: Build y push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
