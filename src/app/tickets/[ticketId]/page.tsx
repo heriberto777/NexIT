@@ -9,6 +9,8 @@ import { GestionTicketPanel } from "@/components/tickets/gestion-ticket-panel";
 import { SolicitarCotizacionModal } from "@/components/tickets/solicitar-cotizacion-modal";
 import { storageService } from "@/server/services/storage.service";
 import { ESTADOS_CON_WIZARD_ACTIVO, ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
+import { formatCurrency } from "@/lib/utils/currency";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 const ESTADOS_GESTIONABLES = new Set(["ABIERTO", "ASIGNADO", "EN_DIAGNOSTICO", "ESPERANDO_REPUESTO", "EN_EJECUCION", "REABIERTO"]);
 
@@ -24,13 +26,14 @@ interface PageProps {
   params: Promise<{ ticketId: string }>;
 }
 
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
 export default async function TicketDetailPage({ params }: PageProps) {
   const { ticketId } = await params;
+
+  const config = await obtenerConfiguracion();
+  const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -184,7 +187,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
               {ticket.cotizaciones.map((c) => (
                 <div key={c.id} className="flex items-start justify-between gap-3 py-2">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">S/ {c.monto.toNumber().toFixed(2)}</p>
+                    <p className="text-sm font-medium text-gray-900">{formatCurrency(c.monto.toNumber(), config.monedaSimbolo)}</p>
                     <p className="text-sm text-gray-600">{c.descripcion}</p>
                     <p className="text-xs text-gray-400">{FORMATO_FECHA.format(c.fecha)}</p>
                   </div>
@@ -195,7 +198,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
               ))}
             </div>
           )}
-          {puedeSolicitarCotizacion && <SolicitarCotizacionModal ticketId={ticket.id} />}
+          {puedeSolicitarCotizacion && <SolicitarCotizacionModal ticketId={ticket.id} monedaSimbolo={config.monedaSimbolo} />}
         </section>
       )}
 
@@ -259,7 +262,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
                 <tr key={r.id}>
                   <td className="py-1.5 text-gray-800">{r.repuesto.nombre}</td>
                   <td className="py-1.5 text-gray-600">{r.cantidad}</td>
-                  <td className="py-1.5 text-gray-600">S/ {r.costoTotal.toNumber().toFixed(2)}</td>
+                  <td className="py-1.5 text-gray-600">{formatCurrency(r.costoTotal.toNumber(), config.monedaSimbolo)}</td>
                   <td className="py-1.5 text-gray-600">{r.estadoAprobacion}</td>
                 </tr>
               ))}

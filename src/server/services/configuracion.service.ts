@@ -29,6 +29,9 @@ function defaultsDesdeEnv(): Omit<ConfiguracionSistema, "id" | "actualizadoEn"> 
     slaHorasMedia: 24,
     slaHorasBaja: 48,
     diasAnticipacionPreventivos: 7,
+    monedaCodigo: process.env.MONEDA_CODIGO ?? "DOP",
+    monedaSimbolo: process.env.MONEDA_SIMBOLO ?? "RD$",
+    localeFecha: process.env.LOCALE_FECHA ?? "es-DO",
   };
 }
 

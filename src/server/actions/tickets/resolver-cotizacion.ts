@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { resolverCotizacionSchema } from "@/lib/zod/ticket.schema";
 import type { ResolverCotizacionInput } from "@/lib/zod/ticket.schema";
+import { formatCurrency } from "@/lib/utils/currency";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 const ROLES_PERMITIDOS = ["CLIENTE", "COORDINADOR", "ADMIN"] as const;
 
@@ -29,6 +31,9 @@ export async function resolverCotizacion(input: ResolverCotizacionInput) {
     throw new Error(`Esta cotización ya fue ${cotizacion.estado.toLowerCase()}`);
   }
 
+  const { monedaSimbolo } = await obtenerConfiguracion();
+  const montoFormateado = formatCurrency(cotizacion.monto.toNumber(), monedaSimbolo);
+
   const actualizada = await prisma.$transaction(async (tx) => {
     const cotizacionActualizada = await tx.cotizacion.update({
       where: { id: cotizacionId },
@@ -42,8 +47,8 @@ export async function resolverCotizacion(input: ResolverCotizacionInput) {
         estadoNuevo: cotizacion.ticket.estado,
         comentario:
           decision === "APROBADO"
-            ? `Cotización de S/ ${cotizacion.monto.toFixed(2)} aprobada`
-            : `Cotización de S/ ${cotizacion.monto.toFixed(2)} rechazada: ${comentario}`,
+            ? `Cotización de ${montoFormateado} aprobada`
+            : `Cotización de ${montoFormateado} rechazada: ${comentario}`,
       },
     });
 

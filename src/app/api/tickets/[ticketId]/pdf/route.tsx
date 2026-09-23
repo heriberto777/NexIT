@@ -60,6 +60,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
   const buffer = await renderToBuffer(
     <InformeServicioDocument
+      monedaSimbolo={config.monedaSimbolo}
+      localeFecha={config.localeFecha}
       empresa={{
         nombre: config.empresaNombre,
         rnc: config.empresaRnc,

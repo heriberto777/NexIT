@@ -15,8 +15,6 @@ const ESTADOS_ACTIVOS = ["ABIERTO", "ASIGNADO", "EN_DIAGNOSTICO", "ESPERANDO_REP
 const ESTADOS_RESUELTOS = ["RESUELTO", "CERRADO"] as const;
 const ESTADOS_DESCARGABLES = new Set(["RESUELTO", "CERRADO"]);
 
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", { dateStyle: "short" });
-
 interface PageProps {
   searchParams: Promise<{ q?: string; sucursalId?: string; estado?: string }>;
 }
@@ -48,6 +46,7 @@ export default async function PortalTicketsPage({ searchParams }: PageProps) {
     prisma.sucursal.findMany({ where: { clienteId }, orderBy: { nombre: "asc" } }),
     obtenerConfiguracion(),
   ]);
+  const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, { dateStyle: "short" });
   const defaultsHoras = slaHorasPorPrioridad(config);
 
   const hayFiltros = Boolean(q || sucursalId || estado);

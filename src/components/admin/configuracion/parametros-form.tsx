@@ -73,6 +73,30 @@ export function ParametrosForm({ valores }: { valores: ParametrosValues }) {
         {errors.diasAnticipacionPreventivos && <p className="mt-1 text-xs text-red-600">{errors.diasAnticipacionPreventivos.message}</p>}
       </div>
 
+      <div className="border-t border-gray-100 pt-4">
+        <p className="mb-2 text-sm font-medium text-gray-700">Moneda y formato de fecha</p>
+        <p className="mb-3 text-xs text-gray-400">
+          Usado en montos de cotizaciones/repuestos, PDFs de informe de servicio y fechas mostradas en toda la aplicación.
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Código (ISO 4217)</label>
+            <input type="text" maxLength={3} placeholder="DOP" {...register("monedaCodigo")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase" />
+            {errors.monedaCodigo && <p className="mt-1 text-xs text-red-600">{errors.monedaCodigo.message}</p>}
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Símbolo</label>
+            <input type="text" placeholder="RD$" {...register("monedaSimbolo")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            {errors.monedaSimbolo && <p className="mt-1 text-xs text-red-600">{errors.monedaSimbolo.message}</p>}
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Locale de fecha</label>
+            <input type="text" placeholder="es-DO" {...register("localeFecha")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            {errors.localeFecha && <p className="mt-1 text-xs text-red-600">{errors.localeFecha.message}</p>}
+          </div>
+        </div>
+      </div>
+
       <Button type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Guardando..." : "Guardar cambios"}
       </Button>

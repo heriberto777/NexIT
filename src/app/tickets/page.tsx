@@ -15,8 +15,6 @@ interface PageProps {
   searchParams: Promise<{ estado?: string; prioridad?: string; clienteId?: string }>;
 }
 
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", { dateStyle: "short" });
-
 export default async function TicketsPage({ searchParams }: PageProps) {
   const sesion = await getSesionActual();
   const esTecnico = sesion?.rol === "TECNICO";
@@ -43,6 +41,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
     obtenerConfiguracion(),
   ]);
 
+  const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, { dateStyle: "short" });
   const defaultsHoras = slaHorasPorPrioridad(config);
   const conSla = tickets.map((t) => ({ ...t, estadoSla: calcularEstadoSla(t, defaultsHoras) }));
   const kpis = {

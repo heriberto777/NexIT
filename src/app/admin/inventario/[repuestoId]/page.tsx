@@ -4,14 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils/cn";
 import { RepuestoForm } from "@/components/admin/repuesto-form";
 import { RegistrarMovimientoModal } from "@/components/admin/registrar-movimiento-modal";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ repuestoId: string }>;
 }
-
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", { dateStyle: "short", timeStyle: "short" });
 
 const ESTILOS_TIPO: Record<string, string> = {
   ENTRADA: "bg-green-100 text-green-800",
@@ -22,6 +21,9 @@ const ESTILOS_TIPO: Record<string, string> = {
 
 export default async function RepuestoDetailPage({ params }: PageProps) {
   const { repuestoId } = await params;
+
+  const config = await obtenerConfiguracion();
+  const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, { dateStyle: "short", timeStyle: "short" });
 
   const repuesto = await prisma.repuesto.findUnique({ where: { id: repuestoId } });
   if (!repuesto) notFound();
@@ -69,6 +71,7 @@ export default async function RepuestoDetailPage({ params }: PageProps) {
         <div className="mt-3">
           <RepuestoForm
             modoEdicion
+            monedaSimbolo={config.monedaSimbolo}
             valoresIniciales={{
               id: repuesto.id,
               codigo: repuesto.codigo,

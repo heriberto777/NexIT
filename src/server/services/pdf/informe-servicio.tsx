@@ -1,6 +1,5 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
-
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", { dateStyle: "medium", timeStyle: "short" });
+import { formatCurrency } from "@/lib/utils/currency";
 
 const styles = StyleSheet.create({
   page: { padding: 32, fontSize: 10, fontFamily: "Helvetica", color: "#1f2937" },
@@ -37,6 +36,8 @@ const styles = StyleSheet.create({
 });
 
 export interface InformeServicioProps {
+  monedaSimbolo: string;
+  localeFecha: string;
   empresa: {
     nombre: string;
     rnc: string | null;
@@ -69,6 +70,8 @@ export interface InformeServicioProps {
 }
 
 export function InformeServicioDocument({
+  monedaSimbolo,
+  localeFecha,
   empresa,
   ticket,
   cliente,
@@ -82,6 +85,7 @@ export function InformeServicioDocument({
   firma,
   historial,
 }: InformeServicioProps) {
+  const FORMATO_FECHA = new Intl.DateTimeFormat(localeFecha, { dateStyle: "medium", timeStyle: "short" });
   return (
     <Document title={`Informe de servicio ${ticket.numeroTicket}`}>
       <Page size="A4" style={styles.page}>
@@ -195,7 +199,7 @@ export function InformeServicioDocument({
                 <View key={i} style={styles.tableRow}>
                   <Text style={styles.td}>{r.nombre}</Text>
                   <Text style={styles.td}>{r.cantidad}</Text>
-                  <Text style={styles.td}>S/ {r.costoTotal.toFixed(2)}</Text>
+                  <Text style={styles.td}>{formatCurrency(r.costoTotal, monedaSimbolo)}</Text>
                 </View>
               ))}
             </View>

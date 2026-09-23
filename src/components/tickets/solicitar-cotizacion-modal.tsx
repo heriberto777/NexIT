@@ -9,7 +9,7 @@ import { crearCotizacion } from "@/server/actions/tickets/crear-cotizacion";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 
-export function SolicitarCotizacionModal({ ticketId }: { ticketId: string }) {
+export function SolicitarCotizacionModal({ ticketId, monedaSimbolo }: { ticketId: string; monedaSimbolo: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export function SolicitarCotizacionModal({ ticketId }: { ticketId: string }) {
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Monto (S/)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Monto ({monedaSimbolo})</label>
             <input type="number" step="0.01" {...register("monto")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="150.00" />
             {errors.monto && <p className="mt-1 text-xs text-red-600">{errors.monto.message}</p>}
           </div>

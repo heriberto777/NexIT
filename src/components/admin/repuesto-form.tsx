@@ -12,9 +12,10 @@ import { Button } from "@/components/ui/button";
 interface Props {
   modoEdicion?: boolean;
   valoresIniciales?: GuardarRepuestoInput;
+  monedaSimbolo: string;
 }
 
-export function RepuestoForm({ modoEdicion, valoresIniciales }: Props) {
+export function RepuestoForm({ modoEdicion, valoresIniciales, monedaSimbolo }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
 
@@ -86,7 +87,7 @@ export function RepuestoForm({ modoEdicion, valoresIniciales }: Props) {
             <input type="number" min={0} {...register("stockMinimo")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Costo por unidad (S/)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Costo por unidad ({monedaSimbolo})</label>
             <input type="number" min={0} step="0.01" {...register("costoUnidad")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
         </div>

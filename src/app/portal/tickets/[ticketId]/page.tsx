@@ -8,6 +8,8 @@ import { ValidationActions } from "@/components/tickets/validation-actions";
 import { ComentarioForm } from "@/components/portal/comentario-form";
 import { CotizacionActions } from "@/components/portal/cotizacion-actions";
 import { storageService } from "@/server/services/storage.service";
+import { formatCurrency } from "@/lib/utils/currency";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +22,6 @@ const ESTADO_COTIZACION_ESTILO: Record<string, string> = {
 interface PageProps {
   params: Promise<{ ticketId: string }>;
 }
-
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", { dateStyle: "medium", timeStyle: "short" });
 
 const PASOS_FLUJO = [
   { estado: "ABIERTO", label: "Recibido" },
@@ -36,6 +36,8 @@ const ESTADOS_DESCARGABLES = new Set(["RESUELTO", "CERRADO"]);
 export default async function PortalTicketDetailPage({ params }: PageProps) {
   const { ticketId } = await params;
   const sesion = await getSesionActual();
+  const config = await obtenerConfiguracion();
+  const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, { dateStyle: "medium", timeStyle: "short" });
 
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -119,7 +121,7 @@ export default async function PortalTicketDetailPage({ params }: PageProps) {
               <div key={c.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">S/ {c.monto.toNumber().toFixed(2)}</p>
+                    <p className="text-sm font-medium text-gray-900">{formatCurrency(c.monto.toNumber(), config.monedaSimbolo)}</p>
                     <p className="text-sm text-gray-600">{c.descripcion}</p>
                     <p className="text-xs text-gray-400">{FORMATO_FECHA.format(c.fecha)}</p>
                   </div>

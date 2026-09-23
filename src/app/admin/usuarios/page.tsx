@@ -4,10 +4,9 @@ import { rolUsuarioSchema, estadoUsuarioSchema } from "@/lib/zod/usuario.schema"
 import { UsuarioFormModal } from "@/components/admin/usuario-form-modal";
 import { UsuarioEstadoToggle } from "@/components/admin/usuario-estado-toggle";
 import { ResetearPasswordButton } from "@/components/admin/resetear-password-button";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
-
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", { dateStyle: "short", timeStyle: "short" });
 
 const ROL_LABEL: Record<string, string> = {
   ADMIN: "Admin",
@@ -36,7 +35,7 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
   const estado = estadoUsuarioSchema.safeParse(params.estado).success ? params.estado : undefined;
   const q = params.q?.trim() || undefined;
 
-  const [usuarios, clientes] = await Promise.all([
+  const [usuarios, clientes, config] = await Promise.all([
     prisma.usuario.findMany({
       where: {
         rol: rol as never,
@@ -47,8 +46,10 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
       orderBy: { nombre: "asc" },
     }),
     prisma.cliente.findMany({ orderBy: { nombre: "asc" } }),
+    obtenerConfiguracion(),
   ]);
 
+  const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, { dateStyle: "short", timeStyle: "short" });
   const hayFiltros = Boolean(rol || estado || q);
 
   return (

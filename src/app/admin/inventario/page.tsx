@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils/cn";
+import { formatCurrency } from "@/lib/utils/currency";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
 export default async function InventarioPage() {
-  const repuestos = await prisma.repuesto.findMany({ orderBy: { nombre: "asc" } });
+  const [repuestos, config] = await Promise.all([
+    prisma.repuesto.findMany({ orderBy: { nombre: "asc" } }),
+    obtenerConfiguracion(),
+  ]);
   const criticos = repuestos.filter((r) => r.stockActual <= r.stockMinimo);
 
   return (
@@ -29,7 +34,10 @@ export default async function InventarioPage() {
         <div className="rounded-xl border border-gray-200 bg-white p-3">
           <p className="text-xs text-gray-500">Valor total inventario</p>
           <p className="text-2xl font-semibold text-gray-900">
-            S/ {repuestos.reduce((acc, r) => acc + r.stockActual * r.costoUnidad.toNumber(), 0).toFixed(2)}
+            {formatCurrency(
+              repuestos.reduce((acc, r) => acc + r.stockActual * r.costoUnidad.toNumber(), 0),
+              config.monedaSimbolo,
+            )}
           </p>
         </div>
       </div>
@@ -67,7 +75,7 @@ export default async function InventarioPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-gray-600">S/ {r.costoUnidad.toNumber().toFixed(2)}</td>
+                  <td className="px-3 py-2 text-gray-600">{formatCurrency(r.costoUnidad.toNumber(), config.monedaSimbolo)}</td>
                   <td className="px-3 py-2 text-gray-500">{r.ubicacion ?? "—"}</td>
                 </tr>
               );

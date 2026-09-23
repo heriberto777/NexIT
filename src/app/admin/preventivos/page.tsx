@@ -3,10 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { calcularVigenciaPlan, type EstadoVigenciaPlan } from "@/lib/utils/plan-preventivo";
 import { GenerarTicketsPreventivosButton } from "@/components/admin/generar-tickets-preventivos-button";
 import { TogglePlanEstadoButton } from "@/components/admin/toggle-plan-estado-button";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
-
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", { dateStyle: "medium" });
 
 const ESTILOS_VIGENCIA: Record<EstadoVigenciaPlan, { label: string; className: string }> = {
   vencido: { label: "Vencido", className: "bg-red-100 text-red-800" },
@@ -15,14 +14,18 @@ const ESTILOS_VIGENCIA: Record<EstadoVigenciaPlan, { label: string; className: s
 };
 
 export default async function PreventivosPage() {
-  const planes = await prisma.planMantenimientoPreventivo.findMany({
-    include: {
-      activo: { include: { sucursal: { include: { cliente: true } }, categoria: true } },
-      sucursal: { include: { cliente: true } },
-      tecnicoAsignado: true,
-    },
-    orderBy: { proximaFecha: "asc" },
-  });
+  const [planes, config] = await Promise.all([
+    prisma.planMantenimientoPreventivo.findMany({
+      include: {
+        activo: { include: { sucursal: { include: { cliente: true } }, categoria: true } },
+        sucursal: { include: { cliente: true } },
+        tecnicoAsignado: true,
+      },
+      orderBy: { proximaFecha: "asc" },
+    }),
+    obtenerConfiguracion(),
+  ]);
+  const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, { dateStyle: "medium" });
 
   const kpis = {
     total: planes.length,

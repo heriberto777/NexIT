@@ -52,6 +52,9 @@ export default async function ConfiguracionPage() {
           slaHorasMedia: config.slaHorasMedia,
           slaHorasBaja: config.slaHorasBaja,
           diasAnticipacionPreventivos: config.diasAnticipacionPreventivos,
+          monedaCodigo: config.monedaCodigo,
+          monedaSimbolo: config.monedaSimbolo,
+          localeFecha: config.localeFecha,
         }}
       />
     </div>

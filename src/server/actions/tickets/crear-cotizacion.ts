@@ -5,6 +5,8 @@ import { requireUsuario } from "@/server/auth/session";
 import { crearCotizacionSchema } from "@/lib/zod/ticket.schema";
 import type { CrearCotizacionInput } from "@/lib/zod/ticket.schema";
 import { ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
+import { formatCurrency } from "@/lib/utils/currency";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 const ROLES_PERMITIDOS = ["TECNICO", "COORDINADOR", "ADMIN"] as const;
 
@@ -24,6 +26,8 @@ export async function crearCotizacion(input: CrearCotizacionInput) {
     throw new Error("Este ticket no está asignado a este técnico");
   }
 
+  const { monedaSimbolo } = await obtenerConfiguracion();
+
   const cotizacion = await prisma.$transaction(async (tx) => {
     const nueva = await tx.cotizacion.create({
       data: { ticketId, monto, descripcion },
@@ -34,7 +38,7 @@ export async function crearCotizacion(input: CrearCotizacionInput) {
         ticketId,
         usuarioId: usuario.id,
         estadoNuevo: ticket.estado,
-        comentario: `Cotización solicitada por S/ ${monto.toFixed(2)}: ${descripcion}`,
+        comentario: `Cotización solicitada por ${formatCurrency(monto, monedaSimbolo)}: ${descripcion}`,
       },
     });
 
