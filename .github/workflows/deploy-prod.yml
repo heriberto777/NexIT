@@ -71,6 +71,14 @@ jobs:
         # nunca la crea sola, solo falla si no existe. Idempotente: no rompe si ya está.
         run: docker network inspect dev-network >/dev/null 2>&1 || docker network create dev-network
 
+      - name: Actualizar docker-compose.prod.yml y .env.example en el servidor
+        # Sin esto, cambios de infraestructura (puertos, volúmenes, redes) en
+        # docker-compose.prod.yml no se aplican solos — el `pull` de abajo solo trae
+        # la imagen de la app, nunca este archivo. `git pull` en vez de checkout para
+        # no tocar el .env real (que no está trackeado, así que no lo pisa).
+        working-directory: /home/heriberto777/apps/nexit
+        run: git pull --ff-only origin main
+
       - name: Pull de la imagen nueva y reinicio del contenedor
         # Directorio real en el servidor donde vive el clon del repo con su .env de
         # producción (ver DEPLOYMENT.md → "a) Clonar el repositorio y configurar .env").

@@ -242,14 +242,21 @@ instalas ahí — así no hace falta abrir SSH desde GitHub hacia tu servidor).
    sudo usermod -aG docker <usuario-del-runner>
    sudo ./svc.sh stop && sudo ./svc.sh start
    ```
-5. El `working-directory` de `deploy-prod.yml` ya apunta a `/apps/nexit` (la carpeta
-   real del clon en este servidor). Si en algún momento mueves el clon a otra ruta,
-   actualízalo ahí también.
+5. El `working-directory` de `deploy-prod.yml` ya apunta a `/home/heriberto777/apps/nexit`
+   (la carpeta real del clon en este servidor). Si en algún momento mueves el clon a
+   otra ruta, actualízalo ahí también.
 
-A partir de ahí, cada push a `main` (o tag `v*`) construye la imagen, la publica en
-GHCR, y el propio servidor la descarga y reinicia el contenedor automáticamente — sin
-pasos manuales. Sigue siendo válido hacerlo a mano con los comandos de la sección
-anterior si prefieres desplegar de forma controlada en vez de automática.
+A partir de ahí, cada push a `main` (o tag `v*`): construye la imagen, la publica en
+GHCR, el job `deploy` hace `git pull --ff-only` en esa carpeta (para traer cambios de
+`docker-compose.prod.yml` — puertos, volúmenes, red — no solo la imagen de la app), y
+finalmente descarga y reinicia el contenedor. Sin pasos manuales.
+
+`--ff-only` es a propósito: si alguien edita algo directo en el servidor (por ejemplo
+un `.env` distinto que sí quedó trackeado por error, o un cambio manual al compose sin
+commitear), el `git pull` falla en vez de mezclar cambios en automático — revisa el log
+del job en ese caso y resuelve el conflicto a mano antes de reintentar. Sigue siendo
+válido desplegar a mano con los comandos de la sección anterior si prefieres control
+manual en vez de automático.
 
 > **Nota de seguridad**: un runner self-hosted ejecuta literalmente lo que diga el
 > workflow del repo — aceptable aquí porque es un repo privado que tú controlas, pero
