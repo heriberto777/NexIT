@@ -70,7 +70,11 @@ export function NuevoTicketWizard({ sucursales, activos }: { sucursales: Sucursa
       for (const foto of fotos) {
         const formData = new FormData();
         formData.append("file", foto);
-        formData.append("tipo", "OTRO");
+        // FOTO_ANTES, no OTRO: es conceptualmente una foto "antes" (la falla, previa a
+        // cualquier intervención) — así aparece sola, sin cambios adicionales, en la
+        // sección "Antes" que ya existe en /tickets/[id], en el PDF y en cualquier otra
+        // pantalla que filtre evidencias por tipo.
+        formData.append("tipo", "FOTO_ANTES");
         await fetch(`/api/tickets/${id}/evidencias`, { method: "POST", body: formData });
       }
 

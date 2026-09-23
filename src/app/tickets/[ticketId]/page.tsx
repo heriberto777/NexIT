@@ -11,6 +11,7 @@ import { storageService } from "@/server/services/storage.service";
 import { ESTADOS_CON_WIZARD_ACTIVO, ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
 import { formatCurrency } from "@/lib/utils/currency";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { ImageThumbnail } from "@/components/ui/image-thumbnail";
 
 const ESTADOS_GESTIONABLES = new Set(["ABIERTO", "ASIGNADO", "EN_DIAGNOSTICO", "ESPERANDO_REPUESTO", "EN_EJECUCION", "REABIERTO"]);
 
@@ -227,8 +228,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
               <p className="mb-1 text-xs font-medium text-gray-500">Antes ({fotosAntes.length})</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {fotosAntes.map((f) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- galería de evidencia subida por el usuario
-                  <img key={f.id} src={f.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
+                  <ImageThumbnail key={f.id} src={f.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
                 ))}
               </div>
             </div>
@@ -236,8 +236,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
               <p className="mb-1 text-xs font-medium text-gray-500">Después ({fotosDespues.length})</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {fotosDespues.map((f) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- galería de evidencia subida por el usuario
-                  <img key={f.id} src={f.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
+                  <ImageThumbnail key={f.id} src={f.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
                 ))}
               </div>
             </div>

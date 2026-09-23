@@ -10,6 +10,7 @@ import { CotizacionActions } from "@/components/portal/cotizacion-actions";
 import { storageService } from "@/server/services/storage.service";
 import { formatCurrency } from "@/lib/utils/currency";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { ImageThumbnail } from "@/components/ui/image-thumbnail";
 
 export const dynamic = "force-dynamic";
 
@@ -141,8 +142,7 @@ export default async function PortalTicketDetailPage({ params }: PageProps) {
           <h2 className="mb-3 text-sm font-semibold text-gray-900">Fotos</h2>
           <div className="grid grid-cols-4 gap-1.5">
             {evidenciasResueltas.map((e) => (
-              // eslint-disable-next-line @next/next/no-img-element -- galería de evidencia subida por el usuario
-              <img key={e.id} src={e.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
+              <ImageThumbnail key={e.id} src={e.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
             ))}
           </div>
         </section>

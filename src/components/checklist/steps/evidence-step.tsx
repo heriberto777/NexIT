@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Button } from "@/components/ui/button";
+import { ImageThumbnail } from "@/components/ui/image-thumbnail";
 import { WebcamCaptureModal } from "./webcam-capture-modal";
 import type { EvidenciaPlana } from "@/types/ejecucion";
 
@@ -108,8 +109,7 @@ function PhotoZone({
       <p className="text-xs font-medium text-gray-600">{label}</p>
       <div className="grid grid-cols-3 gap-1.5">
         {fotos.map((foto) => (
-          // eslint-disable-next-line @next/next/no-img-element -- miniaturas de fotos subidas por el usuario, no assets estáticos
-          <img key={foto.id} src={foto.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
+          <ImageThumbnail key={foto.id} src={foto.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
         ))}
         <button
           type="button"
