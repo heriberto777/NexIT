@@ -69,7 +69,7 @@ jobs:
       - name: Pull de la imagen nueva y reinicio del contenedor
         # Directorio real en el servidor donde vive el clon del repo con su .env de
         # producción (ver DEPLOYMENT.md → "a) Clonar el repositorio y configurar .env").
-        working-directory: /opt/nexit
+        working-directory: /apps/nexit
         run: |
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d
