@@ -66,6 +66,11 @@ jobs:
     # para otro proyecto en la misma cuenta de GitHub.
     runs-on: [self-hosted, nexit-prod]
     steps:
+      - name: Asegurar que la red externa dev-network exista
+        # docker-compose.prod.yml declara dev-network como "external: true" — Compose
+        # nunca la crea sola, solo falla si no existe. Idempotente: no rompe si ya está.
+        run: docker network inspect dev-network >/dev/null 2>&1 || docker network create dev-network
+
       - name: Pull de la imagen nueva y reinicio del contenedor
         # Directorio real en el servidor donde vive el clon del repo con su .env de
         # producción (ver DEPLOYMENT.md → "a) Clonar el repositorio y configurar .env").
