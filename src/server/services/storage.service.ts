@@ -44,7 +44,9 @@ class LocalStorageProvider implements StorageProvider {
   }
 
   async getPublicUrl(key: string): Promise<string> {
-    return `/uploads/${key}`;
+    // No es "/uploads/${key}" directo (servido por Next.js desde public/) a propósito:
+    // ver el comentario en src/app/api/uploads/[...path]/route.ts.
+    return `/api/uploads/${key}`;
   }
 
   async getBuffer(key: string): Promise<Buffer> {
