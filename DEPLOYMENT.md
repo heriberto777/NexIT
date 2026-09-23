@@ -96,16 +96,17 @@ cargar datos reales desde cero vía la UI.
 
 ## d) Reverse proxy (SSL, WebSockets, uploads grandes)
 
-`nexit` **no publica ningún puerto al host** a propósito (ver comentario en
-`docker-compose.prod.yml`) — mismo patrón que el resto de los backends en este
-servidor. El reverse proxy debe alcanzarlo por nombre de contenedor dentro de
-`dev-network`, no por `127.0.0.1:<puerto>`.
+`nexit` publica el puerto **8089** al host (`"8089:3000"` en
+`docker-compose.prod.yml`) — siguiente libre en el rango `808x` que ya usan los demás
+proyectos de este servidor. Esto es un extra para acceso directo/debug por
+`IP:8089`, no el camino principal: el reverse proxy sigue llegando por nombre de
+contenedor dentro de `dev-network`, sin depender de ese puerto.
 
 **Con Nginx Proxy Manager (el caso real de este servidor)**: en el Proxy Host,
 **Forward Hostname/IP** = `nexit`, **Forward Port** = `3000` (NPM resuelve el nombre
-del contenedor porque comparte la red `dev-network`). Activa "Websockets Support",
-pide el certificado Let's Encrypt desde la misma pantalla, y en la pestaña "Advanced"
-agrega:
+del contenedor porque comparte la red `dev-network` — no hace falta usar el 8089 para
+esto). Activa "Websockets Support", pide el certificado Let's Encrypt desde la misma
+pantalla, y en la pestaña "Advanced" agrega:
 
 ```nginx
 client_max_body_size 20M;
@@ -117,11 +118,8 @@ rechazan con 413 antes de llegar a la app.
 <details>
 <summary>Alternativa: Nginx corriendo directo en el host (no en un contenedor)</summary>
 
-Solo aplica si tu reverse proxy vive fuera de Docker. En ese caso sí necesitas volver
-a publicar el puerto en `docker-compose.prod.yml` (descomentar el bloque `ports:`,
-eligiendo un puerto de host libre — revisa `docker ps` para no chocar con otro
-proyecto) y apuntar `proxy_pass` a `127.0.0.1:<ese puerto>` en vez de al nombre del
-contenedor.
+Solo aplica si tu reverse proxy vive fuera de Docker. En ese caso usa el puerto ya
+publicado, `127.0.0.1:8089`, en vez del nombre del contenedor.
 
 ```nginx
 server {
@@ -143,7 +141,7 @@ server {
     client_max_body_size 20M;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;   # o el puerto publicado en docker-compose.yml
+        proxy_pass http://127.0.0.1:8089;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";

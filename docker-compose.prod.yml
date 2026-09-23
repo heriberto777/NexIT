@@ -27,14 +27,15 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    # Sin publicar puerto al host, a propósito — mismo patrón que el resto de los
-    # backends en este servidor (sistema-del-sol-backend, bonifapp-backend,
-    # ciguainv-backend, etc.): el reverse proxy (Nginx Proxy Manager u otro) también
-    # corre como contenedor en dev-network y llega a este servicio directo por nombre
-    # de contenedor — proxy_pass/Forward Hostname a "nexit", puerto 3000. Si en algún
-    # momento hace falta debug directo desde el host, descomenta:
-    # ports:
-    #   - "3000:3000"
+    # 8089: siguiente libre en el rango 808x que ya usan los demás proyectos de este
+    # servidor (8082–8088 ocupados por core_app/sistema-del-sol/gclab/ciguainv/
+    # catelli-invoice/bonifapp/catelliweb2 — ver docker ps). Esto es ADEMÁS de, no en
+    # vez de, llegar por nombre de contenedor dentro de dev-network: Nginx Proxy
+    # Manager puede seguir apuntando a Forward Hostname=nexit, Forward Port=3000 (no
+    # necesita este puerto); 8089 queda disponible para acceso directo por IP:puerto
+    # o debug sin pasar por el proxy.
+    ports:
+      - "8089:3000"
     volumes:
       # Evidencias/firmas del StorageService local sobreviven a un pull/restart.
       - nexit_uploads:/app/public/uploads
