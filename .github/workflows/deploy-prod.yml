@@ -66,23 +66,26 @@ jobs:
     # para otro proyecto en la misma cuenta de GitHub.
     runs-on: [self-hosted, nexit-prod]
     steps:
+      - name: Checkout
+        # El runner trae el código fresco en cada corrida (usa el GITHUB_TOKEN del
+        # propio job para autenticarse — no hace falta llave SSH ni PAT configurados
+        # a mano en el servidor). Así docker-compose.prod.yml siempre queda al día
+        # con lo que se pusheó, sin mantener un clon persistente aparte.
+        uses: actions/checkout@v4
+
       - name: Asegurar que la red externa dev-network exista
         # docker-compose.prod.yml declara dev-network como "external: true" — Compose
         # nunca la crea sola, solo falla si no existe. Idempotente: no rompe si ya está.
         run: docker network inspect dev-network >/dev/null 2>&1 || docker network create dev-network
 
-      - name: Actualizar docker-compose.prod.yml y .env.example en el servidor
-        # Sin esto, cambios de infraestructura (puertos, volúmenes, redes) en
-        # docker-compose.prod.yml no se aplican solos — el `pull` de abajo solo trae
-        # la imagen de la app, nunca este archivo. `git pull` en vez de checkout para
-        # no tocar el .env real (que no está trackeado, así que no lo pisa).
-        working-directory: /home/heriberto777/apps/nexit
-        run: git pull --ff-only origin main
+      - name: Copiar el .env real de producción al checkout
+        # El .env real (credenciales, DATABASE_URL, etc.) NUNCA vive en git — se creó
+        # una sola vez a mano en esta ruta fija del servidor (ver DEPLOYMENT.md →
+        # "a) Clonar el repositorio y configurar .env") y se reutiliza en cada deploy,
+        # aunque el checkout de arriba sea uno nuevo cada vez.
+        run: cp /home/heriberto777/apps/nexit/.env .env
 
       - name: Pull de la imagen nueva y reinicio del contenedor
-        # Directorio real en el servidor donde vive el clon del repo con su .env de
-        # producción (ver DEPLOYMENT.md → "a) Clonar el repositorio y configurar .env").
-        working-directory: /home/heriberto777/apps/nexit
         run: |
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d

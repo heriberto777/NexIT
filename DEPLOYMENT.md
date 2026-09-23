@@ -242,21 +242,22 @@ instalas ahí — así no hace falta abrir SSH desde GitHub hacia tu servidor).
    sudo usermod -aG docker <usuario-del-runner>
    sudo ./svc.sh stop && sudo ./svc.sh start
    ```
-5. El `working-directory` de `deploy-prod.yml` ya apunta a `/home/heriberto777/apps/nexit`
-   (la carpeta real del clon en este servidor). Si en algún momento mueves el clon a
-   otra ruta, actualízalo ahí también.
+5. Crea el `.env` real de producción **una sola vez**, a mano, en
+   `/home/heriberto777/apps/nexit/.env` (con los valores reales — ver la tabla de
+   variables de la sección "a)" más arriba). Esa ruta **no necesita ser un clon git**:
+   el job `deploy` hace su propio `checkout` del código en cada corrida y solo copia
+   este `.env` hacia ahí, así que esa carpeta existe únicamente para guardar el `.env`
+   persistente entre despliegues. Si mueves el archivo a otra ruta, actualiza el paso
+   "Copiar el .env real de producción al checkout" en `deploy-prod.yml`.
 
 A partir de ahí, cada push a `main` (o tag `v*`): construye la imagen, la publica en
-GHCR, el job `deploy` hace `git pull --ff-only` en esa carpeta (para traer cambios de
-`docker-compose.prod.yml` — puertos, volúmenes, red — no solo la imagen de la app), y
-finalmente descarga y reinicia el contenedor. Sin pasos manuales.
-
-`--ff-only` es a propósito: si alguien edita algo directo en el servidor (por ejemplo
-un `.env` distinto que sí quedó trackeado por error, o un cambio manual al compose sin
-commitear), el `git pull` falla en vez de mezclar cambios en automático — revisa el log
-del job en ese caso y resuelve el conflicto a mano antes de reintentar. Sigue siendo
-válido desplegar a mano con los comandos de la sección anterior si prefieres control
-manual en vez de automático.
+GHCR, el job `deploy` hace `checkout` del código (usando el `GITHUB_TOKEN` del propio
+job — no hace falta SSH ni un token configurado a mano en el servidor), copia el `.env`
+real, y descarga/reinicia el contenedor. Sin pasos manuales, y sin depender de un clon
+persistente que puedas dejar desactualizado o en un estado inconsistente — cada corrida
+usa exactamente el código que se pusheó, siempre. Sigue siendo válido desplegar a mano
+con los comandos de la sección anterior si prefieres control manual en vez de
+automático (en ese caso sí necesitas un clon real, con `git clone`, en el servidor).
 
 > **Nota de seguridad**: un runner self-hosted ejecuta literalmente lo que diga el
 > workflow del repo — aceptable aquí porque es un repo privado que tú controlas, pero
