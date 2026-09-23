@@ -195,6 +195,51 @@ docker run --rm \
 docker exec postgres-core pg_dump -U postgres nexit_db > backups/nexit_db-$(date +%Y%m%d).sql
 ```
 
+## Despliegue automático (self-hosted runner de GitHub Actions)
+
+`.github/workflows/deploy-prod.yml` tiene dos jobs: `build-and-push` (compila y publica
+en GHCR, corre en un runner de GitHub, sin acceso a tu servidor) y `deploy` (hace
+`pull`/`up -d` en tu servidor de producción, corre en un runner **self-hosted** que tú
+instalas ahí — así no hace falta abrir SSH desde GitHub hacia tu servidor).
+
+**Instalar el runner** (una sola vez, en el servidor de producción):
+
+1. En el repo de GitHub: **Settings → Actions → Runners → New self-hosted runner** →
+   elige `Linux`. Copia los comandos que te muestra ahí — incluyen un token temporal
+   que expira rápido, no lo reutilices de otra sesión.
+2. Al correr `./config.sh`, cuando te pregunte por las **labels**, agrega `nexit-prod`
+   (además de la `self-hosted` que ya trae por defecto). El workflow usa
+   `runs-on: [self-hosted, nexit-prod]` específicamente para eso — si en el futuro
+   instalas otro runner self-hosted en el mismo servidor para otro proyecto
+   (bonifapp/ciguacash/sistema-del-sol), cada uno necesita su propia label distintiva
+   para que los jobs no crucen entre proyectos.
+3. Instalarlo como servicio (systemd), para que sobreviva a reinicios y no dependa de
+   una sesión SSH abierta:
+   ```bash
+   sudo ./svc.sh install
+   sudo ./svc.sh start
+   sudo ./svc.sh status
+   ```
+4. El usuario bajo el que corre el servicio necesita poder ejecutar `docker
+   compose` sin `sudo` — agrégalo al grupo `docker` y reinicia el servicio del runner:
+   ```bash
+   sudo usermod -aG docker <usuario-del-runner>
+   sudo ./svc.sh stop && sudo ./svc.sh start
+   ```
+5. El `working-directory` de `deploy-prod.yml` ya apunta a `/apps/nexit` (la carpeta
+   real del clon en este servidor). Si en algún momento mueves el clon a otra ruta,
+   actualízalo ahí también.
+
+A partir de ahí, cada push a `main` (o tag `v*`) construye la imagen, la publica en
+GHCR, y el propio servidor la descarga y reinicia el contenedor automáticamente — sin
+pasos manuales. Sigue siendo válido hacerlo a mano con los comandos de la sección
+anterior si prefieres desplegar de forma controlada en vez de automática.
+
+> **Nota de seguridad**: un runner self-hosted ejecuta literalmente lo que diga el
+> workflow del repo — aceptable aquí porque es un repo privado que tú controlas, pero
+> nunca habilites "Allow running workflows from fork pull requests" en un repo con
+> colaboradores externos si usas self-hosted runners.
+
 ## Chequeo periódico de SLA (webhook `SLA_EN_RIESGO`)
 
 Next.js no trae un scheduler propio, así que la detección de "ticket a punto de vencer

@@ -56,3 +56,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    # Corre en el runner self-hosted instalado en el propio servidor de producción
+    # (ver DEPLOYMENT.md → sección "Despliegue automático") — por eso no hace falta
+    # SSH: el job YA se ejecuta en esa máquina. La etiqueta "nexit-prod" (además de
+    # "self-hosted") evita que este job caiga en otro runner self-hosted que exista
+    # para otro proyecto en la misma cuenta de GitHub.
+    runs-on: [self-hosted, nexit-prod]
+    steps:
+      - name: Pull de la imagen nueva y reinicio del contenedor
+        # Directorio real en el servidor donde vive el clon del repo con su .env de
+        # producción (ver DEPLOYMENT.md → "a) Clonar el repositorio y configurar .env").
+        working-directory: /apps/nexit
+        run: |
+          docker compose -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.prod.yml up -d
