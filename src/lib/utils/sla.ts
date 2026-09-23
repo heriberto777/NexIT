@@ -34,3 +34,22 @@ export function calcularEstadoSla(ticket: TicketConSla, defaultsHoras: Record<Pr
   if (porcentaje >= 0.8) return "en_riesgo";
   return "ok";
 }
+
+interface TicketResuelto {
+  prioridad: Prioridad;
+  fechaCreacion: Date;
+  fechaResolucion: Date | null;
+  sla: { tiempoResolucionMin: number } | null;
+}
+
+// Distinto de calcularEstadoSla (que solo evalúa tickets ACTIVOS, en tiempo real): esto
+// mide cumplimiento histórico — ¿el tiempo real hasta fechaResolucion quedó dentro del
+// SLA pactado o no? null si el ticket aún no se ha resuelto (nada que medir todavía).
+export function cumplioSla(ticket: TicketResuelto, defaultsHoras: Record<Prioridad, number> = FALLBACK_HORAS): boolean | null {
+  if (!ticket.fechaResolucion) return null;
+
+  const tiempoResolucionMin = ticket.sla?.tiempoResolucionMin ?? defaultsHoras[ticket.prioridad] * 60;
+  const minutosReales = (ticket.fechaResolucion.getTime() - ticket.fechaCreacion.getTime()) / 60_000;
+
+  return minutosReales <= tiempoResolucionMin;
+}
