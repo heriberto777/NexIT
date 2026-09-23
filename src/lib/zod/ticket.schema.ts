@@ -17,18 +17,22 @@ export const estadoTicketSchema = z.enum([
   "CANCELADO",
 ]);
 
-// Creación de ticket desde el portal del cliente
+// Creación manual por staff (Admin/Coordinador/Técnico) — típicamente cuando un cliente
+// llama por teléfono en vez de reportar desde el portal. clienteId viaja en el input
+// (a diferencia de crearTicketPortalSchema, donde sale de la sesión) porque aquí el
+// staff elige a qué cliente pertenece.
 export const crearTicketSchema = z.object({
+  clienteId: z.string().cuid(),
   sucursalId: z.string().cuid(),
   activoId: optionalCuid(),
+  ubicacionNoCatalogada: z.string().trim().max(200).optional(),
   tipo: tipoTicketSchema,
   categoriaSoporte: categoriaSoporteSchema,
   titulo: z.string().trim().min(5, "El título debe tener al menos 5 caracteres").max(120),
   descripcion: z.string().trim().min(20, "Describe el problema con al menos 20 caracteres").max(4000),
-  prioridadPercibida: prioridadSchema,
-  contactoNombre: z.string().trim().min(2).max(120),
-  contactoTelefono: z.string().trim().min(7).max(20),
-  adjuntos: z.array(z.string().url()).max(10).optional(),
+  prioridad: prioridadSchema,
+  contactoNombre: z.string().trim().min(2, "Indica con quién se habló").max(120),
+  contactoTelefono: z.string().trim().min(7, "Indica un teléfono de contacto").max(20),
 });
 export type CrearTicketInput = z.infer<typeof crearTicketSchema>;
 

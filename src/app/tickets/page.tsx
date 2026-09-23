@@ -56,7 +56,12 @@ export default async function TicketsPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 bg-gray-50 px-4 py-6">
-      <h1 className="text-lg font-semibold text-gray-900">{esTecnico ? "Mis tickets" : "Tickets"}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold text-gray-900">{esTecnico ? "Mis tickets" : "Tickets"}</h1>
+        <Link href="/tickets/nuevo" className="whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
+          + Crear ticket
+        </Link>
+      </div>
 
       <div className={`grid grid-cols-2 gap-3 ${esTecnico ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
         <KpiCard label="Total" value={kpis.total} />
