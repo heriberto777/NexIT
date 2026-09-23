@@ -153,7 +153,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
                     {ESTADOS_CON_WIZARD_ACTIVO.has(t.estado) ? (
                       <Link
                         href={`/tickets/${t.id}/ejecucion`}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                        className="whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
                       >
                         Continuar atención
                       </Link>

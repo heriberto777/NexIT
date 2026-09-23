@@ -46,7 +46,7 @@ export function CloseStep({
 
       <div className="flex gap-2">
         <Button type="button" variant="secondary" onClick={onGuardarParaDespues} className="flex-1">
-          Guardar y continuar después
+          Guardar para después
         </Button>
         <Button
           type="button"

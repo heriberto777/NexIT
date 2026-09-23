@@ -104,7 +104,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
         </Link>
         <a
           href={`/api/tickets/${ticket.id}/pdf`}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           Descargar informe PDF
         </a>
