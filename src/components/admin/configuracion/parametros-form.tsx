@@ -74,6 +74,15 @@ export function ParametrosForm({ valores }: { valores: ParametrosValues }) {
       </div>
 
       <div className="border-t border-gray-100 pt-4">
+        <label className="mb-1 block text-sm font-medium text-gray-700">Fotos mínimas en el wizard de ejecución</label>
+        <p className="mb-2 text-xs text-gray-400">
+          Cuántas fotos &quot;antes&quot; y &quot;después&quot; exige el paso de evidencia antes de dejar avanzar al técnico. Ponlo en 0 para no exigir ninguna.
+        </p>
+        <input type="number" min={0} max={20} {...register("fotosMinimasEvidencia")} className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        {errors.fotosMinimasEvidencia && <p className="mt-1 text-xs text-red-600">{errors.fotosMinimasEvidencia.message}</p>}
+      </div>
+
+      <div className="border-t border-gray-100 pt-4">
         <p className="mb-2 text-sm font-medium text-gray-700">Moneda y formato de fecha</p>
         <p className="mb-3 text-xs text-gray-400">
           Usado en montos de cotizaciones/repuestos, PDFs de informe de servicio y fechas mostradas en toda la aplicación.

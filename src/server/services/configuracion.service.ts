@@ -32,6 +32,7 @@ function defaultsDesdeEnv(): Omit<ConfiguracionSistema, "id" | "actualizadoEn"> 
     monedaCodigo: process.env.MONEDA_CODIGO ?? "DOP",
     monedaSimbolo: process.env.MONEDA_SIMBOLO ?? "RD$",
     localeFecha: process.env.LOCALE_FECHA ?? "es-DO",
+    fotosMinimasEvidencia: process.env.FOTOS_MINIMAS_EVIDENCIA ? Number(process.env.FOTOS_MINIMAS_EVIDENCIA) : 1,
   };
 }
 

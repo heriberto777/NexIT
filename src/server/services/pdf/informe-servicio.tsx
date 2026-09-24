@@ -61,7 +61,7 @@ export interface InformeServicioProps {
   sucursal: { nombre: string; direccion: string; ciudad: string };
   activo: { categoria: string; marca: string; modelo: string; numeroSerie: string } | null;
   tecnico: { nombre: string } | null;
-  checklist: { descripcion: string; respuesta: string; observacion: string | null }[];
+  checklist: { descripcion: string; respuesta: string; observacion: string | null; fotoDataUri: string | null }[];
   fotosAntes: string[];
   fotosDespues: string[];
   repuestos: { nombre: string; cantidad: number; costoTotal: number }[];
@@ -177,10 +177,16 @@ export function InformeServicioDocument({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Checklist de mantenimiento</Text>
             {checklist.map((item, i) => (
-              <View key={i} style={styles.checklistRow}>
-                <Text style={styles.checklistDesc}>{item.descripcion}</Text>
-                <Text style={styles.checklistResp}>{item.respuesta}</Text>
-                <Text style={{ flex: 1.5, color: "#6b7280" }}>{item.observacion ?? ""}</Text>
+              <View key={i} style={{ borderBottom: "0.5 solid #f3f4f6", paddingVertical: 4 }}>
+                <View style={{ flexDirection: "row" }}>
+                  <Text style={styles.checklistDesc}>{item.descripcion}</Text>
+                  <Text style={styles.checklistResp}>{item.respuesta}</Text>
+                  <Text style={{ flex: 1.5, color: "#6b7280" }}>{item.observacion ?? ""}</Text>
+                </View>
+                {item.fotoDataUri && (
+                  // eslint-disable-next-line jsx-a11y/alt-text -- Image de @react-pdf/renderer, no <img> HTML
+                  <Image src={item.fotoDataUri} style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 3, marginTop: 3 }} />
+                )}
               </View>
             ))}
           </View>

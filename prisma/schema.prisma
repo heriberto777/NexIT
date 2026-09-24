@@ -152,6 +152,10 @@ model ConfiguracionSistema {
   slaHorasMedia               Int @default(24)
   slaHorasBaja                Int @default(48)
   diasAnticipacionPreventivos Int @default(7)
+  // Mínimo de fotos "antes"/"después" que exige el paso de evidencia del wizard de
+  // ejecución para poder avanzar — antes era 2 fijo en el código (MIN_FOTOS en
+  // evidence-step.tsx), sin forma de ajustarlo por instalación.
+  fotosMinimasEvidencia       Int @default(1)
 
   // Localización — antes hardcodeada como soles peruanos ("S/", en 9 sitios
   // distintos) y fechas en es-PE (en otros 9 sitios distintos), sin relación con el
@@ -421,6 +425,10 @@ model TicketChecklistRespuesta {
   checklistItem   ChecklistItemTemplate @relation(fields: [checklistItemId], references: [id])
   respuesta       String
   observacion     String?
+  // Key del storage (igual que Evidencia.urlArchivo — nunca una URL ya resuelta), no un
+  // FK a Evidencia: es una foto de ESE ítem puntual del checklist, no una evidencia
+  // general antes/después del ticket.
+  fotoArchivo     String?
 
   @@unique([ticketId, checklistItemId])
   @@map("ticket_checklist_respuestas")

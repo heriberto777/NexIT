@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSesionActual } from "@/server/auth/session";
 import { ExecutionWizard } from "@/components/checklist/execution-wizard";
 import { storageService } from "@/server/services/storage.service";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 // Esta pantalla depende de datos siempre frescos del ticket (estado, evidencias, firma)
 // y de sesión del técnico — nunca debe pre-renderizarse estáticamente en el build.
@@ -60,10 +61,14 @@ export default async function EjecucionPage({ params }: PageProps) {
       })
     : null;
 
-  const repuestos = await prisma.repuesto.findMany({ orderBy: { nombre: "asc" } });
+  const [repuestos, config] = await Promise.all([
+    prisma.repuesto.findMany({ orderBy: { nombre: "asc" } }),
+    obtenerConfiguracion(),
+  ]);
 
   return (
     <ExecutionWizard
+      fotosMinimasEvidencia={config.fotosMinimasEvidencia}
       ticket={{
         id: ticket.id,
         numeroTicket: ticket.numeroTicket,

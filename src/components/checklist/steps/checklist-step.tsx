@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { tipoRespuestaChecklistSchema, type GuardarChecklistInput } from "@/lib/zod/checklist.schema";
 import type { ChecklistItemPlano } from "@/types/ejecucion";
 import { Button } from "@/components/ui/button";
+import { ImageThumbnail } from "@/components/ui/image-thumbnail";
 
 interface Props {
   ticketId: string;
@@ -27,6 +29,7 @@ const checklistFormSchema = z.object({
       tipoRespuesta: tipoRespuestaChecklistSchema,
       respuesta: z.string().min(1, "Este campo es obligatorio"),
       observacion: z.string().optional(),
+      fotoArchivo: z.string().optional(),
     }),
   ),
 });
@@ -37,10 +40,15 @@ function defaultRespuesta(tipo: ChecklistItemPlano["tipoRespuesta"]) {
 }
 
 export function ChecklistStep({ ticketId, items, isPending, onSubmit }: Props) {
+  const [fotosPorIndice, setFotosPorIndice] = useState<Record<number, string>>({});
+  const [subiendoIndice, setSubiendoIndice] = useState<number | null>(null);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<ChecklistFormValues>({
     resolver: zodResolver(checklistFormSchema),
@@ -54,6 +62,29 @@ export function ChecklistStep({ ticketId, items, isPending, onSubmit }: Props) {
       })),
     },
   });
+
+  // Se sube de inmediato (igual que la evidencia general) para que el técnico vea la
+  // miniatura al momento — el submit final solo manda la key ya subida, no el archivo.
+  async function handleFoto(index: number, file: File) {
+    setErrorFoto(null);
+    setSubiendoIndice(index);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/tickets/${ticketId}/checklist-foto`, { method: "POST", body: formData });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}) as { error?: string });
+        throw new Error(body.error ?? "No se pudo subir la foto");
+      }
+      const { key, url } = (await res.json()) as { key: string; url: string };
+      setValue(`respuestas.${index}.fotoArchivo`, key);
+      setFotosPorIndice((prev) => ({ ...prev, [index]: url }));
+    } catch (err) {
+      setErrorFoto(err instanceof Error ? err.message : "No se pudo subir la foto");
+    } finally {
+      setSubiendoIndice(null);
+    }
+  }
 
   // Sin esto, un ticket sin activo asociado (o cuya categoría no tiene checklist
   // configurado, ej. "Instalación de punto de red adicional") dejaba al técnico
@@ -151,9 +182,31 @@ export function ChecklistStep({ ticketId, items, isPending, onSubmit }: Props) {
               )}
 
               {respuestaError && <p className="text-xs text-red-600">{respuestaError.message}</p>}
+
+              <div className="pt-1">
+                {fotosPorIndice[index] ? (
+                  <ImageThumbnail src={fotosPorIndice[index]} alt="" className="h-16 w-16 rounded-md object-cover" />
+                ) : (
+                  <label className="inline-block cursor-pointer text-xs text-blue-600 underline">
+                    {subiendoIndice === index ? "Subiendo..." : "+ Foto (opcional)"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={subiendoIndice !== null}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFoto(index, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
             </div>
           );
         })}
+        {errorFoto && <p className="text-xs text-red-600">{errorFoto}</p>}
       </section>
 
       <Button type="submit" disabled={isPending} className="w-full">

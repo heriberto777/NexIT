@@ -46,13 +46,17 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Ticket no encontrado" }, { status: 404 });
   }
 
-  const [fotosAntesRaw, fotosDespuesRaw, firmaUri, config] = await Promise.all([
+  const [fotosAntesRaw, fotosDespuesRaw, firmaUri, config, checklistFotos] = await Promise.all([
     Promise.all(ticket.evidencias.filter((e) => e.tipo === "FOTO_ANTES").map((e) => keyToDataUri(e.urlArchivo))),
     Promise.all(ticket.evidencias.filter((e) => e.tipo === "FOTO_DESPUES").map((e) => keyToDataUri(e.urlArchivo))),
     ticket.firmas[0] ? keyToDataUri(ticket.firmas[0].urlFirmaImagen) : Promise.resolve(null),
     obtenerConfiguracion(),
+    Promise.all(
+      ticket.checklistRespuestas.map(async (r) => [r.id, r.fotoArchivo ? await keyToDataUri(r.fotoArchivo) : null] as const),
+    ),
   ]);
   const logoBase64 = config.empresaLogoUrl ? await keyToDataUri(config.empresaLogoUrl) : null;
+  const fotoPorRespuestaId = new Map(checklistFotos);
 
   const checklistOrdenado = [...ticket.checklistRespuestas].sort(
     (a, b) => a.checklistItem.orden - b.checklistItem.orden,
@@ -98,6 +102,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         descripcion: r.checklistItem.descripcion,
         respuesta: r.respuesta,
         observacion: r.observacion,
+        fotoDataUri: fotoPorRespuestaId.get(r.id) ?? null,
       }))}
       fotosAntes={fotosAntesRaw.filter((x): x is string => x !== null)}
       fotosDespues={fotosDespuesRaw.filter((x): x is string => x !== null)}

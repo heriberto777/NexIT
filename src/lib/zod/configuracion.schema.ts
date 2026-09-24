@@ -36,5 +36,6 @@ export const guardarParametrosSchema = z.object({
   monedaCodigo: z.string().trim().length(3, "Usa el código ISO 4217 de 3 letras (ej. DOP, USD)").toUpperCase(),
   monedaSimbolo: z.string().trim().min(1).max(10),
   localeFecha: z.string().trim().min(2).max(20),
+  fotosMinimasEvidencia: z.coerce.number().int().min(0).max(20),
 });
 export type GuardarParametrosInput = z.infer<typeof guardarParametrosSchema>;

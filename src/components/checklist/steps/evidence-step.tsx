@@ -9,13 +9,12 @@ import type { EvidenciaPlana } from "@/types/ejecucion";
 interface Props {
   ticketId: string;
   evidencias: EvidenciaPlana[];
+  fotosMinimas: number;
   onEvidenciaSubida: (evidencia: EvidenciaPlana) => void;
   onContinue: () => void;
 }
 
-const MIN_FOTOS = 2;
-
-export function EvidenceStep({ ticketId, evidencias, onEvidenciaSubida, onContinue }: Props) {
+export function EvidenceStep({ ticketId, evidencias, fotosMinimas, onEvidenciaSubida, onContinue }: Props) {
   const [uploading, setUploading] = useState<"FOTO_ANTES" | "FOTO_DESPUES" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const antesInputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +46,7 @@ export function EvidenceStep({ ticketId, evidencias, onEvidenciaSubida, onContin
     }
   }
 
-  const puedeContinuar = fotosAntes.length >= MIN_FOTOS && fotosDespues.length >= MIN_FOTOS;
+  const puedeContinuar = fotosAntes.length >= fotosMinimas && fotosDespues.length >= fotosMinimas;
 
   return (
     <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
@@ -56,7 +55,7 @@ export function EvidenceStep({ ticketId, evidencias, onEvidenciaSubida, onContin
 
       <div className="grid grid-cols-2 gap-4">
         <PhotoZone
-          label={`Fotos antes (${fotosAntes.length}/${MIN_FOTOS} mín.)`}
+          label={`Fotos antes (${fotosAntes.length}/${fotosMinimas} mín.)`}
           fotos={fotosAntes}
           uploading={uploading === "FOTO_ANTES"}
           inputRef={antesInputRef}
@@ -64,7 +63,7 @@ export function EvidenceStep({ ticketId, evidencias, onEvidenciaSubida, onContin
           onSelect={(file) => handleFile("FOTO_ANTES", file)}
         />
         <PhotoZone
-          label={`Fotos después (${fotosDespues.length}/${MIN_FOTOS} mín.)`}
+          label={`Fotos después (${fotosDespues.length}/${fotosMinimas} mín.)`}
           fotos={fotosDespues}
           uploading={uploading === "FOTO_DESPUES"}
           inputRef={despuesInputRef}

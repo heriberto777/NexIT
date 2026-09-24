@@ -86,14 +86,20 @@ export default async function TicketDetailPage({ params }: PageProps) {
 
   // Las columnas urlArchivo/urlFirmaImagen guardan la KEY del storage, no una URL
   // usable directo — se resuelve aquí, una vez por carga de la página.
-  const [evidenciasResueltas, firmasResueltas] = await Promise.all([
+  const [evidenciasResueltas, firmasResueltas, checklistConFoto] = await Promise.all([
     Promise.all(ticket.evidencias.map(async (e) => ({ ...e, urlArchivo: await storageService.getPublicUrl(e.urlArchivo) }))),
     Promise.all(ticket.firmas.map(async (f) => ({ ...f, urlFirmaImagen: await storageService.getPublicUrl(f.urlFirmaImagen) }))),
+    Promise.all(
+      ticket.checklistRespuestas.map(async (r) => ({
+        ...r,
+        fotoUrl: r.fotoArchivo ? await storageService.getPublicUrl(r.fotoArchivo) : null,
+      })),
+    ),
   ]);
 
   const fotosAntes = evidenciasResueltas.filter((e) => e.tipo === "FOTO_ANTES");
   const fotosDespues = evidenciasResueltas.filter((e) => e.tipo === "FOTO_DESPUES");
-  const checklistOrdenado = [...ticket.checklistRespuestas].sort(
+  const checklistOrdenado = [...checklistConFoto].sort(
     (a, b) => a.checklistItem.orden - b.checklistItem.orden,
   );
 
@@ -212,6 +218,11 @@ export default async function TicketDetailPage({ params }: PageProps) {
                 <div>
                   <p className="text-gray-800">{r.checklistItem.descripcion}</p>
                   {r.observacion && <p className="text-xs text-gray-500">{r.observacion}</p>}
+                  {r.fotoUrl && (
+                    <div className="mt-1.5">
+                      <ImageThumbnail src={r.fotoUrl} alt="" className="h-16 w-16 rounded-md object-cover" />
+                    </div>
+                  )}
                 </div>
                 <span className="shrink-0 font-medium text-gray-900">{r.respuesta}</span>
               </div>

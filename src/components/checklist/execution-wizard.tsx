@@ -26,6 +26,7 @@ interface Props {
   checklistItems: ChecklistItemPlano[];
   repuestosDisponibles: RepuestoPlano[];
   evidenciasIniciales: EvidenciaPlana[];
+  fotosMinimasEvidencia: number;
 }
 
 // El estado del wizard vivía SOLO en memoria del componente, nunca derivado del ticket
@@ -35,20 +36,20 @@ interface Props {
 // historial (visto en pruebas reales de esta conversación). No hay un estado por-paso
 // explícito en Ticket — EN_DIAGNOSTICO cubre diagnóstico/checklist/evidencia/repuestos
 // por igual — así que esto es una heurística con las señales concretas que sí tenemos.
-function calcularPasoInicial(ticket: TicketEjecucionData, evidenciasIniciales: EvidenciaPlana[]): number {
+function calcularPasoInicial(ticket: TicketEjecucionData, evidenciasIniciales: EvidenciaPlana[], fotosMinimasEvidencia: number): number {
   if (!ticket.fechaInicioAtencion) return 1;
   if (ticket.tieneFirma) return 6;
 
   const fotosAntes = evidenciasIniciales.filter((e) => e.tipo === "FOTO_ANTES").length;
   const fotosDespues = evidenciasIniciales.filter((e) => e.tipo === "FOTO_DESPUES").length;
-  if (fotosAntes >= 2 && fotosDespues >= 2) return 4; // evidencia mínima ya cumplida -> repuestos
+  if (fotosAntes >= fotosMinimasEvidencia && fotosDespues >= fotosMinimasEvidencia) return 4; // evidencia mínima ya cumplida -> repuestos
   if (fotosAntes > 0 || fotosDespues > 0) return 3; // ya empezó a subir fotos
   return 2; // ya hizo check-in — evita repetirlo y duplicar el historial
 }
 
-export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, evidenciasIniciales }: Props) {
+export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, evidenciasIniciales, fotosMinimasEvidencia }: Props) {
   const router = useRouter();
-  const [step, setStep] = useState(() => calcularPasoInicial(ticket, evidenciasIniciales));
+  const [step, setStep] = useState(() => calcularPasoInicial(ticket, evidenciasIniciales, fotosMinimasEvidencia));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -194,6 +195,7 @@ export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, 
           <EvidenceStep
             ticketId={ticket.id}
             evidencias={evidencias}
+            fotosMinimas={fotosMinimasEvidencia}
             onEvidenciaSubida={(evidencia) => setEvidencias((prev) => [...prev, evidencia])}
             onContinue={() => setStep(4)}
           />

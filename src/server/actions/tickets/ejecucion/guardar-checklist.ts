@@ -25,10 +25,12 @@ export async function guardarChecklist(input: GuardarChecklistInput) {
           checklistItemId: r.checklistItemId,
           respuesta: String(r.respuesta),
           observacion: r.observacion,
+          fotoArchivo: r.fotoArchivo,
         },
         update: {
           respuesta: String(r.respuesta),
           observacion: r.observacion,
+          fotoArchivo: r.fotoArchivo,
         },
       }),
     ),

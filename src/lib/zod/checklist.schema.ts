@@ -5,6 +5,10 @@ export const tipoRespuestaChecklistSchema = z.enum(["BOOLEANO", "TEXTO", "NUMERO
 const baseRespuesta = {
   checklistItemId: z.string().cuid(),
   observacion: z.string().trim().max(500).optional(),
+  // Key del storage (no URL resuelta), subida aparte vía POST a
+  // /api/tickets/[ticketId]/checklist-foto antes de este submit — igual patrón que
+  // evidencias, pero una sola foto por ítem, no una galería.
+  fotoArchivo: z.string().optional(),
 };
 
 const respuestaBooleanoSchema = z.object({
