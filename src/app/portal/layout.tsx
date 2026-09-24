@@ -48,6 +48,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
     <div className="min-h-screen bg-gray-50">
       <MainNav
         brand={cliente?.nombre ?? "Portal"}
+        brandHref="/portal"
         links={[
           { href: "/portal", label: "Inicio" },
           { href: "/portal/tickets", label: "Mis tickets" },

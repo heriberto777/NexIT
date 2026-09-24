@@ -3,6 +3,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
 
 const NAV = [
+  { href: "/admin", label: "Dashboard" },
   { href: "/tickets", label: "Tickets" },
   { href: "/admin/clientes", label: "Clientes" },
   { href: "/admin/activos", label: "Activos" },
@@ -16,7 +17,7 @@ const NAV = [
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainNav brand="NexIT Admin" links={NAV}>
+      <MainNav brand="NexIT Admin" brandHref="/admin" links={NAV}>
         <LogoutButton />
       </MainNav>
       {children}

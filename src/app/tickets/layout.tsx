@@ -4,6 +4,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
 
 const NAV_ADMIN = [
+  { href: "/admin", label: "Dashboard" },
   { href: "/tickets", label: "Tickets" },
   { href: "/admin/clientes", label: "Clientes" },
   { href: "/admin/activos", label: "Activos" },
@@ -22,11 +23,12 @@ const NAV_TECNICO = [{ href: "/tickets", label: "Tickets" }];
 // ya la hace middleware.ts, así que aquí solo decidimos qué nav mostrar).
 export default async function TicketsLayout({ children }: { children: ReactNode }) {
   const sesion = await getSesionActual();
-  const nav = sesion?.rol === "TECNICO" ? NAV_TECNICO : NAV_ADMIN;
+  const esTecnico = sesion?.rol === "TECNICO";
+  const nav = esTecnico ? NAV_TECNICO : NAV_ADMIN;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainNav brand="NexIT" links={nav}>
+      <MainNav brand="NexIT" brandHref={esTecnico ? "/tickets" : "/admin"} links={nav}>
         <LogoutButton />
       </MainNav>
       {children}

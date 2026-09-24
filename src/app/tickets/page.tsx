@@ -9,6 +9,7 @@ import { calcularEstadoSla } from "@/lib/utils/sla";
 import { obtenerConfiguracion, slaHorasPorPrioridad } from "@/server/services/configuracion.service";
 import { ESTADOS_CON_WIZARD_ACTIVO } from "@/lib/utils/ticket-estado";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { TicketCard } from "@/components/tickets/ticket-card";
 
 export const dynamic = "force-dynamic";
 
@@ -116,7 +117,18 @@ export default async function TicketsPage({ searchParams }: PageProps) {
         )}
       </form>
 
-      <TableScroll>
+      <div className="space-y-2 sm:hidden">
+        {conSla.map((t) => (
+          <TicketCard key={t.id} ticket={t} fecha={FORMATO_FECHA.format(t.fechaCreacion)} esTecnico={esTecnico} />
+        ))}
+        {tickets.length === 0 && (
+          <p className="rounded-xl border border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-400">
+            {esTecnico ? "No tienes tickets asignados por ahora." : "No hay tickets que coincidan con los filtros."}
+          </p>
+        )}
+      </div>
+
+      <TableScroll className="hidden sm:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-left text-xs text-gray-500">

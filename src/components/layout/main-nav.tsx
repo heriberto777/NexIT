@@ -13,6 +13,7 @@ export interface NavLinkItem {
 
 interface Props {
   brand: string;
+  brandHref: string;
   links: NavLinkItem[];
   children?: ReactNode; // LogoutButton, DevUserSwitcher, etc.
 }
@@ -21,7 +22,7 @@ interface Props {
 // fila flex sin wrap: en mobile la página entera desbordaba y "Cerrar sesión" quedaba
 // fuera de la pantalla sin ninguna pista de que había que hacer scroll horizontal. A
 // partir de md: se ve la fila original; debajo de md: colapsa a un menú hamburguesa.
-export function MainNav({ brand, links, children }: Props) {
+export function MainNav({ brand, brandHref, links, children }: Props) {
   const [abierto, setAbierto] = useState(false);
 
   function claseLink(item: NavLinkItem) {
@@ -32,7 +33,9 @@ export function MainNav({ brand, links, children }: Props) {
     <nav className="border-b border-gray-200 bg-white px-4 py-3">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          <span className="max-w-[9rem] truncate text-sm font-semibold text-gray-900 sm:max-w-none">{brand}</span>
+          <Link href={brandHref} className="max-w-[9rem] truncate text-sm font-semibold text-gray-900 hover:text-blue-600 sm:max-w-none">
+            {brand}
+          </Link>
           <div className="hidden items-center gap-4 md:flex">
             {links.map((item) => (
               <Link key={item.href} href={item.href} className={claseLink(item)}>
