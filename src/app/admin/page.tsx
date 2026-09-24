@@ -107,7 +107,7 @@ export default async function AdminDashboardPage() {
   };
   const conteoVigencia = { Vencido: 0, "Próximo a vencer": 0, Programado: 0 };
   for (const p of planes) {
-    conteoVigencia[vigenciaLabel[calcularVigenciaPlan(p.proximaFecha)]] += 1;
+    conteoVigencia[vigenciaLabel[calcularVigenciaPlan(p.proximaFecha, config.diasVentanaProximoPreventivo)]] += 1;
   }
   const preventivosPorVigencia = (Object.entries(conteoVigencia) as [keyof typeof conteoVigencia, number][]).map(
     ([vigencia, cantidad]) => ({ vigencia, cantidad }),

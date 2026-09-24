@@ -5,12 +5,14 @@ import { BrandingForm, type BrandingValues } from "@/components/admin/configurac
 import { SmtpForm, type SmtpValues } from "@/components/admin/configuracion/smtp-form";
 import { WebhooksForm, type WebhooksValues } from "@/components/admin/configuracion/webhooks-form";
 import { ParametrosForm, type ParametrosValues } from "@/components/admin/configuracion/parametros-form";
+import { CategoriasForm, type CategoriaActivoValue } from "@/components/admin/configuracion/categorias-form";
 
 const TABS = [
   { id: "branding", label: "Perfil de la empresa" },
   { id: "smtp", label: "Servidor de correo" },
   { id: "webhooks", label: "Integraciones" },
   { id: "parametros", label: "Parámetros y SLA" },
+  { id: "categorias", label: "Categorías de activo" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -21,9 +23,10 @@ interface Props {
   smtp: SmtpValues;
   webhooks: WebhooksValues;
   parametros: ParametrosValues;
+  categorias: CategoriaActivoValue[];
 }
 
-export function ConfiguracionTabs({ branding, logoUrl, smtp, webhooks, parametros }: Props) {
+export function ConfiguracionTabs({ branding, logoUrl, smtp, webhooks, parametros, categorias }: Props) {
   const [tab, setTab] = useState<TabId>("branding");
 
   return (
@@ -47,6 +50,7 @@ export function ConfiguracionTabs({ branding, logoUrl, smtp, webhooks, parametro
       {tab === "smtp" && <SmtpForm valores={smtp} />}
       {tab === "webhooks" && <WebhooksForm valores={webhooks} />}
       {tab === "parametros" && <ParametrosForm valores={parametros} />}
+      {tab === "categorias" && <CategoriasForm categorias={categorias} />}
     </div>
   );
 }

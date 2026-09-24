@@ -21,6 +21,17 @@ export const crearCategoriaActivoSchema = z.object({
 });
 export type CrearCategoriaActivoInput = z.infer<typeof crearCategoriaActivoSchema>;
 
+export const editarCategoriaActivoSchema = z.object({
+  id: z.string().cuid(),
+  nombre: z.string().trim().min(2, "Mínimo 2 caracteres").max(80),
+});
+export type EditarCategoriaActivoInput = z.infer<typeof editarCategoriaActivoSchema>;
+
+export const eliminarCategoriaActivoSchema = z.object({
+  id: z.string().cuid(),
+});
+export type EliminarCategoriaActivoInput = z.infer<typeof eliminarCategoriaActivoSchema>;
+
 // fechaInstalacion/fechaFinGarantia viajan como string "YYYY-MM-DD" (input type=date) o
 // vacío/undefined; la conversión a Date ocurre en el Server Action, no aquí, para no
 // pelear con el coerce de Zod sobre strings vacíos.

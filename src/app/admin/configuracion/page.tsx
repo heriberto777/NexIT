@@ -1,6 +1,7 @@
 import { getSesionActual } from "@/server/auth/session";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { storageService } from "@/server/services/storage.service";
+import { prisma } from "@/lib/prisma";
 import { ConfiguracionTabs } from "@/components/admin/configuracion/configuracion-tabs";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,13 @@ export default async function ConfiguracionPage() {
     );
   }
 
-  const config = await obtenerConfiguracion();
+  const [config, categoriasRaw] = await Promise.all([
+    obtenerConfiguracion(),
+    prisma.categoriaActivo.findMany({
+      include: { _count: { select: { activos: true, checklistTemplates: true } } },
+      orderBy: { nombre: "asc" },
+    }),
+  ]);
   const logoUrl = config.empresaLogoUrl ? await storageService.getPublicUrl(config.empresaLogoUrl) : null;
 
   return (
@@ -52,11 +59,19 @@ export default async function ConfiguracionPage() {
           slaHorasMedia: config.slaHorasMedia,
           slaHorasBaja: config.slaHorasBaja,
           diasAnticipacionPreventivos: config.diasAnticipacionPreventivos,
+          diasVentanaProximoPreventivo: config.diasVentanaProximoPreventivo,
           fotosMinimasEvidencia: config.fotosMinimasEvidencia,
+          evidenciaMaxMB: config.evidenciaMaxMB,
           monedaCodigo: config.monedaCodigo,
           monedaSimbolo: config.monedaSimbolo,
           localeFecha: config.localeFecha,
         }}
+        categorias={categoriasRaw.map((c) => ({
+          id: c.id,
+          nombre: c.nombre,
+          activos: c._count.activos,
+          checklistTemplates: c._count.checklistTemplates,
+        }))}
       />
     </div>
   );

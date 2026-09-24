@@ -30,8 +30,8 @@ export default async function PreventivosPage() {
 
   const kpis = {
     total: planes.length,
-    vencidos: planes.filter((p) => p.estado === "ACTIVO" && calcularVigenciaPlan(p.proximaFecha) === "vencido").length,
-    proximos: planes.filter((p) => p.estado === "ACTIVO" && calcularVigenciaPlan(p.proximaFecha) === "proximo").length,
+    vencidos: planes.filter((p) => p.estado === "ACTIVO" && calcularVigenciaPlan(p.proximaFecha, config.diasVentanaProximoPreventivo) === "vencido").length,
+    proximos: planes.filter((p) => p.estado === "ACTIVO" && calcularVigenciaPlan(p.proximaFecha, config.diasVentanaProximoPreventivo) === "proximo").length,
     pausados: planes.filter((p) => p.estado === "PAUSADO").length,
   };
 
@@ -87,7 +87,7 @@ export default async function PreventivosPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {planes.map((p) => {
-              const vigencia = calcularVigenciaPlan(p.proximaFecha);
+              const vigencia = calcularVigenciaPlan(p.proximaFecha, config.diasVentanaProximoPreventivo);
               const cliente = p.activo?.sucursal.cliente.nombre ?? p.sucursal?.cliente.nombre ?? "—";
               const lugar = p.activo
                 ? `${p.activo.categoria.nombre} — ${p.activo.marca} ${p.activo.modelo}`

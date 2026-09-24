@@ -33,6 +33,8 @@ function defaultsDesdeEnv(): Omit<ConfiguracionSistema, "id" | "actualizadoEn"> 
     monedaSimbolo: process.env.MONEDA_SIMBOLO ?? "RD$",
     localeFecha: process.env.LOCALE_FECHA ?? "es-DO",
     fotosMinimasEvidencia: process.env.FOTOS_MINIMAS_EVIDENCIA ? Number(process.env.FOTOS_MINIMAS_EVIDENCIA) : 1,
+    evidenciaMaxMB: process.env.EVIDENCIA_MAX_MB ? Number(process.env.EVIDENCIA_MAX_MB) : 8,
+    diasVentanaProximoPreventivo: process.env.DIAS_VENTANA_PROXIMO_PREVENTIVO ? Number(process.env.DIAS_VENTANA_PROXIMO_PREVENTIVO) : 7,
   };
 }
 

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { storageService } from "@/server/services/storage.service";
-
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB por foto
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 type RouteParams = { params: Promise<{ ticketId: string }> };
 
@@ -26,8 +25,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
   }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "La foto excede 8MB" }, { status: 413 });
+  const { evidenciaMaxMB } = await obtenerConfiguracion();
+  if (file.size > evidenciaMaxMB * 1024 * 1024) {
+    return NextResponse.json({ error: `La foto excede ${evidenciaMaxMB}MB` }, { status: 413 });
   }
   if (!file.type.startsWith("image/")) {
     return NextResponse.json({ error: "Solo se aceptan imágenes" }, { status: 415 });

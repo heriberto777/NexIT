@@ -156,6 +156,15 @@ model ConfiguracionSistema {
   // ejecución para poder avanzar — antes era 2 fijo en el código (MIN_FOTOS en
   // evidence-step.tsx), sin forma de ajustarlo por instalación.
   fotosMinimasEvidencia       Int @default(1)
+  // Tamaño máximo (MB) por foto subida (evidencia general o por ítem de checklist) —
+  // antes 8 fijo en MAX_BYTES en cada ruta de subida.
+  evidenciaMaxMB              Int @default(8)
+  // Ventana (días) para marcar un plan preventivo como "Próximo a vencer" en vez de
+  // "Programado" — antes DIAS_VENTANA_PROXIMO fijo en lib/utils/plan-preventivo.ts.
+  // Distinto de diasAnticipacionPreventivos (arriba): ese controla cuándo se GENERA el
+  // ticket; este controla solo la etiqueta de vigencia mostrada en /admin/preventivos
+  // y en el dashboard — pueden coincidir o no según cómo quiera operar cada instalación.
+  diasVentanaProximoPreventivo Int @default(7)
 
   // Localización — antes hardcodeada como soles peruanos ("S/", en 9 sitios
   // distintos) y fechas en es-PE (en otros 9 sitios distintos), sin relación con el

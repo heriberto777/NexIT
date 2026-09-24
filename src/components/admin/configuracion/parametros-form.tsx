@@ -67,19 +67,39 @@ export function ParametrosForm({ valores }: { valores: ParametrosValues }) {
       </div>
 
       <div className="border-t border-gray-100 pt-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Días de anticipación para preventivos</label>
-        <p className="mb-2 text-xs text-gray-400">Ventana por defecto al generar tickets desde planes de mantenimiento preventivo en /admin/preventivos.</p>
-        <input type="number" {...register("diasAnticipacionPreventivos")} className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-        {errors.diasAnticipacionPreventivos && <p className="mt-1 text-xs text-red-600">{errors.diasAnticipacionPreventivos.message}</p>}
+        <p className="mb-2 text-sm font-medium text-gray-700">Preventivos</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Días de anticipación para generar el ticket</label>
+            <input type="number" {...register("diasAnticipacionPreventivos")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            {errors.diasAnticipacionPreventivos && <p className="mt-1 text-xs text-red-600">{errors.diasAnticipacionPreventivos.message}</p>}
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Días para marcar &quot;Próximo a vencer&quot;</label>
+            <input type="number" {...register("diasVentanaProximoPreventivo")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            {errors.diasVentanaProximoPreventivo && <p className="mt-1 text-xs text-red-600">{errors.diasVentanaProximoPreventivo.message}</p>}
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-gray-400">
+          El primero controla cuándo se GENERA el ticket desde el plan; el segundo solo la etiqueta de vigencia que ves en
+          /admin/preventivos y el dashboard — no tienen que coincidir.
+        </p>
       </div>
 
       <div className="border-t border-gray-100 pt-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Fotos mínimas en el wizard de ejecución</label>
-        <p className="mb-2 text-xs text-gray-400">
-          Cuántas fotos &quot;antes&quot; y &quot;después&quot; exige el paso de evidencia antes de dejar avanzar al técnico. Ponlo en 0 para no exigir ninguna.
-        </p>
-        <input type="number" min={0} max={20} {...register("fotosMinimasEvidencia")} className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-        {errors.fotosMinimasEvidencia && <p className="mt-1 text-xs text-red-600">{errors.fotosMinimasEvidencia.message}</p>}
+        <p className="mb-2 text-sm font-medium text-gray-700">Evidencia fotográfica</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Fotos mínimas en el wizard (0 = ninguna exigida)</label>
+            <input type="number" min={0} max={20} {...register("fotosMinimasEvidencia")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            {errors.fotosMinimasEvidencia && <p className="mt-1 text-xs text-red-600">{errors.fotosMinimasEvidencia.message}</p>}
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Tamaño máximo por foto (MB)</label>
+            <input type="number" min={1} max={50} {...register("evidenciaMaxMB")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            {errors.evidenciaMaxMB && <p className="mt-1 text-xs text-red-600">{errors.evidenciaMaxMB.message}</p>}
+          </div>
+        </div>
       </div>
 
       <div className="border-t border-gray-100 pt-4">
