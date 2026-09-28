@@ -303,6 +303,11 @@ y Telegram (no viajan en el export), revisar el nombre exacto del campo de body 
 del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
 `NEXIT_BASE_URL` como variables de entorno de tu instancia de n8n.
 
+> Los JSON de abajo también están como archivos sueltos en
+> [`n8n-workflows/`](./n8n-workflows/) — en n8n, **Workflows → Import from File** y
+> subís directo `1-eventos-webhook.json` / `2-cron-sla.json` /
+> `3-asistente-ia-telegram-whatsapp.json`, sin copiar/pegar.
+
 ### Workflow 1 — Router de eventos
 
 ```json
@@ -624,6 +629,9 @@ Igual que en §5: después de importar hace falta crear/asignar las credenciales
 (Telegram API, Twilio API, tu proveedor de IA), reemplazar
 `https://nexit.tuempresa.com` por tu dominio real, y revisar los nombres exactos de
 campo del nodo Webhook/IF/Switch según tu versión de n8n.
+
+> También como archivo suelto:
+> [`n8n-workflows/3-asistente-ia-telegram-whatsapp.json`](./n8n-workflows/3-asistente-ia-telegram-whatsapp.json).
 
 ```json
 {

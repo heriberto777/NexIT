@@ -1,0 +1,60 @@
+{
+  "name": "NexIT - Cron SLA",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-sla",
+      "name": "Cada 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/cron/sla-check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "http-sla-check",
+      "name": "POST sla-check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Webhook Secret"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cada 15 min": {
+      "main": [
+        [
+          {
+            "node": "POST sla-check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
