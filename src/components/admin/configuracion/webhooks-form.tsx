@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { guardarWebhooksSchema, type GuardarWebhooksInput } from "@/lib/zod/configuracion.schema";
 import { guardarWebhooks } from "@/server/actions/admin/configuracion/guardar-webhooks";
 import { probarWebhookAction } from "@/server/actions/admin/configuracion/probar-integraciones";
+import { generarWebhookSecret } from "@/server/actions/admin/configuracion/generar-webhook-secret";
 import { Button } from "@/components/ui/button";
 
 export interface WebhooksValues {
@@ -21,15 +22,39 @@ export function WebhooksForm({ valores }: { valores: WebhooksValues }) {
   const [guardado, setGuardado] = useState(false);
   const [isPendingPrueba, startPrueba] = useTransition();
   const [resultadoPrueba, setResultadoPrueba] = useState<{ ok: boolean; mensaje: string } | null>(null);
+  const [isPendingGenerar, startGenerar] = useTransition();
+  const [secretoRecienGenerado, setSecretoRecienGenerado] = useState(false);
+  const [copiado, setCopiado] = useState(false);
 
   const {
     register,
     handleSubmit,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<GuardarWebhooksInput>({
     resolver: zodResolver(guardarWebhooksSchema),
     defaultValues: { webhookUrl: valores.webhookUrl, webhooksHabilitados: valores.webhooksHabilitados, webhookSecret: "" },
   });
+
+  function generarSecreto() {
+    setCopiado(false);
+    startGenerar(async () => {
+      const { secreto } = await generarWebhookSecret();
+      setValue("webhookSecret", secreto, { shouldDirty: true });
+      setSecretoRecienGenerado(true);
+    });
+  }
+
+  async function copiarSecreto() {
+    try {
+      await navigator.clipboard.writeText(getValues("webhookSecret") ?? "");
+      setCopiado(true);
+    } catch {
+      // Portapapeles bloqueado (permiso denegado, contexto no seguro, etc.) — el
+      // secreto sigue visible en el input de texto para copiarlo a mano.
+    }
+  }
 
   async function onSubmit(values: GuardarWebhooksInput) {
     setError(null);
@@ -37,6 +62,8 @@ export function WebhooksForm({ valores }: { valores: WebhooksValues }) {
     try {
       await guardarWebhooks(values);
       setGuardado(true);
+      setSecretoRecienGenerado(false);
+      setCopiado(false);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
@@ -71,8 +98,29 @@ export function WebhooksForm({ valores }: { valores: WebhooksValues }) {
         <label className="mb-1 block text-sm font-medium text-gray-700">
           Secreto {valores.tieneWebhookSecret && <span className="text-xs font-normal text-gray-400">(configurado — deja vacío para no cambiarlo)</span>}
         </label>
-        <input type="password" {...register("webhookSecret")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder={valores.tieneWebhookSecret ? "••••••••" : ""} />
+        <div className="flex gap-2">
+          <input
+            type={secretoRecienGenerado ? "text" : "password"}
+            {...register("webhookSecret")}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+            placeholder={valores.tieneWebhookSecret ? "••••••••" : ""}
+          />
+          {secretoRecienGenerado && (
+            <Button type="button" variant="secondary" onClick={copiarSecreto}>
+              {copiado ? "Copiado" : "Copiar"}
+            </Button>
+          )}
+          <Button type="button" variant="secondary" disabled={isPendingGenerar} onClick={generarSecreto}>
+            {isPendingGenerar ? "Generando..." : "Generar"}
+          </Button>
+        </div>
         <p className="mt-1 text-xs text-gray-400">Firma cada request con HMAC-SHA256 (header X-NexIT-Signature) y también viaja como Bearer token.</p>
+        {secretoRecienGenerado && (
+          <p className="mt-1 text-xs text-amber-700">
+            Copialo a la variable <span className="font-mono">WEBHOOK_SECRET</span> de tu instancia de n8n y luego guardá los cambios para activarlo
+            — no vuelve a mostrarse una vez guardado.
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-3 border-t border-gray-100 pt-3">
