@@ -1490,3 +1490,149 @@ horario que prefieras.
 Solo manda a Telegram (mismo criterio que la alerta de SLA) — si además querés el
 resumen por WhatsApp, agregá un nodo Twilio igual al de los otros workflows, con el
 número de destino fijo en vez de `{{$json.identificador}}`.
+
+## 9. Resumen diario personalizado (uno por persona, no a un grupo)
+
+Distinto del §8.e (que manda un único resumen agregado a un chat/grupo fijo): acá cada
+persona con un canal vinculado en `/perfil` recibe **su propio mensaje**, con datos
+relevantes para ella:
+
+- **Técnicos**: sus tickets activos asignados (marcando cuáles tienen el SLA vencido o
+  en riesgo) + sus próximos preventivos agendados (próximos 7 días).
+- **Admin/Coordinador**: el mismo resumen agregado del §8 (tickets por estado,
+  cumplimiento de SLA, críticos sin asignar, preventivos vencidos), pero entregado a su
+  chat individual en vez de a un grupo compartido.
+
+Ambos workflows (§8.e y §9) pueden convivir: uno mantiene la visibilidad compartida del
+equipo en un canal común, el otro le llega a cada quien sin que tenga que estar mirando
+ese grupo.
+
+### a) Endpoint
+
+**`GET /api/n8n/resumen-diario`** — sin identidad, solo `WEBHOOK_SECRET` (lo dispara un
+Schedule Trigger, no hay un chat de por medio). Devuelve un array por cada rol con
+canal vinculado:
+
+```json
+{
+  "tecnicos": [
+    {
+      "usuarioNombre": "María Gómez",
+      "telegramChatId": "555000111",
+      "whatsappTelefono": null,
+      "ticketsHoy": [
+        { "numeroTicket": "TCK-0002", "titulo": "Switch de piso 3 no responde", "clienteNombre": "Hospital San Rafael", "prioridad": "CRITICA", "estado": "EN_EJECUCION", "estadoSla": "vencido" }
+      ],
+      "preventivosProximos": [
+        { "titulo": "Mantenimiento mensual - Switch piso 3", "clienteNombre": "Hospital San Rafael", "proximaFecha": "2026-09-26" }
+      ]
+    }
+  ],
+  "staff": [
+    { "usuarioNombre": "Lucía Fernández", "rol": "ADMIN", "telegramChatId": "777000222", "whatsappTelefono": null, "resumen": { "...": "mismo shape que /api/n8n/staff/resumen" } }
+  ]
+}
+```
+
+Un usuario sin ningún canal vinculado (ni Telegram ni WhatsApp) simplemente no aparece
+en ninguno de los dos arrays — no hace falta filtrarlo del lado de n8n.
+
+### b) Diagrama
+
+```
+Schedule Trigger (7am) → GET resumen-diario
+                            → Aplanar destinatarios (Code: un item por persona y canal
+                              vinculado, con el mensaje ya formateado — un técnico con
+                              Telegram Y WhatsApp vinculados recibe el mismo mensaje
+                              por ambos)
+                            → Switch por canal
+                               ├─ TELEGRAM → Telegram - Enviar
+                               └─ WHATSAPP → Twilio - Enviar
+```
+
+### c) JSON importable
+
+[`n8n-workflows/7-resumen-diario-personalizado.json`](./n8n-workflows/7-resumen-diario-personalizado.json)
+
+```json
+{
+  "name": "NexIT - Resumen diario personalizado",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }] } },
+      "id": "schedule-resumen-personalizado",
+      "name": "Todos los días 7am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://nexit.tuempresa.com/api/n8n/resumen-diario",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+      },
+      "id": "get-resumen-diario-personalizado",
+      "name": "GET resumen diario",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\nconst items = [];\n\nfunction agregarDestino(canal, identificador, mensaje) {\n  if (!identificador) return;\n  items.push({ json: { canal, identificador, mensaje } });\n}\n\nfor (const t of data.tecnicos) {\n  const lineasTickets = t.ticketsHoy.length\n    ? t.ticketsHoy.map((tk) => {\n        const alerta = tk.estadoSla === 'vencido' ? ' ⚠️ SLA VENCIDO' : tk.estadoSla === 'en_riesgo' ? ' ⏰ SLA en riesgo' : '';\n        return `- #${tk.numeroTicket} ${tk.titulo} (${tk.clienteNombre}, ${tk.prioridad})${alerta}`;\n      }).join('\\n')\n    : 'Sin tickets activos asignados.';\n  const lineasPreventivos = t.preventivosProximos.length\n    ? t.preventivosProximos.map((p) => `- ${p.titulo} (${p.clienteNombre}) — ${p.proximaFecha}`).join('\\n')\n    : null;\n\n  let mensaje = `☀️ Buenos días ${t.usuarioNombre.split(' ')[0]}, tus tickets activos:\\n${lineasTickets}`;\n  if (lineasPreventivos) mensaje += `\\n\\nPreventivos próximos (7 días):\\n${lineasPreventivos}`;\n\n  agregarDestino('TELEGRAM', t.telegramChatId, mensaje);\n  agregarDestino('WHATSAPP', t.whatsappTelefono, mensaje);\n}\n\nfor (const s of data.staff) {\n  const r = s.resumen;\n  const mensaje = `📊 Resumen diario NexIT\\n\\nTickets activos: ${r.ticketsActivos}\\nCríticos/altos sin asignar: ${r.criticosSinAsignar.length}\\nCumplimiento SLA: ${r.slaCumplimiento.pctCumplimiento ?? '—'}%\\nPreventivos vencidos: ${r.preventivosPorVigencia.vencido}`;\n  agregarDestino('TELEGRAM', s.telegramChatId, mensaje);\n  agregarDestino('WHATSAPP', s.whatsappTelefono, mensaje);\n}\n\nreturn items;"
+      },
+      "id": "aplanar-destinatarios",
+      "name": "Aplanar destinatarios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "TELEGRAM", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "WHATSAPP", "operator": { "type": "string", "operation": "equals" } }] } }
+          ]
+        }
+      },
+      "id": "switch-canal-resumen-personalizado",
+      "name": "Switch por canal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [660, 0]
+    },
+    {
+      "parameters": { "chatId": "={{ $json.identificador }}", "text": "={{ $json.mensaje }}" },
+      "id": "telegram-resumen-personalizado",
+      "name": "Telegram - Enviar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [880, -100],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+    },
+    {
+      "parameters": { "from": "whatsapp:+14155238886", "to": "=whatsapp:{{ $json.identificador }}", "message": "={{ $json.mensaje }}" },
+      "id": "twilio-resumen-personalizado",
+      "name": "Twilio - Enviar",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [880, 100],
+      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+    }
+  ],
+  "connections": {
+    "Todos los días 7am": { "main": [[{ "node": "GET resumen diario", "type": "main", "index": 0 }]] },
+    "GET resumen diario": { "main": [[{ "node": "Aplanar destinatarios", "type": "main", "index": 0 }]] },
+    "Aplanar destinatarios": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "Switch por canal": {
+      "main": [
+        [{ "node": "Telegram - Enviar", "type": "main", "index": 0 }],
+        [{ "node": "Twilio - Enviar", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}
+```
