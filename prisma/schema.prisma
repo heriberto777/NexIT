@@ -242,6 +242,7 @@ model Usuario {
   cotizacionesAprobadas Cotizacion[]                  @relation("CotizacionAprobador")
   planesPreventivos     PlanMantenimientoPreventivo[]
   movimientosInventario MovimientoInventario[]
+  registrosAuditoria    RegistroAuditoria[]
 
   @@index([clienteId])
   @@map("usuarios")
@@ -558,4 +559,46 @@ model Cotizacion {
 
   @@index([ticketId])
   @@map("cotizaciones")
+}
+
+// ---------- Logs / eventos del sistema ----------
+
+// Quién hizo qué sobre entidades administrativas (usuarios, clientes, sucursales,
+// activos, configuración) — el ciclo de vida de un Ticket ya tiene su propio historial
+// dedicado en TicketHistorial, así que ESTE registro no duplica altas/bajas de tickets,
+// solo las acciones que hoy no dejaban ningún rastro de "quién" las hizo.
+// usuarioNombre/usuarioRol quedan congelados al momento del evento (no se leen desde
+// la relación) para que el registro siga siendo legible aunque el usuario cambie de rol
+// o de nombre después.
+model RegistroAuditoria {
+  id            String     @id @default(cuid())
+  usuarioId     String?
+  usuario       Usuario?   @relation(fields: [usuarioId], references: [id])
+  usuarioNombre String
+  usuarioRol    RolUsuario
+  accion        String
+  entidad       String
+  entidadId     String?
+  detalle       String?
+  createdAt     DateTime   @default(now())
+
+  @@index([entidad, entidadId])
+  @@index([usuarioId])
+  @@index([createdAt])
+  @@map("registros_auditoria")
+}
+
+// Errores técnicos que antes solo llegaban a console.error (visibles únicamente con
+// `docker logs`) — centralizados acá para poder revisarlos desde /admin/logs sin
+// acceso a la terminal del servidor.
+model RegistroError {
+  id        String   @id @default(cuid())
+  origen    String
+  mensaje   String
+  stack     String?
+  contexto  Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("registros_error")
 }

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { crearCategoriaActivoSchema } from "@/lib/zod/admin.schema";
 import type { CrearCategoriaActivoInput } from "@/lib/zod/admin.schema";
 
@@ -20,6 +21,8 @@ export async function crearCategoriaActivo(input: CrearCategoriaActivoInput) {
     update: {},
     create: { nombre },
   });
+
+  await registrarAuditoria({ usuario, accion: "categoria_activo.crear", entidad: "CategoriaActivo", entidadId: categoria.id, detalle: nombre });
 
   return { id: categoria.id, nombre: categoria.nombre };
 }

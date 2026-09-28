@@ -2,6 +2,7 @@
 
 import { requireUsuario } from "@/server/auth/session";
 import { actualizarConfiguracion } from "@/server/services/configuracion.service";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { guardarWebhooksSchema } from "@/lib/zod/configuracion.schema";
 import type { GuardarWebhooksInput } from "@/lib/zod/configuracion.schema";
 
@@ -21,6 +22,13 @@ export async function guardarWebhooks(input: GuardarWebhooksInput) {
     // manda el valor real de vuelta al formulario para que el admin lo reescriba.
     ...(webhookSecret ? { webhookSecret } : {}),
     webhooksHabilitados,
+  });
+
+  await registrarAuditoria({
+    usuario,
+    accion: "configuracion.webhooks",
+    entidad: "ConfiguracionSistema",
+    detalle: webhookSecret ? "Cambió URL y secreto" : "Cambió URL (secreto sin cambios)",
   });
 
   return { ok: true };

@@ -2,6 +2,7 @@
 
 import { requireUsuario } from "@/server/auth/session";
 import { actualizarConfiguracion } from "@/server/services/configuracion.service";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { guardarParametrosSchema } from "@/lib/zod/configuracion.schema";
 import type { GuardarParametrosInput } from "@/lib/zod/configuracion.schema";
 
@@ -15,6 +16,8 @@ export async function guardarParametros(input: GuardarParametrosInput) {
 
   const data = guardarParametrosSchema.parse(input);
   await actualizarConfiguracion(data);
+
+  await registrarAuditoria({ usuario, accion: "configuracion.parametros", entidad: "ConfiguracionSistema" });
 
   return { ok: true };
 }

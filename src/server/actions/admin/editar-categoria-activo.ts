@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { editarCategoriaActivoSchema } from "@/lib/zod/admin.schema";
 import type { EditarCategoriaActivoInput } from "@/lib/zod/admin.schema";
 
@@ -17,6 +18,7 @@ export async function editarCategoriaActivo(input: EditarCategoriaActivoInput) {
 
   try {
     const categoria = await prisma.categoriaActivo.update({ where: { id }, data: { nombre } });
+    await registrarAuditoria({ usuario, accion: "categoria_activo.editar", entidad: "CategoriaActivo", entidadId: id, detalle: `Renombró a "${nombre}"` });
     return { id: categoria.id, nombre: categoria.nombre };
   } catch (error) {
     // P2002: violación de @unique en `nombre` — ya existe otra categoría con ese nombre.

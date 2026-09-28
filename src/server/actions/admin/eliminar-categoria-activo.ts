@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { eliminarCategoriaActivoSchema } from "@/lib/zod/admin.schema";
 import type { EliminarCategoriaActivoInput } from "@/lib/zod/admin.schema";
 
@@ -30,6 +31,9 @@ export async function eliminarCategoriaActivo(input: EliminarCategoriaActivoInpu
     throw new Error(`No se puede eliminar: está en uso por ${partes.join(" y ")}.`);
   }
 
-  await prisma.categoriaActivo.delete({ where: { id } });
+  const eliminada = await prisma.categoriaActivo.delete({ where: { id } });
+
+  await registrarAuditoria({ usuario, accion: "categoria_activo.eliminar", entidad: "CategoriaActivo", entidadId: id, detalle: eliminada.nombre });
+
   return { ok: true };
 }

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { registrarError } from "@/server/services/error-log.service";
 
 export type EventoWebhook =
   | {
@@ -54,7 +55,7 @@ const TIMEOUT_MS = 8000;
 // de la Server Action que originó el evento. Los errores solo se registran.
 export function emitirEvento(evento: EventoWebhook): void {
   void enviarWebhook(evento).catch((error) => {
-    console.error(`[webhook] Error enviando evento ${evento.tipo} (ticket ${evento.ticketId}):`, error);
+    registrarError("webhook", error, { evento: evento.tipo, ticketId: evento.ticketId });
   });
 }
 
@@ -91,7 +92,7 @@ async function enviarWebhook(evento: EventoWebhook): Promise<void> {
 
   const res = await postConTimeout(config.webhookUrl, body, headers);
   if (!res.ok) {
-    console.error(`[webhook] ${tipo} respondió ${res.status} ${res.statusText}`);
+    registrarError("webhook", new Error(`${tipo} respondió ${res.status} ${res.statusText}`), { evento: tipo });
   }
 }
 

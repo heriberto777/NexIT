@@ -4,6 +4,7 @@ import type { JWT } from "next-auth/jwt";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/zod/auth.schema";
+import { registrarError } from "@/server/services/error-log.service";
 
 // El proveedor Credentials exige estrategia JWT (no hay "cuenta OAuth verificada" que
 // el adapter de Prisma pueda enlazar), así que no usamos PrismaAdapter aquí — solo
@@ -36,7 +37,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Fire-and-forget: registrar el último acceso no debe demorar ni poder tumbar
         // un login por lo demás válido si esta escritura fallara.
         void prisma.usuario.update({ where: { id: usuario.id }, data: { ultimoAccesoAt: new Date() } }).catch((error) => {
-          console.error("[auth] No se pudo actualizar ultimoAccesoAt:", error);
+          registrarError("auth", error, { usuarioId: usuario.id });
         });
 
         return {

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { editarActivoSchema } from "@/lib/zod/admin.schema";
 import type { EditarActivoInput } from "@/lib/zod/admin.schema";
 
@@ -28,6 +29,14 @@ export async function editarActivo(input: EditarActivoInput) {
       fechaFinGarantia: data.fechaFinGarantia ? new Date(data.fechaFinGarantia) : null,
       estado: data.estado,
     },
+  });
+
+  await registrarAuditoria({
+    usuario,
+    accion: "activo.editar",
+    entidad: "Activo",
+    entidadId: data.id,
+    detalle: `Editó ${data.marca} ${data.modelo} (estado ${data.estado})`,
   });
 
   return { id: data.id };

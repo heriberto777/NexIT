@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { cambiarEstadoUsuarioSchema } from "@/lib/zod/usuario.schema";
 import type { CambiarEstadoUsuarioInput } from "@/lib/zod/usuario.schema";
 
@@ -23,5 +24,14 @@ export async function cambiarEstadoUsuario(input: CambiarEstadoUsuarioInput) {
   }
 
   const actualizado = await prisma.usuario.update({ where: { id }, data: { estado } });
+
+  await registrarAuditoria({
+    usuario,
+    accion: "usuario.cambiar_estado",
+    entidad: "Usuario",
+    entidadId: actualizado.id,
+    detalle: `Cambió el estado a ${estado}`,
+  });
+
   return { id: actualizado.id, estado: actualizado.estado };
 }

@@ -3,6 +3,7 @@
 import { requireUsuario } from "@/server/auth/session";
 import { actualizarConfiguracion } from "@/server/services/configuracion.service";
 import { storageService } from "@/server/services/storage.service";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { guardarBrandingSchema } from "@/lib/zod/configuracion.schema";
 import type { GuardarBrandingInput } from "@/lib/zod/configuracion.schema";
 
@@ -23,6 +24,8 @@ export async function guardarBranding(input: GuardarBrandingInput) {
     empresaEmail: empresaEmail || null,
     empresaDireccion: empresaDireccion || null,
   });
+
+  await registrarAuditoria({ usuario, accion: "configuracion.branding", entidad: "ConfiguracionSistema" });
 
   return { ok: true };
 }

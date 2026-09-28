@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { resetearPasswordUsuarioSchema } from "@/lib/zod/usuario.schema";
 import type { ResetearPasswordUsuarioInput } from "@/lib/zod/usuario.schema";
 
@@ -28,6 +29,8 @@ export async function resetearPasswordUsuario(input: ResetearPasswordUsuarioInpu
   const passwordHash = await bcrypt.hash(passwordTemporal, 10);
 
   await prisma.usuario.update({ where: { id }, data: { passwordHash } });
+
+  await registrarAuditoria({ usuario, accion: "usuario.resetear_password", entidad: "Usuario", entidadId: id });
 
   return { passwordTemporal };
 }

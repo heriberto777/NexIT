@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { crearClienteSchema } from "@/lib/zod/admin.schema";
 import type { CrearClienteInput } from "@/lib/zod/admin.schema";
 
@@ -18,6 +19,8 @@ export async function crearCliente(input: CrearClienteInput) {
   const cliente = await prisma.cliente.create({
     data: { nombre, identificacionFiscal: identificacionFiscal || undefined },
   });
+
+  await registrarAuditoria({ usuario, accion: "cliente.crear", entidad: "Cliente", entidadId: cliente.id, detalle: `Creó a ${nombre}` });
 
   return { id: cliente.id };
 }

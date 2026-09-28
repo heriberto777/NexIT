@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { editarUsuarioSchema } from "@/lib/zod/usuario.schema";
 import type { EditarUsuarioInput } from "@/lib/zod/usuario.schema";
 
@@ -29,6 +30,14 @@ export async function editarUsuario(input: EditarUsuarioInput) {
       clienteId: rol === "CLIENTE" ? clienteId : null,
       especialidad: rol === "TECNICO" ? especialidad : null,
     },
+  });
+
+  await registrarAuditoria({
+    usuario,
+    accion: "usuario.editar",
+    entidad: "Usuario",
+    entidadId: actualizado.id,
+    detalle: `Editó a ${nombre} (${email}), rol ${rol}`,
   });
 
   return { id: actualizado.id };

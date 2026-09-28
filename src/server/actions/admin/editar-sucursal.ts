@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { editarSucursalSchema } from "@/lib/zod/admin.schema";
 import type { EditarSucursalInput } from "@/lib/zod/admin.schema";
 
@@ -19,6 +20,8 @@ export async function editarSucursal(input: EditarSucursalInput) {
     where: { id },
     data: { nombre, direccion, ciudad, contactoNombre, contactoTelefono },
   });
+
+  await registrarAuditoria({ usuario, accion: "sucursal.editar", entidad: "Sucursal", entidadId: id, detalle: `Editó "${nombre}"` });
 
   return { id };
 }

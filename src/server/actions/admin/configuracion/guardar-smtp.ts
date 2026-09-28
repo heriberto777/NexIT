@@ -2,6 +2,7 @@
 
 import { requireUsuario } from "@/server/auth/session";
 import { actualizarConfiguracion } from "@/server/services/configuracion.service";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { guardarSmtpSchema } from "@/lib/zod/configuracion.schema";
 import type { GuardarSmtpInput } from "@/lib/zod/configuracion.schema";
 
@@ -27,6 +28,8 @@ export async function guardarSmtp(input: GuardarSmtpInput) {
     smtpFromName: smtpFromName || null,
     smtpSsl,
   });
+
+  await registrarAuditoria({ usuario, accion: "configuracion.smtp", entidad: "ConfiguracionSistema" });
 
   return { ok: true };
 }

@@ -3,6 +3,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { crearUsuarioSchema } from "@/lib/zod/usuario.schema";
 import type { CrearUsuarioInput } from "@/lib/zod/usuario.schema";
 
@@ -32,6 +33,14 @@ export async function crearUsuario(input: CrearUsuarioInput) {
       clienteId: rol === "CLIENTE" ? clienteId : undefined,
       especialidad: rol === "TECNICO" ? especialidad : undefined,
     },
+  });
+
+  await registrarAuditoria({
+    usuario,
+    accion: "usuario.crear",
+    entidad: "Usuario",
+    entidadId: nuevo.id,
+    detalle: `Creó a ${nombre} (${email}) con rol ${rol}`,
   });
 
   return { id: nuevo.id };
