@@ -10,7 +10,9 @@ export default async function NuevoTicketPortalPage() {
 
   const sucursales = await prisma.sucursal.findMany({
     where: { clienteId },
-    include: { activos: { include: { categoria: true } } },
+    // Un activo dado de baja no debería recibir tickets nuevos — pero uno "fuera de
+    // servicio" sí (justamente es el estado de algo roto que hay que reportar/arreglar).
+    include: { activos: { where: { estado: { not: "DADO_DE_BAJA" } }, include: { categoria: true } } },
     orderBy: { nombre: "asc" },
   });
 

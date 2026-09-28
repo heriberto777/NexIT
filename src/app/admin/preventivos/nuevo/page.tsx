@@ -5,7 +5,13 @@ export const dynamic = "force-dynamic";
 
 export default async function NuevoPlanPreventivoPage() {
   const [activos, sucursales, tecnicos] = await Promise.all([
-    prisma.activo.findMany({ include: { categoria: true, sucursal: { include: { cliente: true } } }, orderBy: { marca: "asc" } }),
+    // No tiene sentido programar un preventivo sobre un activo retirado o ya roto — a
+    // diferencia de la creación de tickets, acá sí se excluyen ambos estados.
+    prisma.activo.findMany({
+      where: { estado: { notIn: ["DADO_DE_BAJA", "FUERA_DE_SERVICIO"] } },
+      include: { categoria: true, sucursal: { include: { cliente: true } } },
+      orderBy: { marca: "asc" },
+    }),
     prisma.sucursal.findMany({ include: { cliente: true }, orderBy: { nombre: "asc" } }),
     prisma.usuario.findMany({ where: { rol: "TECNICO" }, orderBy: { nombre: "asc" } }),
   ]);
