@@ -33,3 +33,62 @@ export const crearTicketChatSchema = z.object({
   activoId: optionalCuid(),
 });
 export type CrearTicketChatInput = z.infer<typeof crearTicketChatSchema>;
+
+// ---------- Técnico: seguimiento de tickets asignados por chat ----------
+
+export const identidadChatSchema = z.object({
+  canal: canalChatSchema,
+  identificador: z.string().trim().min(1, "Requerido"),
+});
+export type IdentidadChatInput = z.infer<typeof identidadChatSchema>;
+
+// texto/tieneFoto/fileId/mediaUrl son puro passthrough (mismo motivo que `texto` en
+// contextoClienteSchema): el workflow de técnico necesita saber si el mensaje traía una
+// foto y desde dónde descargarla DESPUÉS de esta llamada, que ya pisó el $json original.
+export const contextoTecnicoSchema = z.object({
+  canal: canalChatSchema,
+  identificador: z.string().trim().min(1, "Requerido"),
+  texto: z.string().trim().max(4000).optional(),
+  tieneFoto: z.string().trim().optional(),
+  fileId: z.string().trim().optional(),
+  mediaUrl: z.string().trim().optional(),
+});
+export type ContextoTecnicoInput = z.infer<typeof contextoTecnicoSchema>;
+
+export const checkinTecnicoSchema = z.object({
+  canal: canalChatSchema,
+  identificador: z.string().trim().min(1, "Requerido"),
+  numeroTicket: z.string().trim().min(1, "Requerido"),
+});
+export type CheckinTecnicoInput = z.infer<typeof checkinTecnicoSchema>;
+
+export const notaTecnicoSchema = z.object({
+  canal: canalChatSchema,
+  identificador: z.string().trim().min(1, "Requerido"),
+  numeroTicket: z.string().trim().min(1, "Requerido"),
+  comentario: z.string().trim().min(1, "Requerido").max(2000),
+});
+export type NotaTecnicoInput = z.infer<typeof notaTecnicoSchema>;
+
+// ---------- Coordinador/Admin: consultas y estadísticas por chat ----------
+
+// `texto` viaja de ida y vuelta por el mismo motivo que en contextoTecnicoSchema: el
+// workflow necesita la pregunta original DESPUÉS de llamar a /staff/resumen (que no
+// la recibe ni la devuelve, porque es un snapshot de datos sin identidad de por medio).
+export const verificarStaffSchema = z.object({
+  canal: canalChatSchema,
+  identificador: z.string().trim().min(1, "Requerido"),
+  texto: z.string().trim().max(4000).optional(),
+});
+export type VerificarStaffInput = z.infer<typeof verificarStaffSchema>;
+
+// imagenBase64 sin el prefijo "data:image/...;base64," — ese prefijo se separa en el
+// paso de n8n que descarga el archivo de Telegram/Twilio, antes de mandarlo acá.
+export const evidenciaTecnicoSchema = z.object({
+  canal: canalChatSchema,
+  identificador: z.string().trim().min(1, "Requerido"),
+  numeroTicket: z.string().trim().min(1, "Requerido"),
+  imagenBase64: z.string().trim().min(1, "Requerido"),
+  contentType: z.enum(["image/png", "image/jpeg", "image/webp"]).default("image/jpeg"),
+});
+export type EvidenciaTecnicoInput = z.infer<typeof evidenciaTecnicoSchema>;

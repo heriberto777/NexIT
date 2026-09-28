@@ -1,0 +1,266 @@
+{
+  "name": "NexIT - Técnico seguimiento de tickets",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message"] },
+      "id": "telegram-trigger-tecnico",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [0, -160],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "nexit-tecnico-whatsapp-in", "responseMode": "onReceived" },
+      "id": "webhook-whatsapp-tecnico",
+      "name": "Webhook WhatsApp (Twilio)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 160]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "1", "name": "canal", "value": "TELEGRAM", "type": "string" },
+            { "id": "2", "name": "identificador", "value": "={{ $json.message.chat.id }}", "type": "string" },
+            { "id": "3", "name": "texto", "value": "={{ $json.message.text || $json.message.caption || '' }}", "type": "string" },
+            { "id": "4", "name": "tieneFoto", "value": "={{ $json.message.photo ? 'true' : 'false' }}", "type": "string" },
+            { "id": "5", "name": "fileId", "value": "={{ $json.message.photo ? $json.message.photo[$json.message.photo.length - 1].file_id : '' }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "normalizar-telegram-tecnico",
+      "name": "Normalizar Telegram",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, -160]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "1", "name": "canal", "value": "WHATSAPP", "type": "string" },
+            { "id": "2", "name": "identificador", "value": "={{ $json.body.From.replace('whatsapp:', '') }}", "type": "string" },
+            { "id": "3", "name": "texto", "value": "={{ $json.body.Body || '' }}", "type": "string" },
+            { "id": "4", "name": "tieneFoto", "value": "={{ $json.body.NumMedia && $json.body.NumMedia !== '0' ? 'true' : 'false' }}", "type": "string" },
+            { "id": "5", "name": "mediaUrl", "value": "={{ $json.body.MediaUrl0 || '' }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "normalizar-whatsapp-tecnico",
+      "name": "Normalizar WhatsApp",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 160]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://nexit.tuempresa.com/api/n8n/tecnico/contexto",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "canal", "value": "={{ $json.canal }}" },
+            { "name": "identificador", "value": "={{ $json.identificador }}" },
+            { "name": "texto", "value": "={{ $json.texto }}" },
+            { "name": "tieneFoto", "value": "={{ $json.tieneFoto }}" },
+            { "name": "fileId", "value": "={{ $json.fileId || '' }}" },
+            { "name": "mediaUrl", "value": "={{ $json.mediaUrl || '' }}" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+      },
+      "id": "contexto-tecnico",
+      "name": "Contexto técnico",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "leftValue": "={{$json.autorizado}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] }
+      },
+      "id": "if-autorizado-tecnico",
+      "name": "IF autorizado",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nlet imagenBase64 = null;\nconst contentType = 'image/jpeg';\n\nif (contexto.tieneFoto === 'true') {\n  if (contexto.canal === 'TELEGRAM') {\n    const token = $env.TELEGRAM_BOT_TOKEN;\n    const fileInfo = await this.helpers.httpRequest({ url: `https://api.telegram.org/bot${token}/getFile?file_id=${contexto.fileId}`, json: true });\n    const filePath = fileInfo.result.file_path;\n    const bytes = await this.helpers.httpRequest({ url: `https://api.telegram.org/file/bot${token}/${filePath}`, encoding: 'arraybuffer' });\n    imagenBase64 = Buffer.from(bytes).toString('base64');\n  } else {\n    const bytes = await this.helpers.httpRequest({\n      url: contexto.mediaUrl,\n      encoding: 'arraybuffer',\n      auth: { username: $env.TWILIO_ACCOUNT_SID, password: $env.TWILIO_AUTH_TOKEN },\n    });\n    imagenBase64 = Buffer.from(bytes).toString('base64');\n  }\n}\n\nconst prompt = `Sos un asistente para tecnicos de soporte que siguen sus tickets por chat.\nTickets asignados activos:\n${JSON.stringify(contexto.tickets)}\n\nMensaje del tecnico: \"${contexto.texto}\"\nTrae una foto adjunta?: ${contexto.tieneFoto === 'true' ? 'si' : 'no'}\n\nDevolve SOLO un JSON con esta forma:\n{\n  \"intencion\": \"LISTAR\" o \"CHECKIN\" o \"NOTA\" o \"EVIDENCIA\" o \"ERROR\",\n  \"numeroTicket\": \"TCK-0001\" o null,\n  \"comentario\": \"texto de la nota, solo si intencion=NOTA\"\n}\n\nReglas:\n- Si trae foto adjunta, intencion SIEMPRE es EVIDENCIA. Si el tecnico tiene un solo ticket activo usa ese numeroTicket aunque no lo haya escrito. Si tiene mas de uno, buscá el numero en el texto/caption; si no aparece, intencion=ERROR.\n- Si pregunta por sus tickets o dice algo como \"que tengo pendiente\", intencion=LISTAR.\n- Si dice que llego, que esta en sitio, que empieza a revisar, intencion=CHECKIN con el numeroTicket que mencione (o el unico ticket ASIGNADO si solo tiene uno).\n- Cualquier otro comentario sobre un ticket es intencion=NOTA.\n- Si no podes determinar de que ticket habla y hay mas de uno activo, intencion=ERROR.`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  intencion: ai.intencion,\n  numeroTicket: ai.numeroTicket || null,\n  comentario: ai.comentario || null,\n  imagenBase64,\n  contentType,\n} }];"
+      },
+      "id": "ia-interpretar-tecnico",
+      "name": "IA: interpretar mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.intencion}}", "rightValue": "LISTAR", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.intencion}}", "rightValue": "CHECKIN", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.intencion}}", "rightValue": "NOTA", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.intencion}}", "rightValue": "EVIDENCIA", "operator": { "type": "string", "operation": "equals" } }] } }
+          ]
+        },
+        "fallbackOutput": "extra"
+      },
+      "id": "switch-intencion",
+      "name": "Switch por intención",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1100, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contexto = $('Contexto técnico').item.json;\nconst lineas = contexto.tickets.map((t) => `#${t.numeroTicket} - ${t.titulo} (${t.clienteNombre}, ${t.prioridad}, ${t.estado})`).join('\\n');\nreturn [{ json: {\n  canal: $json.canal,\n  identificador: $json.identificador,\n  mensaje: contexto.tickets.length ? `Tus tickets activos:\\n${lineas}` : 'No tenés tickets activos asignados.',\n} }];"
+      },
+      "id": "formatear-lista-tickets",
+      "name": "Formatear lista de tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, -280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/tecnico/checkin",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, numeroTicket: $json.numeroTicket }) }}"
+      },
+      "id": "post-checkin",
+      "name": "POST check-in",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/tecnico/nota",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, numeroTicket: $json.numeroTicket, comentario: $json.comentario }) }}"
+      },
+      "id": "post-nota",
+      "name": "POST nota",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 60]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/tecnico/evidencia",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, numeroTicket: $json.numeroTicket, imagenBase64: $json.imagenBase64, contentType: $json.contentType }) }}"
+      },
+      "id": "post-evidencia",
+      "name": "POST evidencia",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 220]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "1", "name": "canal", "value": "={{ $json.canal }}", "type": "string" },
+            { "id": "2", "name": "identificador", "value": "={{ $json.identificador }}", "type": "string" },
+            {
+              "id": "3",
+              "name": "mensaje",
+              "value": "={{ $('Contexto técnico').item.json.tickets.length > 1 ? 'No entendí a qué ticket te referís. Decime el número (ej. TCK-0001).' : 'No entendí tu mensaje. Contame qué necesitás sobre tu ticket.' }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "mensaje-error-tecnico",
+      "name": "Mensaje: no entendido",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1320, 380]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "TELEGRAM", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "WHATSAPP", "operator": { "type": "string", "operation": "equals" } }] } }
+          ]
+        }
+      },
+      "id": "switch-canal-tecnico",
+      "name": "Switch por canal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1560, 0]
+    },
+    {
+      "parameters": { "chatId": "={{ $json.identificador }}", "text": "={{ $json.mensaje }}" },
+      "id": "telegram-responder-tecnico",
+      "name": "Telegram - Responder",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1780, -100],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+    },
+    {
+      "parameters": { "from": "whatsapp:+14155238886", "to": "=whatsapp:{{ $json.identificador }}", "message": "={{ $json.mensaje }}" },
+      "id": "twilio-responder-tecnico",
+      "name": "Twilio - Responder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1780, 100],
+      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [[{ "node": "Normalizar Telegram", "type": "main", "index": 0 }]] },
+    "Webhook WhatsApp (Twilio)": { "main": [[{ "node": "Normalizar WhatsApp", "type": "main", "index": 0 }]] },
+    "Normalizar Telegram": { "main": [[{ "node": "Contexto técnico", "type": "main", "index": 0 }]] },
+    "Normalizar WhatsApp": { "main": [[{ "node": "Contexto técnico", "type": "main", "index": 0 }]] },
+    "Contexto técnico": { "main": [[{ "node": "IF autorizado", "type": "main", "index": 0 }]] },
+    "IF autorizado": {
+      "main": [
+        [{ "node": "IA: interpretar mensaje", "type": "main", "index": 0 }],
+        [{ "node": "Switch por canal", "type": "main", "index": 0 }]
+      ]
+    },
+    "IA: interpretar mensaje": { "main": [[{ "node": "Switch por intención", "type": "main", "index": 0 }]] },
+    "Switch por intención": {
+      "main": [
+        [{ "node": "Formatear lista de tickets", "type": "main", "index": 0 }],
+        [{ "node": "POST check-in", "type": "main", "index": 0 }],
+        [{ "node": "POST nota", "type": "main", "index": 0 }],
+        [{ "node": "POST evidencia", "type": "main", "index": 0 }],
+        [{ "node": "Mensaje: no entendido", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatear lista de tickets": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "POST check-in": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "POST nota": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "POST evidencia": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "Mensaje: no entendido": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "Switch por canal": {
+      "main": [
+        [{ "node": "Telegram - Responder", "type": "main", "index": 0 }],
+        [{ "node": "Twilio - Responder", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}
