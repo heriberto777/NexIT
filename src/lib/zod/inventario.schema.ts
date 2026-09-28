@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-export const tipoMovimientoInventarioSchema = z.enum(["ENTRADA", "SALIDA", "AJUSTE", "CONSUMO_TICKET"]);
-
 export const guardarRepuestoSchema = z.object({
   id: z.string().cuid().optional(),
   codigo: z.string().trim().min(2, "Mínimo 2 caracteres").max(40),

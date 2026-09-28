@@ -43,19 +43,6 @@ export const asignarTicketSchema = z.object({
 });
 export type AsignarTicketInput = z.infer<typeof asignarTicketSchema>;
 
-// Transición de estado (con comentario obligatorio en ciertos casos)
-export const cambiarEstadoTicketSchema = z
-  .object({
-    ticketId: z.string().cuid(),
-    estadoNuevo: estadoTicketSchema,
-    comentario: z.string().trim().max(1000).optional(),
-  })
-  .refine(
-    (data) => data.estadoNuevo !== "REABIERTO" || (data.comentario?.length ?? 0) > 0,
-    { message: "Debes indicar por qué se reabre el ticket", path: ["comentario"] },
-  );
-export type CambiarEstadoTicketInput = z.infer<typeof cambiarEstadoTicketSchema>;
-
 // Validación de la visita por el Cliente (o Admin como override): aprobar cierra el
 // ciclo (-> RESUELTO), rechazar reabre el ticket y exige justificar por qué.
 export const validarVisitaSchema = z
