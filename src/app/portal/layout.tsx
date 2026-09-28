@@ -52,6 +52,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
         links={[
           { href: "/portal", label: "Inicio" },
           { href: "/portal/tickets", label: "Mis tickets" },
+          { href: "/perfil", label: "Perfil" },
           { href: "/portal/tickets/nuevo", label: "+ Reportar falla", primary: true },
         ]}
       >

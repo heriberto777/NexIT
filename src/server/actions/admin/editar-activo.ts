@@ -1,0 +1,34 @@
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/server/auth/session";
+import { editarActivoSchema } from "@/lib/zod/admin.schema";
+import type { EditarActivoInput } from "@/lib/zod/admin.schema";
+
+const ROLES_PERMITIDOS = ["COORDINADOR", "ADMIN"] as const;
+
+export async function editarActivo(input: EditarActivoInput) {
+  const usuario = await requireUsuario();
+  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+    throw new Error(`Tu rol (${usuario.rol}) no puede editar activos`);
+  }
+
+  const data = editarActivoSchema.parse(input);
+
+  await prisma.activo.update({
+    where: { id: data.id },
+    data: {
+      sucursalId: data.sucursalId,
+      categoriaId: data.categoriaId,
+      marca: data.marca,
+      modelo: data.modelo,
+      numeroSerie: data.numeroSerie,
+      ubicacionEspecifica: data.ubicacionEspecifica || null,
+      fechaInstalacion: data.fechaInstalacion ? new Date(data.fechaInstalacion) : null,
+      fechaFinGarantia: data.fechaFinGarantia ? new Date(data.fechaFinGarantia) : null,
+      estado: data.estado,
+    },
+  });
+
+  return { id: data.id };
+}

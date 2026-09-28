@@ -1,23 +1,15 @@
 import type { ReactNode } from "react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
+import { getSesionActual } from "@/server/auth/session";
+import { navParaRol } from "@/lib/utils/nav-admin";
 
-const NAV = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/tickets", label: "Tickets" },
-  { href: "/admin/clientes", label: "Clientes" },
-  { href: "/admin/activos", label: "Activos" },
-  { href: "/admin/checklists", label: "Checklists" },
-  { href: "/admin/preventivos", label: "Preventivos" },
-  { href: "/admin/inventario", label: "Inventario" },
-  { href: "/admin/usuarios", label: "Usuarios" },
-  { href: "/admin/configuracion", label: "Configuración" },
-];
+export default async function AdminLayout({ children }: { children: ReactNode }) {
+  const sesion = await getSesionActual();
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainNav brand="NexIT Admin" brandHref="/admin" links={NAV}>
+      <MainNav brand="NexIT Admin" brandHref="/admin" links={navParaRol(sesion?.rol)}>
         <LogoutButton />
       </MainNav>
       {children}

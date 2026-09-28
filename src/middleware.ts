@@ -8,6 +8,7 @@ const REGLAS: { prefix: string; roles: readonly string[] }[] = [
   { prefix: "/admin", roles: ["ADMIN", "COORDINADOR"] },
   { prefix: "/portal", roles: ["CLIENTE"] },
   { prefix: "/tickets", roles: ["ADMIN", "COORDINADOR", "TECNICO"] },
+  { prefix: "/perfil", roles: ["ADMIN", "COORDINADOR", "TECNICO", "CLIENTE"] },
 ];
 
 const RUTAS_PROTEGIDAS = REGLAS.map((r) => r.prefix);
@@ -48,5 +49,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/portal/:path*", "/tickets/:path*"],
+  matcher: ["/admin/:path*", "/portal/:path*", "/tickets/:path*", "/perfil/:path*"],
 };

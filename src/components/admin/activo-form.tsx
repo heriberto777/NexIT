@@ -5,8 +5,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { crearActivoSchema, crearCategoriaActivoSchema, type CrearActivoInput } from "@/lib/zod/admin.schema";
+import { crearActivoSchema, editarActivoSchema, crearCategoriaActivoSchema, type CrearActivoInput, type EditarActivoInput } from "@/lib/zod/admin.schema";
 import { crearActivo } from "@/server/actions/admin/crear-activo";
+import { editarActivo } from "@/server/actions/admin/editar-activo";
 import { crearCategoriaActivo } from "@/server/actions/admin/crear-categoria-activo";
 import { Button } from "@/components/ui/button";
 
@@ -20,12 +21,25 @@ interface Categoria {
   checklist: { nombre: string; items: number } | null;
 }
 
+const ESTADOS = [
+  { value: "ACTIVO", label: "Activo" },
+  { value: "EN_MANTENIMIENTO", label: "En mantenimiento" },
+  { value: "FUERA_DE_SERVICIO", label: "Fuera de servicio" },
+  { value: "DADO_DE_BAJA", label: "Dado de baja" },
+] as const;
+
 interface Props {
   sucursales: Sucursal[];
   categorias: Categoria[];
+  modoEdicion?: boolean;
+  valoresIniciales?: EditarActivoInput;
 }
 
-export function NuevoActivoForm({ sucursales, categorias: categoriasIniciales }: Props) {
+// Dual modo (igual patrón que RepuestoForm): crear un activo nuevo o editar uno
+// existente reutilizan el mismo formulario — antes solo existía el modo creación,
+// así que un activo, una vez registrado, no se podía corregir nunca (typo en la marca,
+// número de serie mal digitado, cambio de sede, etc.) sin borrarlo y recrearlo.
+export function ActivoForm({ sucursales, categorias: categoriasIniciales, modoEdicion, valoresIniciales }: Props) {
   const router = useRouter();
   const [categorias, setCategorias] = useState(categoriasIniciales);
   const [error, setError] = useState<string | null>(null);
@@ -39,18 +53,23 @@ export function NuevoActivoForm({ sucursales, categorias: categoriasIniciales }:
     watch,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<CrearActivoInput>({
-    resolver: zodResolver(crearActivoSchema),
-    defaultValues: { sucursalId: "", categoriaId: "", marca: "", modelo: "", numeroSerie: "" },
+  } = useForm<CrearActivoInput | EditarActivoInput>({
+    resolver: zodResolver(modoEdicion ? editarActivoSchema : crearActivoSchema),
+    defaultValues: valoresIniciales ?? { sucursalId: "", categoriaId: "", marca: "", modelo: "", numeroSerie: "" },
   });
 
   const categoriaSeleccionada = categorias.find((c) => c.id === watch("categoriaId"));
 
-  async function onSubmit(values: CrearActivoInput) {
+  async function onSubmit(values: CrearActivoInput | EditarActivoInput) {
     setError(null);
     try {
-      const { id } = await crearActivo(values);
-      router.push(`/admin/activos?nuevo=${id}`);
+      if (modoEdicion) {
+        const { id } = await editarActivo(values as EditarActivoInput);
+        router.push(`/admin/activos/${id}`);
+      } else {
+        const { id } = await crearActivo(values as CrearActivoInput);
+        router.push(`/admin/activos?nuevo=${id}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
     }
@@ -177,8 +196,21 @@ export function NuevoActivoForm({ sucursales, categorias: categoriasIniciales }:
           </div>
         </div>
 
+        {modoEdicion && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Estado</label>
+            <select {...register("estado")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              {ESTADOS.map((e) => (
+                <option key={e.value} value={e.value}>
+                  {e.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <Button type="submit" disabled={isSubmitting} className="w-full">
-          {isSubmitting ? "Guardando..." : "Registrar activo"}
+          {isSubmitting ? "Guardando..." : modoEdicion ? "Guardar cambios" : "Registrar activo"}
         </Button>
       </form>
     </div>

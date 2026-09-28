@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { ConfirmProvider } from "@/components/ui/confirm-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       {/* suppressHydrationWarning: extensiones de navegador (ej. ClickUp) inyectan clases
           en <body> antes de que React hidrate — no es un mismatch real de la app. */}
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        {children}
+        <ConfirmProvider>{children}</ConfirmProvider>
       </body>
     </html>
   );

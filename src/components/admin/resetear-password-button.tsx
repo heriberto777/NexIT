@@ -3,19 +3,23 @@
 import { useState, useTransition } from "react";
 import { resetearPasswordUsuario } from "@/server/actions/admin/usuarios/resetear-password-usuario";
 import { Modal } from "@/components/ui/modal";
+import { useConfirm } from "@/components/ui/confirm-provider";
 
 // Muestra la contraseña temporal UNA sola vez, en un modal — después de cerrarlo no
 // hay forma de volver a verla desde la interfaz (NexIT no la guarda en texto plano).
 export function ResetearPasswordButton({ id, nombre }: { id: string; nombre: string }) {
+  const confirm = useConfirm();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [passwordTemporal, setPasswordTemporal] = useState<string | null>(null);
 
-  function resetear() {
+  async function resetear() {
     setError(null);
-    if (!confirm(`¿Generar una contraseña temporal nueva para ${nombre}? La anterior dejará de funcionar de inmediato.`)) {
-      return;
-    }
+    const ok = await confirm({
+      mensaje: `¿Generar una contraseña temporal nueva para ${nombre}? La anterior dejará de funcionar de inmediato.`,
+      textoConfirmar: "Generar",
+    });
+    if (!ok) return;
     startTransition(async () => {
       try {
         const { passwordTemporal } = await resetearPasswordUsuario({ id });

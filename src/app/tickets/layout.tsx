@@ -2,20 +2,12 @@ import type { ReactNode } from "react";
 import { getSesionActual } from "@/server/auth/session";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
+import { navParaRol } from "@/lib/utils/nav-admin";
 
-const NAV_ADMIN = [
-  { href: "/admin", label: "Dashboard" },
+const NAV_TECNICO = [
   { href: "/tickets", label: "Tickets" },
-  { href: "/admin/clientes", label: "Clientes" },
-  { href: "/admin/activos", label: "Activos" },
-  { href: "/admin/checklists", label: "Checklists" },
-  { href: "/admin/preventivos", label: "Preventivos" },
-  { href: "/admin/inventario", label: "Inventario" },
-  { href: "/admin/usuarios", label: "Usuarios" },
-  { href: "/admin/configuracion", label: "Configuración" },
+  { href: "/perfil", label: "Perfil" },
 ];
-
-const NAV_TECNICO = [{ href: "/tickets", label: "Tickets" }];
 
 // /tickets es la pantalla de aterrizaje del técnico (su "home") y también el listado
 // que Admin/Coordinador visitan desde su propio nav — sin este layout quedaban sin
@@ -24,7 +16,7 @@ const NAV_TECNICO = [{ href: "/tickets", label: "Tickets" }];
 export default async function TicketsLayout({ children }: { children: ReactNode }) {
   const sesion = await getSesionActual();
   const esTecnico = sesion?.rol === "TECNICO";
-  const nav = esTecnico ? NAV_TECNICO : NAV_ADMIN;
+  const nav = esTecnico ? NAV_TECNICO : navParaRol(sesion?.rol);
 
   return (
     <div className="min-h-screen bg-gray-50">

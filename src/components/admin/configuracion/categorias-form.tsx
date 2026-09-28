@@ -9,6 +9,7 @@ import { crearCategoriaActivo } from "@/server/actions/admin/crear-categoria-act
 import { editarCategoriaActivo } from "@/server/actions/admin/editar-categoria-activo";
 import { eliminarCategoriaActivo } from "@/server/actions/admin/eliminar-categoria-activo";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-provider";
 
 export interface CategoriaActivoValue {
   id: string;
@@ -19,6 +20,7 @@ export interface CategoriaActivoValue {
 
 export function CategoriasForm({ categorias }: { categorias: CategoriaActivoValue[] }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [error, setError] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nombreEdicion, setNombreEdicion] = useState("");
@@ -57,7 +59,8 @@ export function CategoriasForm({ categorias }: { categorias: CategoriaActivoValu
   }
 
   async function eliminar(id: string, nombre: string) {
-    if (!confirm(`¿Eliminar la categoría "${nombre}"?`)) return;
+    const ok = await confirm({ mensaje: `¿Eliminar la categoría "${nombre}"?`, textoConfirmar: "Eliminar", peligroso: true });
+    if (!ok) return;
     setError(null);
     try {
       await eliminarCategoriaActivo({ id });

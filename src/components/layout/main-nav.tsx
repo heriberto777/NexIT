@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
 export interface NavLinkItem {
@@ -24,9 +25,23 @@ interface Props {
 // partir de md: se ve la fila original; debajo de md: colapsa a un menú hamburguesa.
 export function MainNav({ brand, brandHref, links, children }: Props) {
   const [abierto, setAbierto] = useState(false);
+  const pathname = usePathname();
+
+  // "/admin" y "/portal" son a la vez la ruta del propio link Y un prefijo literal de
+  // TODOS sus hermanos ("/admin/clientes", "/portal/tickets", ...) — sin este caso
+  // especial, "Dashboard"/"Inicio" quedarían marcados activos en cualquier subpágina.
+  // El resto de los links sí usa match por prefijo: querés que "Tickets" siga resaltado
+  // en /tickets/nuevo o /tickets/:id, no solo en /tickets exacto.
+  function esActivo(href: string): boolean {
+    if (href === "/admin" || href === "/portal") return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
 
   function claseLink(item: NavLinkItem) {
-    return item.primary ? "text-sm font-medium text-blue-600 hover:text-blue-700" : "text-sm text-gray-600 hover:text-blue-600";
+    if (item.primary) return "text-sm font-medium text-blue-600 hover:text-blue-700";
+    return esActivo(item.href)
+      ? "rounded-lg bg-blue-50 px-2 py-1 text-sm font-semibold text-blue-700 -mx-2 -my-1"
+      : "text-sm text-gray-600 hover:text-blue-600";
   }
 
   return (

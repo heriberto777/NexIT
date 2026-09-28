@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { NuevaSucursalForm } from "@/components/admin/nueva-sucursal-form";
+import { EditarClienteForm } from "@/components/admin/editar-cliente-form";
+import { EditarSucursalRow } from "@/components/admin/editar-sucursal-form";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,15 @@ export default async function ClienteDetailPage({ params }: PageProps) {
         </p>
       </header>
 
+      <EditarClienteForm
+        valores={{
+          id: cliente.id,
+          nombre: cliente.nombre,
+          identificacionFiscal: cliente.identificacionFiscal ?? undefined,
+          estado: cliente.estado,
+        }}
+      />
+
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-gray-900">Sucursales</h2>
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -46,22 +57,27 @@ export default async function ClienteDetailPage({ params }: PageProps) {
                 <th className="px-3 py-2 font-medium">Dirección</th>
                 <th className="px-3 py-2 font-medium">Contacto</th>
                 <th className="px-3 py-2 font-medium">Activos</th>
+                <th className="px-3 py-2 font-medium"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {cliente.sucursales.map((s) => (
-                <tr key={s.id}>
-                  <td className="px-3 py-2 font-medium text-gray-800">{s.nombre}</td>
-                  <td className="px-3 py-2 text-gray-600">
-                    {s.direccion}, {s.ciudad}
-                  </td>
-                  <td className="px-3 py-2 text-gray-600">{s.contactoNombre ?? "—"}</td>
-                  <td className="px-3 py-2 text-gray-600">{s._count.activos}</td>
-                </tr>
+                <EditarSucursalRow
+                  key={s.id}
+                  sucursal={{
+                    id: s.id,
+                    nombre: s.nombre,
+                    direccion: s.direccion,
+                    ciudad: s.ciudad,
+                    contactoNombre: s.contactoNombre,
+                    contactoTelefono: s.contactoTelefono,
+                    activos: s._count.activos,
+                  }}
+                />
               ))}
               {cliente.sucursales.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-400">
+                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-400">
                     Sin sucursales registradas.
                   </td>
                 </tr>

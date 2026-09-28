@@ -78,8 +78,10 @@ export default async function ActivosPage({ searchParams }: PageProps) {
               return (
                 <tr key={a.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-700">{a.categoria.nombre}</td>
-                  <td className="px-3 py-2 font-medium text-gray-800">
-                    {a.marca} {a.modelo}
+                  <td className="px-3 py-2 font-medium">
+                    <Link href={`/admin/activos/${a.id}`} className="text-blue-600 hover:underline">
+                      {a.marca} {a.modelo}
+                    </Link>
                   </td>
                   <td className="px-3 py-2 text-gray-600">{a.numeroSerie}</td>
                   <td className="px-3 py-2 text-gray-600">
