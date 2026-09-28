@@ -18,6 +18,13 @@ export async function POST(request: Request) {
   if (noAutorizado) return noAutorizado;
 
   const body = await request.json().catch(() => null);
+  // `ticket` solo importa cuando accion=CREAR_TICKET — si la IA mandó un objeto
+  // parcial/con campos en null para las otras acciones (PREGUNTAR, SUGERIR_SOLUCION,
+  // CERRAR_SIN_TICKET), se ignora por completo en vez de dejar que su forma inválida
+  // tumbe un turno que ni siquiera necesita crear un ticket.
+  if (body && typeof body === "object" && body.accion !== "CREAR_TICKET") {
+    delete (body as Record<string, unknown>).ticket;
+  }
   const parsed = turnoConversacionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" }, { status: 400 });

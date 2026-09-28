@@ -5,4 +5,8 @@ import { z } from "zod";
 // inválido. Sin esto, z.string().cuid().optional() rechaza la cadena vacía y el
 // formulario falla la validación en silencio (el error nunca se muestra si el campo
 // no tiene su propio <p>{errors.x}</p>).
-export const optionalCuid = () => z.preprocess((v) => (v === "" ? undefined : v), z.string().cuid().optional());
+// También normaliza `null` (no solo ""): los formularios HTML nunca mandan null, pero
+// un JSON armado por un modelo de IA (ver /api/n8n/conversacion/turno) sí — el prompt
+// le pide explícitamente "sucursalId: '...' o null" cuando no lo sabe, y sin esto Zod
+// rechaza ese null literal con "Expected string, received null".
+export const optionalCuid = () => z.preprocess((v) => (v === "" || v === null ? undefined : v), z.string().cuid().optional());
