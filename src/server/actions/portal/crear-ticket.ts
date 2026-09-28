@@ -62,7 +62,7 @@ export async function crearTicketPortal(input: CrearTicketPortalInput) {
         slaId: sla?.id,
         origen: "PORTAL",
       },
-      include: { cliente: true },
+      include: { cliente: true, creadoPor: true },
     });
 
     await tx.ticketHistorial.create({
@@ -88,6 +88,8 @@ export async function crearTicketPortal(input: CrearTicketPortalInput) {
     origen: "PORTAL",
     reportadoPorNombre: usuario.nombre,
     reportadoPorEmail: usuario.email,
+    reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
+    reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
   });
 
   return { id: ticket.id, numeroTicket: ticket.numeroTicket };

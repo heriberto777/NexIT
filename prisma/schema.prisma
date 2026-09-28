@@ -83,6 +83,7 @@ enum OrigenTicket {
   CORREO
   TELEFONO
   PROGRAMADO
+  CHATBOT
 }
 
 enum TipoEvidencia {
@@ -226,6 +227,12 @@ model Usuario {
   especialidad   String?
   estado         EstadoUsuario @default(ACTIVO)
   ultimoAccesoAt DateTime?
+
+  // Vínculo self-service (/perfil) para el workflow de n8n de chat con IA: sin esto,
+  // n8n no tiene forma de resolver "quién escribió este mensaje de Telegram/WhatsApp"
+  // a un Usuario/Cliente de NexIT.
+  telegramChatId   String? @unique
+  whatsappTelefono String? @unique
 
   ticketsCreados        Ticket[]                      @relation("TicketCreador")
   ticketsAsignados      Ticket[]                      @relation("TicketTecnico")

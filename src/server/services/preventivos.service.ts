@@ -138,6 +138,8 @@ export async function generarTicketsPreventivos({ diasVentana, usuarioId }: Gene
       origen: "PROGRAMADO",
       reportadoPorNombre: coordinador.nombre,
       reportadoPorEmail: coordinador.email,
+      reportadoPorTelegramChatId: coordinador.telegramChatId,
+      reportadoPorWhatsapp: coordinador.whatsappTelefono,
     });
 
     generados.push({ id: ticket.id, numeroTicket: ticket.numeroTicket, planTitulo: plan.titulo });

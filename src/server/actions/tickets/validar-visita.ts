@@ -68,6 +68,8 @@ export async function validarVisita(input: ValidarVisitaInput) {
       estadoNuevo,
       reportadoPorNombre: ticket.creadoPor.nombre,
       reportadoPorEmail: ticket.creadoPor.email,
+      reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
+      reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
     });
   }
 

@@ -54,6 +54,8 @@ export async function iniciarAtencion(input: z.infer<typeof iniciarAtencionSchem
     estadoNuevo: "EN_DIAGNOSTICO",
     reportadoPorNombre: ticket.creadoPor.nombre,
     reportadoPorEmail: ticket.creadoPor.email,
+    reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
+    reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
   });
 
   return actualizado;

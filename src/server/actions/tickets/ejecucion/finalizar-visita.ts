@@ -60,6 +60,8 @@ export async function finalizarVisita(input: FinalizarVisitaInput) {
     estadoNuevo,
     reportadoPorNombre: ticket.creadoPor.nombre,
     reportadoPorEmail: ticket.creadoPor.email,
+    reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
+    reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
   });
 
   return actualizado;

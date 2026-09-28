@@ -17,6 +17,11 @@ export type EventoWebhook =
       // job, no un contacto del cliente (el workflow de n8n debe distinguir por `origen`).
       reportadoPorNombre: string;
       reportadoPorEmail: string;
+      // null si el usuario nunca vinculó ese canal desde /perfil — el workflow de n8n
+      // debe saltar el nodo de Telegram/WhatsApp cuando venga null, no intentar mandar
+      // igual (un chat_id/teléfono vacío rompe esos nodos).
+      reportadoPorTelegramChatId: string | null;
+      reportadoPorWhatsapp: string | null;
     }
   | {
       tipo: "TICKET_CAMBIO_ESTADO";
@@ -27,6 +32,8 @@ export type EventoWebhook =
       estadoNuevo: string;
       reportadoPorNombre: string;
       reportadoPorEmail: string;
+      reportadoPorTelegramChatId: string | null;
+      reportadoPorWhatsapp: string | null;
     }
   | {
       tipo: "SLA_EN_RIESGO";
