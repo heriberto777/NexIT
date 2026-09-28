@@ -475,171 +475,147 @@ Crea la credencial **Header Auth** referenciada (`REEMPLAZAR`) con `Name: Author
 `Value: Bearer <tu WEBHOOK_SECRET>` desde el panel de Credentials de n8n antes de
 activar el workflow.
 
-## 6. Asistente de IA por Telegram y WhatsApp (crear tickets por chat)
+## 6. Asistente de IA conversacional por Telegram y WhatsApp (cliente)
 
-A diferencia de los workflows 1 y 2 (NexIT → n8n, notificaciones salientes), este es
-**entrante**: un cliente le escribe a un bot de Telegram o a un número de WhatsApp,
-un paso de IA interpreta el mensaje, y n8n crea el ticket en NexIT por API — sin que
-el cliente entre al portal.
+**Reemplaza el diseño anterior de un solo turno** (mensaje → extraer → crear ticket
+directo), que creaba un ticket vacío con solo un "Hola". Ahora es una conversación con
+estado: la IA puede preguntar, sugerir una solución antes de escalar, y recién crear el
+ticket cuando ya reunió información real — o cerrar sin ticket si el cliente dice que
+se resolvió solo.
 
-### a) Cómo un cliente se vincula
+El estado de la conversación **vive en NexIT, no en n8n**: cada mensaje de Telegram/
+WhatsApp dispara una ejecución de workflow separada y sin memoria propia entre sí — sin
+persistir el historial en algún lado, la IA no tendría forma de "recordar" lo que el
+cliente ya contó en el mensaje anterior.
 
-Cualquier usuario (los 4 roles) puede cargar su Telegram Chat ID y/o su teléfono de
-WhatsApp desde `/perfil` → "Notificaciones por chat". Solo usuarios con rol `CLIENTE`
-pueden crear tickets por este canal (mismo criterio que el portal de auto-servicio);
-Admin/Coordinador/Técnico pueden vincular los campos igual, pero solo para *recibir*
-las notificaciones salientes de §3.d, no para crear tickets por chat.
+### a) Flujo de una conversación típica
 
-Para conseguir un chat_id de Telegram, el cliente le escribe a `@userinfobot` (o a tu
-propio bot) y copia el número que le devuelve.
+```
+Cliente:   Hola
+Asistente: Hola Juan! Contame, ¿qué problema tenés con algún equipo?          [PREGUNTAR]
+Cliente:   El UPS de la sala de servidores está pitando
+Asistente: Eso suele pasar cuando el UPS está a batería por un corte de luz.
+           ¿Revisaste que haya corriente normal y que esté bien conectado?    [SUGERIR_SOLUCION]
+Cliente:   Ya revisé, la corriente está bien y sigue pitando
+Asistente: Entendido, voy a crear un ticket para que un técnico lo revise.
+           ✅ Ticket #TCK-0006 creado (prioridad alta).                       [CREAR_TICKET]
+```
 
-### b) Los dos endpoints que expone NexIT para este flujo
+Si en el primer intercambio el cliente hubiera contestado "ah listo, ya se apagó solo",
+la IA habría respondido `CERRAR_SIN_TICKET` y ahí termina, sin generar nada en
+`/admin/tickets`.
 
-Ambos, igual que `/api/cron/sla-check`, se protegen con el mismo `WEBHOOK_SECRET`
-(`Authorization: Bearer <secret>`) configurado en `/admin/configuracion` — no hay
-sesión de usuario porque los golpea n8n, no un navegador.
+### b) Modelo de datos
 
-**`GET /api/n8n/contexto-cliente?canal=TELEGRAM|WHATSAPP&identificador=...&texto=...`**
+`ConversacionChat` (una por cliente+canal, mientras esté `ACTIVA`) y
+`MensajeConversacion` (cada turno, `rol` `USUARIO` o `ASISTENTE`). Una conversación
+`ACTIVA` sin mensajes nuevos en más de 6 horas se da por abandonada — si el cliente
+vuelve a escribir después, arranca una conversación nueva en vez de resucitar contexto
+viejo. Al crear el ticket, la conversación pasa a `CONVERTIDA_A_TICKET` y queda
+vinculada (`ticketId`) — puede usarse a futuro para mostrar la transcripción completa
+en el detalle del ticket.
 
-Resuelve `identificador` (chat_id de Telegram o teléfono de WhatsApp, tal cual llega
-del mensaje) a un cliente de NexIT, y le da al paso de IA el contexto que necesita
-para interpretar el mensaje (sus sucursales y activos, para resolver referencias como
-"el aire acondicionado del piso 2" a un `activoId` real). `texto` es opcional y viaja
-sin usarse — ver la nota de "por qué `texto` viaja de ida y vuelta" más abajo.
+### c) Endpoints
+
+Ambos protegidos con `WEBHOOK_SECRET`, igual que el resto de `/api/n8n/*`.
+
+**`POST /api/n8n/conversacion/mensaje`** — body `{ canal, identificador, texto }`
+
+Primer paso de cada mensaje entrante: resuelve el cliente, guarda `texto` como un
+mensaje `USUARIO` (busca la conversación `ACTIVA` existente o crea una si no hay, o si
+la que había quedó abandonada), y devuelve **todo el historial** + el contexto del
+cliente (sucursales y sus activos) para que la IA decida con memoria real.
 
 ```json
 // 200 — encontrado
 {
   "encontrado": true,
-  "canal": "TELEGRAM",
-  "identificador": "999888777",
-  "texto": "se dañó el aire acondicionado del piso 2",
+  "conversacionId": "cmuluoqaj0001p40ujpv2csxe",
   "usuarioNombre": "Juan Pérez",
-  "clienteId": "cmue6oofs...",
   "clienteNombre": "Constructora ABC S.A.",
-  "sucursales": [
-    {
-      "id": "cmue6oohm...",
-      "nombre": "Bodega Norte",
-      "direccion": "Av. Industrial 450",
-      "ciudad": "Lima",
-      "activos": [{ "id": "cmue6ooqu...", "categoria": "UPS", "marca": "APC", "modelo": "Smart-UPS 3000VA" }]
-    }
-  ]
+  "sucursales": [{ "id": "...", "nombre": "Bodega Norte", "direccion": "...", "ciudad": "...", "activos": [{ "id": "...", "categoria": "UPS", "marca": "APC", "modelo": "Smart-UPS 3000VA" }] }],
+  "historial": [
+    { "rol": "USUARIO", "contenido": "Hola" },
+    { "rol": "ASISTENTE", "contenido": "Hola Juan! Contame, ¿qué problema tenés con algún equipo?" },
+    { "rol": "USUARIO", "contenido": "El UPS de la sala de servidores está pitando" }
+  ],
+  "canal": "TELEGRAM",
+  "identificador": "999888777"
 }
 
-// 200 — no vinculado (o usuario inactivo)
-{
-  "encontrado": false,
-  "mensaje": "No encontramos tu número vinculado a NexIT. Pedile a soporte que lo configure en tu perfil.",
-  "canal": "TELEGRAM",
-  "identificador": "000000000",
-  "texto": "..."
-}
+// 200 — no vinculado
+{ "encontrado": false, "mensaje": "No encontramos tu número vinculado a NexIT...", "canal": "TELEGRAM", "identificador": "000000000" }
 ```
 
-**`POST /api/n8n/crear-ticket-chat`**
+**`POST /api/n8n/conversacion/turno`** — body `{ conversacionId, accion, mensajeAsistente, ticket? }`
 
-Crea el ticket (`origen: "CHATBOT"`) una vez que la IA ya extrajo los campos del
-mensaje. `tipo`/`categoriaSoporte`/`prioridad` tienen default (`CORRECTIVO`/
-`SOFTWARE`/`MEDIA`) por si la IA no los infiere. Si el cliente tiene más de una
-sucursal y no mandaste `sucursalId`, responde `422 SUCURSAL_AMBIGUA` con la lista de
-sucursales — tu workflow debe volver a preguntarle al usuario cuál es, no reintentar
-solo.
+Persiste la respuesta de la IA (`mensajeAsistente`) como un mensaje `ASISTENTE`, y según
+`accion`:
+
+- `PREGUNTAR` / `SUGERIR_SOLUCION` — no hace nada más; la conversación sigue `ACTIVA`.
+- `CERRAR_SIN_TICKET` — marca la conversación `RESUELTA_SIN_TICKET`.
+- `CREAR_TICKET` — requiere `ticket: { titulo, descripcion, prioridad, sucursalId?, activoId?, tipo?, categoriaSoporte? }` (el schema lo exige con `.refine()` solo para esta acción). Crea el ticket (`origen: "CHATBOT"`), vincula la conversación (`CONVERTIDA_A_TICKET`), y dispara `TICKET_CREADO`. Mismo manejo de `SUCURSAL_AMBIGUA` que el flujo anterior si el cliente tiene más de una sede y la IA no mandó `sucursalId`.
 
 ```json
-// body
-{
-  "canal": "TELEGRAM",
-  "identificador": "999888777",
-  "titulo": "Aire acondicionado no enfría — piso 2",
-  "descripcion": "El cliente reporta que el aire acondicionado del piso 2 dejó de enfriar desde esta mañana.",
-  "prioridad": "MEDIA",
-  "sucursalId": "cmue6oohm..."
-}
-
-// 200 — éxito
+// 200 — CREAR_TICKET exitoso
 {
   "ok": true,
   "ticketId": "...",
-  "numeroTicket": "TCK-0007",
-  "mensaje": "Listo, creé el ticket #TCK-0007 con prioridad media. Te avisaremos cuando un técnico lo atienda.",
-  "canal": "TELEGRAM",
-  "identificador": "999888777"
-}
-
-// 422 — sucursal ambigua
-{
-  "ok": false,
-  "error": "SUCURSAL_AMBIGUA",
-  "mensaje": "¿De cuál de tus sedes es el problema?",
-  "opciones": [{ "id": "...", "nombre": "Bodega Norte" }, { "id": "...", "nombre": "Sede Central" }],
+  "numeroTicket": "TCK-0006",
+  "mensaje": "Entendido, voy a crear un ticket para que un técnico lo revise.\n\n✅ Ticket #TCK-0006 creado (prioridad alta). Te avisaremos cuando un técnico lo atienda.",
   "canal": "TELEGRAM",
   "identificador": "999888777"
 }
 ```
 
-Todas las respuestas de ambos endpoints (éxito o error) traen siempre `canal` +
-`identificador` (y `contexto-cliente` también `texto`) — es **intencional**: un nodo
-HTTP Request de n8n reemplaza `$json` con el body de la respuesta, así que sin este
-eco los pasos siguientes del workflow perderían de vista "a quién había que
-responderle" apenas pasara por el primer HTTP Request. Evita tener que referenciar por
-nombre un nodo Trigger anterior con `$('Nombre del nodo')`, algo que en n8n **falla**
-si ese nodo no corrió en la ejecución actual — y como Telegram Trigger y el Webhook de
-WhatsApp son mutuamente excluyentes (una ejecución viene de uno o del otro, nunca de
-ambos), esa referencia rompería la mitad de las ejecuciones.
+Notá que `mensaje` en la respuesta es `mensajeAsistente` + un sufijo de confirmación que
+arma NexIT (nunca la IA) — así el número de ticket que se le muestra al cliente es
+siempre el real, nunca algo que el modelo podría llegar a inventar.
 
-### c) Prerrequisitos
+### d) El prompt: preguntar y sugerir antes de crear
 
-- **Bot de Telegram**: hablale a `@BotFather` en Telegram, `/newbot`, copiá el token.
-  Se usa como credencial **Telegram API** en n8n.
-- **WhatsApp vía Twilio**: una cuenta de Twilio con el *WhatsApp Sandbox* activado
-  (gratis para pruebas: Twilio Console → Messaging → Try it out → Send a WhatsApp
-  message; el cliente de prueba manda "join &lt;código&gt;" al número sandbox una vez).
-  Necesitás el **Account SID** y el **Auth Token** (credencial **Twilio API** en n8n) y
-  el número sandbox (`whatsapp:+14155238886` por defecto).
-- **IA**: una API key de OpenAI (u otro proveedor con una API de chat compatible —
-  ajustá la URL/body del nodo HTTP Request del paso de IA si usás otro). Se usa como
-  credencial **Header Auth** (`Name: Authorization`, `Value: Bearer <tu API key>`).
+El nodo "IA: decidir siguiente paso" le manda al modelo el historial completo + las
+sucursales/activos del cliente, y le exige devolver un JSON con `accion` +`mensaje` +
+`ticket` (null salvo que `accion = CREAR_TICKET`). Las reglas clave del prompt:
 
-### d) Diagrama
+1. Un saludo o mensaje sin detalle técnico → `PREGUNTAR`, nunca crear ticket todavía.
+2. Problema con una solución simple y segura para que el cliente pruebe él mismo
+   (reiniciar, revisar corriente/cables) → `SUGERIR_SOLUCION` primero.
+3. Sugerencia ya descartada por el cliente, o problema evidentemente grave (no
+   enciende, olor a quemado, corte total) → recién ahí `CREAR_TICKET`.
+4. Cliente dice que ya se resolvió → `CERRAR_SIN_TICKET`.
+
+Ajustá este prompt libremente según el tipo de fallas más comunes de tus clientes —
+está pensado como punto de partida, no como texto final.
+
+### e) Diagrama
 
 ```
 Telegram Trigger ──→ Normalizar Telegram ──┐
-                                             ├─→ GET contexto-cliente → IF encontrado
-Webhook (WhatsApp/Twilio, responseMode:    ─┘                           ├─ false → Switch por canal
-  "onReceived") ──→ Normalizar WhatsApp                                 └─ true  → POST IA (extraer)
-                                                                                      → Code (parsear JSON de la IA)
-                                                                                      → POST crear-ticket-chat
-                                                                                      → Switch por canal
-                                                                        Switch por canal
-                                                                          ├─ TELEGRAM → Telegram sendMessage
-                                                                          └─ WHATSAPP → Twilio (sendMessage)
+                                             ├─→ POST conversacion/mensaje → IF encontrado
+Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘                     ├─ false → Switch por canal → responder
+                                                                             └─ true  → IA: decidir siguiente paso
+                                                                                          → POST conversacion/turno
+                                                                                          → Switch por canal → responder
 ```
 
-`responseMode: "onReceived"` en el Webhook de WhatsApp es a propósito: Twilio espera
-una respuesta rápida (~15s) a su POST entrante; con "onReceived" n8n le contesta 200 OK
-apenas recibe el mensaje y sigue procesando el resto del workflow (IA, crear ticket,
-responder) en segundo plano — así no hay riesgo de que Twilio marque el webhook como
-fallido si la IA tarda.
+### f) Prerrequisitos
 
-### e) JSON importable (punto de partida)
+Los mismos de siempre: bot de Telegram (`@BotFather`), cuenta de Twilio con WhatsApp
+Sandbox, y una API key de IA (OpenAI u otro proveedor de chat compatible — ajustá la
+URL/body del nodo Code si usás otro).
 
-Igual que en §5: después de importar hace falta crear/asignar las credenciales
-(Telegram API, Twilio API, tu proveedor de IA), reemplazar
-`https://nexit.tuempresa.com` por tu dominio real, y revisar los nombres exactos de
-campo del nodo Webhook/IF/Switch según tu versión de n8n.
+### g) JSON importable
 
-> También como archivo suelto:
-> [`n8n-workflows/3-asistente-ia-telegram-whatsapp.json`](./n8n-workflows/3-asistente-ia-telegram-whatsapp.json).
+[`n8n-workflows/3-asistente-ia-telegram-whatsapp.json`](./n8n-workflows/3-asistente-ia-telegram-whatsapp.json)
 
 ```json
 {
-  "name": "NexIT - Asistente IA Telegram/WhatsApp",
+  "name": "NexIT - Asistente IA conversacional (Telegram/WhatsApp)",
   "nodes": [
     {
       "parameters": { "updates": ["message"] },
-      "id": "telegram-trigger",
+      "id": "telegram-trigger-cliente",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
@@ -647,8 +623,8 @@ campo del nodo Webhook/IF/Switch según tu versión de n8n.
       "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
     },
     {
-      "parameters": { "httpMethod": "POST", "path": "nexit-whatsapp-in", "responseMode": "onReceived" },
-      "id": "webhook-whatsapp",
+      "parameters": { "httpMethod": "POST", "path": "nexit-cliente-whatsapp-in", "responseMode": "onReceived" },
+      "id": "webhook-whatsapp-cliente",
       "name": "Webhook WhatsApp (Twilio)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -664,7 +640,7 @@ campo del nodo Webhook/IF/Switch según tu versión de n8n.
           ]
         }
       },
-      "id": "normalizar-telegram",
+      "id": "normalizar-telegram-cliente",
       "name": "Normalizar Telegram",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -680,7 +656,7 @@ campo del nodo Webhook/IF/Switch según tu versión de n8n.
           ]
         }
       },
-      "id": "normalizar-whatsapp",
+      "id": "normalizar-whatsapp-cliente",
       "name": "Normalizar WhatsApp",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -688,21 +664,16 @@ campo del nodo Webhook/IF/Switch según tu versión de n8n.
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://nexit.tuempresa.com/api/n8n/contexto-cliente",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "canal", "value": "={{ $json.canal }}" },
-            { "name": "identificador", "value": "={{ $json.identificador }}" },
-            { "name": "texto", "value": "={{ $json.texto }}" }
-          ]
-        },
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/conversacion/mensaje",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
       },
-      "id": "contexto-cliente",
-      "name": "Contexto cliente",
+      "id": "guardar-mensaje-cliente",
+      "name": "Guardar mensaje",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [440, 0]
@@ -711,7 +682,7 @@ campo del nodo Webhook/IF/Switch según tu versión de n8n.
       "parameters": {
         "conditions": { "conditions": [{ "leftValue": "={{$json.encontrado}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] }
       },
-      "id": "if-encontrado",
+      "id": "if-encontrado-cliente",
       "name": "IF encontrado",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -719,46 +690,29 @@ campo del nodo Webhook/IF/Switch según tu versión de n8n.
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.openai.com/v1/chat/completions",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'Sos un asistente que extrae datos de tickets de soporte tecnico a partir de un mensaje de chat de un cliente. Devolve SOLO un JSON con las claves: titulo (string, maximo 120 caracteres), descripcion (string, el problema reescrito claramente), prioridad (uno de CRITICA, ALTA, MEDIA, BAJA - usa CRITICA solo si implica una interrupcion total del servicio), tipo (siempre CORRECTIVO), sucursalId (el id de la sucursal mencionada de esta lista, o null si no esta claro), activoId (el id del activo mencionado de esta lista, o null si no esta claro). Sucursales y activos disponibles: ' + JSON.stringify($json.sucursales) }, { role: 'user', content: $json.texto } ] }) }}"
+        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nconst historialTexto = contexto.historial.map((m) => `${m.rol === 'USUARIO' ? 'Cliente' : 'Asistente'}: ${m.contenido}`).join('\\n');\n\nconst prompt = `Sos el asistente de soporte tecnico de NexIT, atendiendo por chat a ${contexto.usuarioNombre} de ${contexto.clienteNombre}.\n\nSucursales y equipos (activos) de este cliente:\n${JSON.stringify(contexto.sucursales)}\n\nHistorial completo de la conversacion (el ultimo mensaje es el mas reciente):\n${historialTexto}\n\nTu trabajo, en este orden:\n1. Si el ultimo mensaje del cliente es un saludo o no tiene detalle tecnico (\"hola\", \"tengo un problema\"), NO crees un ticket todavia - respondé con una pregunta concreta para entender que pasa (que equipo, que sintoma exacto, desde cuando).\n2. Si ya entendiste el problema y existe una solucion simple y segura que el cliente pueda intentar el mismo (reiniciar el equipo, revisar que este enchufado/con corriente, verificar un cable), sugerisela y pregunta si funciono - todavia sin crear ticket.\n3. Si el cliente ya confirmo que la sugerencia no resolvio nada, o el problema es evidentemente grave o no autogestionable (no enciende, olor a quemado, chispas, corte total, dano fisico), crea el ticket con los datos ya reunidos en la conversacion. Prioriza ALTA o CRITICA para fallas totales/de seguridad, MEDIA para lo demas.\n4. Si el cliente dice que ya se solucino o no necesita nada mas, cerra la conversacion sin ticket.\n\nNunca inventes datos que el cliente no dio - si falta el nombre de la sede y el cliente tiene mas de una, deja sucursalId en null (el sistema le va a preguntar directamente cual es).\n\nDevolve SOLO un JSON con esta forma exacta:\n{\n  \"accion\": \"PREGUNTAR\" o \"SUGERIR_SOLUCION\" o \"CREAR_TICKET\" o \"CERRAR_SIN_TICKET\",\n  \"mensaje\": \"el texto que le vas a responder al cliente, en español, tono cordial y breve\",\n  \"ticket\": null o { \"titulo\": \"...\", \"descripcion\": \"...\", \"prioridad\": \"CRITICA\" o \"ALTA\" o \"MEDIA\" o \"BAJA\", \"sucursalId\": \"...\" o null, \"activoId\": \"...\" o null }\n}`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  conversacionId: contexto.conversacionId,\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  accion: ai.accion,\n  mensajeAsistente: ai.mensaje,\n  ticket: ai.ticket || undefined,\n} }];"
       },
-      "id": "ia-extraer",
-      "name": "IA - Extraer datos del ticket",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [880, -100],
-      "credentials": { "httpHeaderAuth": { "id": "REEMPLAZAR", "name": "OpenAI API Key" } }
-    },
-    {
-      "parameters": {
-        "jsCode": "const ai = JSON.parse($input.first().json.choices[0].message.content);\nconst contexto = $('Contexto cliente').item.json;\nreturn [{ json: {\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  titulo: ai.titulo,\n  descripcion: ai.descripcion,\n  prioridad: ai.prioridad || 'MEDIA',\n  tipo: ai.tipo || 'CORRECTIVO',\n  sucursalId: ai.sucursalId || undefined,\n  activoId: ai.activoId || undefined,\n} }];"
-      },
-      "id": "parsear-ia",
-      "name": "Parsear respuesta IA",
+      "id": "ia-decidir-paso",
+      "name": "IA: decidir siguiente paso",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, -100]
+      "position": [880, -100]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://nexit.tuempresa.com/api/n8n/crear-ticket-chat",
+        "url": "https://nexit.tuempresa.com/api/n8n/conversacion/turno",
         "sendHeaders": true,
         "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json) }}"
+        "jsonBody": "={{ JSON.stringify({ conversacionId: $json.conversacionId, accion: $json.accion, mensajeAsistente: $json.mensajeAsistente, ticket: $json.ticket }) }}"
       },
-      "id": "crear-ticket-chat",
-      "name": "Crear ticket (chat)",
+      "id": "guardar-turno-cliente",
+      "name": "Guardar turno",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, -100]
+      "position": [1100, -100]
     },
     {
       "parameters": {
@@ -769,46 +723,45 @@ campo del nodo Webhook/IF/Switch según tu versión de n8n.
           ]
         }
       },
-      "id": "switch-canal",
+      "id": "switch-canal-cliente",
       "name": "Switch por canal",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [1320, 200]
+      "position": [1320, 0]
     },
     {
       "parameters": { "chatId": "={{ $json.identificador }}", "text": "={{ $json.mensaje }}" },
-      "id": "telegram-responder",
+      "id": "telegram-responder-cliente",
       "name": "Telegram - Responder",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1540, 100],
+      "position": [1540, -100],
       "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
     },
     {
       "parameters": { "from": "whatsapp:+14155238886", "to": "=whatsapp:{{ $json.identificador }}", "message": "={{ $json.mensaje }}" },
-      "id": "twilio-responder",
+      "id": "twilio-responder-cliente",
       "name": "Twilio - Responder",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [1540, 300],
+      "position": [1540, 100],
       "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
     }
   ],
   "connections": {
     "Telegram Trigger": { "main": [[{ "node": "Normalizar Telegram", "type": "main", "index": 0 }]] },
     "Webhook WhatsApp (Twilio)": { "main": [[{ "node": "Normalizar WhatsApp", "type": "main", "index": 0 }]] },
-    "Normalizar Telegram": { "main": [[{ "node": "Contexto cliente", "type": "main", "index": 0 }]] },
-    "Normalizar WhatsApp": { "main": [[{ "node": "Contexto cliente", "type": "main", "index": 0 }]] },
-    "Contexto cliente": { "main": [[{ "node": "IF encontrado", "type": "main", "index": 0 }]] },
+    "Normalizar Telegram": { "main": [[{ "node": "Guardar mensaje", "type": "main", "index": 0 }]] },
+    "Normalizar WhatsApp": { "main": [[{ "node": "Guardar mensaje", "type": "main", "index": 0 }]] },
+    "Guardar mensaje": { "main": [[{ "node": "IF encontrado", "type": "main", "index": 0 }]] },
     "IF encontrado": {
       "main": [
-        [{ "node": "IA - Extraer datos del ticket", "type": "main", "index": 0 }],
+        [{ "node": "IA: decidir siguiente paso", "type": "main", "index": 0 }],
         [{ "node": "Switch por canal", "type": "main", "index": 0 }]
       ]
     },
-    "IA - Extraer datos del ticket": { "main": [[{ "node": "Parsear respuesta IA", "type": "main", "index": 0 }]] },
-    "Parsear respuesta IA": { "main": [[{ "node": "Crear ticket (chat)", "type": "main", "index": 0 }]] },
-    "Crear ticket (chat)": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "IA: decidir siguiente paso": { "main": [[{ "node": "Guardar turno", "type": "main", "index": 0 }]] },
+    "Guardar turno": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
     "Switch por canal": {
       "main": [
         [{ "node": "Telegram - Responder", "type": "main", "index": 0 }],
@@ -818,16 +771,6 @@ campo del nodo Webhook/IF/Switch según tu versión de n8n.
   }
 }
 ```
-
-### f) Probar sin gastar en WhatsApp real
-
-El WhatsApp Sandbox de Twilio es gratis y no requiere aprobación de Meta — alcanza
-para todo este flujo en desarrollo. Para producción con un número propio hace falta
-pasar por el proceso de verificación de WhatsApp Business de Meta (vía Twilio o
-directo); el nodo/credencial de Twilio en n8n no cambia, solo el número `from`.
-
-Para Telegram no hace falta nada especial: un bot de `@BotFather` funciona igual en
-desarrollo y producción.
 
 ## 7. Técnico: seguimiento de tickets por chat
 

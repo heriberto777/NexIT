@@ -46,6 +46,17 @@ enum EstadoActivo {
   DADO_DE_BAJA
 }
 
+enum EstadoConversacionChat {
+  ACTIVA
+  RESUELTA_SIN_TICKET
+  CONVERTIDA_A_TICKET
+}
+
+enum RolMensajeChat {
+  USUARIO
+  ASISTENTE
+}
+
 enum TipoRespuestaChecklist {
   BOOLEANO
   TEXTO
@@ -243,6 +254,7 @@ model Usuario {
   planesPreventivos     PlanMantenimientoPreventivo[]
   movimientosInventario MovimientoInventario[]
   registrosAuditoria    RegistroAuditoria[]
+  conversacionesChat    ConversacionChat[]
 
   @@index([clienteId])
   @@map("usuarios")
@@ -412,6 +424,7 @@ model Ticket {
   firmas              FirmaDigital[]
   repuestos           TicketRepuesto[]
   cotizaciones        Cotizacion[]
+  conversacionChat    ConversacionChat?
 
   @@index([clienteId, estado])
   @@index([tecnicoAsignadoId, estado])
@@ -601,4 +614,41 @@ model RegistroError {
 
   @@index([createdAt])
   @@map("registros_error")
+}
+
+// ---------- Asistente de IA por chat (cliente) ----------
+
+// El estado de la conversación vive en NexIT, no en n8n: cada mensaje de Telegram/
+// WhatsApp dispara una ejecución de workflow SEPARADA y sin memoria propia — sin esto,
+// la IA no tendría forma de "recordar" lo que el cliente ya contó en el mensaje
+// anterior. `canal`/`identificador` (no una relación directa a un ticket) identifican
+// a quién pertenece, porque la conversación empieza ANTES de que exista un ticket.
+model ConversacionChat {
+  id            String                 @id @default(cuid())
+  usuarioId     String
+  usuario       Usuario                @relation(fields: [usuarioId], references: [id])
+  canal         String
+  identificador String
+  estado        EstadoConversacionChat @default(ACTIVA)
+  ticketId      String?                @unique
+  ticket        Ticket?                @relation(fields: [ticketId], references: [id])
+  createdAt     DateTime               @default(now())
+  actualizadaAt DateTime               @updatedAt
+
+  mensajes MensajeConversacion[]
+
+  @@index([usuarioId, estado])
+  @@map("conversaciones_chat")
+}
+
+model MensajeConversacion {
+  id             String           @id @default(cuid())
+  conversacionId String
+  conversacion   ConversacionChat @relation(fields: [conversacionId], references: [id])
+  rol            RolMensajeChat
+  contenido      String
+  createdAt      DateTime         @default(now())
+
+  @@index([conversacionId])
+  @@map("mensajes_conversacion")
 }

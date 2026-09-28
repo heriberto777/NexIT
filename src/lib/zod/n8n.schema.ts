@@ -34,6 +34,44 @@ export const crearTicketChatSchema = z.object({
 });
 export type CrearTicketChatInput = z.infer<typeof crearTicketChatSchema>;
 
+// ---------- Asistente conversacional por chat (cliente) ----------
+
+export const mensajeConversacionSchema = z.object({
+  canal: canalChatSchema,
+  identificador: z.string().trim().min(1, "Requerido"),
+  texto: z.string().trim().min(1, "Requerido").max(4000),
+});
+export type MensajeConversacionInput = z.infer<typeof mensajeConversacionSchema>;
+
+export const accionTurnoSchema = z.enum(["PREGUNTAR", "SUGERIR_SOLUCION", "CREAR_TICKET", "CERRAR_SIN_TICKET"]);
+
+// Los datos del ticket son opcionales a nivel de schema porque solo hacen falta cuando
+// accion=CREAR_TICKET — el refine exige que vengan completos en ese caso puntual, sin
+// forzar al resto de las acciones (PREGUNTAR/SUGERIR_SOLUCION/CERRAR_SIN_TICKET) a
+// mandar un objeto ticket vacío/dummy.
+export const turnoConversacionSchema = z
+  .object({
+    conversacionId: z.string().cuid(),
+    accion: accionTurnoSchema,
+    mensajeAsistente: z.string().trim().min(1, "Requerido").max(2000),
+    ticket: z
+      .object({
+        titulo: z.string().trim().min(5).max(120),
+        descripcion: z.string().trim().min(10).max(4000),
+        tipo: tipoTicketSchema.default("CORRECTIVO"),
+        categoriaSoporte: categoriaSoporteSchema.default("SOFTWARE"),
+        prioridad: prioridadSchema.default("MEDIA"),
+        sucursalId: optionalCuid(),
+        activoId: optionalCuid(),
+      })
+      .optional(),
+  })
+  .refine((data) => data.accion !== "CREAR_TICKET" || Boolean(data.ticket), {
+    message: "Falta el objeto ticket para accion=CREAR_TICKET",
+    path: ["ticket"],
+  });
+export type TurnoConversacionInput = z.infer<typeof turnoConversacionSchema>;
+
 // ---------- Técnico: seguimiento de tickets asignados por chat ----------
 
 export const identidadChatSchema = z.object({

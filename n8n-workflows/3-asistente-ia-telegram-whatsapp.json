@@ -1,447 +1,159 @@
 {
-  "name": "NexIT - Asistente IA Telegram/WhatsApp",
+  "name": "NexIT - Asistente IA conversacional (Telegram/WhatsApp)",
   "nodes": [
     {
-      "parameters": {
-        "updates": [
-          "message"
-        ]
-      },
-      "id": "telegram-trigger",
+      "parameters": { "updates": ["message"] },
+      "id": "telegram-trigger-cliente",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [
-        0,
-        -160
-      ],
-      "credentials": {
-        "telegramApi": {
-          "id": "REEMPLAZAR",
-          "name": "NexIT Telegram Bot"
-        }
-      }
+      "position": [0, -160],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
     },
     {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "nexit-whatsapp-in",
-        "responseMode": "onReceived"
-      },
-      "id": "webhook-whatsapp",
+      "parameters": { "httpMethod": "POST", "path": "nexit-cliente-whatsapp-in", "responseMode": "onReceived" },
+      "id": "webhook-whatsapp-cliente",
       "name": "Webhook WhatsApp (Twilio)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        0,
-        160
-      ]
+      "position": [0, 160]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "1",
-              "name": "canal",
-              "value": "TELEGRAM",
-              "type": "string"
-            },
-            {
-              "id": "2",
-              "name": "identificador",
-              "value": "={{ $json.message.chat.id }}",
-              "type": "string"
-            },
-            {
-              "id": "3",
-              "name": "texto",
-              "value": "={{ $json.message.text }}",
-              "type": "string"
-            }
+            { "id": "1", "name": "canal", "value": "TELEGRAM", "type": "string" },
+            { "id": "2", "name": "identificador", "value": "={{ $json.message.chat.id }}", "type": "string" },
+            { "id": "3", "name": "texto", "value": "={{ $json.message.text }}", "type": "string" }
           ]
         }
       },
-      "id": "normalizar-telegram",
+      "id": "normalizar-telegram-cliente",
       "name": "Normalizar Telegram",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        220,
-        -160
-      ]
+      "position": [220, -160]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "1",
-              "name": "canal",
-              "value": "WHATSAPP",
-              "type": "string"
-            },
-            {
-              "id": "2",
-              "name": "identificador",
-              "value": "={{ $json.body.From.replace('whatsapp:', '') }}",
-              "type": "string"
-            },
-            {
-              "id": "3",
-              "name": "texto",
-              "value": "={{ $json.body.Body }}",
-              "type": "string"
-            }
+            { "id": "1", "name": "canal", "value": "WHATSAPP", "type": "string" },
+            { "id": "2", "name": "identificador", "value": "={{ $json.body.From.replace('whatsapp:', '') }}", "type": "string" },
+            { "id": "3", "name": "texto", "value": "={{ $json.body.Body }}", "type": "string" }
           ]
         }
       },
-      "id": "normalizar-whatsapp",
+      "id": "normalizar-whatsapp-cliente",
       "name": "Normalizar WhatsApp",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        220,
-        160
-      ]
+      "position": [220, 160]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://nexit.tuempresa.com/api/n8n/contexto-cliente",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "canal",
-              "value": "={{ $json.canal }}"
-            },
-            {
-              "name": "identificador",
-              "value": "={{ $json.identificador }}"
-            },
-            {
-              "name": "texto",
-              "value": "={{ $json.texto }}"
-            }
-          ]
-        },
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/conversacion/mensaje",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
-            }
-          ]
-        }
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
       },
-      "id": "contexto-cliente",
-      "name": "Contexto cliente",
+      "id": "guardar-mensaje-cliente",
+      "name": "Guardar mensaje",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        440,
-        0
-      ]
+      "position": [440, 0]
     },
     {
       "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{$json.encontrado}}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true"
-              }
-            }
-          ]
-        }
+        "conditions": { "conditions": [{ "leftValue": "={{$json.encontrado}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] }
       },
-      "id": "if-encontrado",
+      "id": "if-encontrado-cliente",
       "name": "IF encontrado",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        660,
-        0
-      ]
+      "position": [660, 0]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.openai.com/v1/chat/completions",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'Sos un asistente que extrae datos de tickets de soporte tecnico a partir de un mensaje de chat de un cliente. Devolve SOLO un JSON con las claves: titulo (string, maximo 120 caracteres), descripcion (string, el problema reescrito claramente), prioridad (uno de CRITICA, ALTA, MEDIA, BAJA - usa CRITICA solo si implica una interrupcion total del servicio), tipo (siempre CORRECTIVO), sucursalId (el id de la sucursal mencionada de esta lista, o null si no esta claro), activoId (el id del activo mencionado de esta lista, o null si no esta claro). Sucursales y activos disponibles: ' + JSON.stringify($json.sucursales) }, { role: 'user', content: $json.texto } ] }) }}"
+        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nconst historialTexto = contexto.historial.map((m) => `${m.rol === 'USUARIO' ? 'Cliente' : 'Asistente'}: ${m.contenido}`).join('\\n');\n\nconst prompt = `Sos el asistente de soporte tecnico de NexIT, atendiendo por chat a ${contexto.usuarioNombre} de ${contexto.clienteNombre}.\n\nSucursales y equipos (activos) de este cliente:\n${JSON.stringify(contexto.sucursales)}\n\nHistorial completo de la conversacion (el ultimo mensaje es el mas reciente):\n${historialTexto}\n\nTu trabajo, en este orden:\n1. Si el ultimo mensaje del cliente es un saludo o no tiene detalle tecnico (\"hola\", \"tengo un problema\"), NO crees un ticket todavia - respondé con una pregunta concreta para entender que pasa (que equipo, que sintoma exacto, desde cuando).\n2. Si ya entendiste el problema y existe una solucion simple y segura que el cliente pueda intentar el mismo (reiniciar el equipo, revisar que este enchufado/con corriente, verificar un cable), sugerisela y pregunta si funciono - todavia sin crear ticket.\n3. Si el cliente ya confirmo que la sugerencia no resolvio nada, o el problema es evidentemente grave o no autogestionable (no enciende, olor a quemado, chispas, corte total, dano fisico), crea el ticket con los datos ya reunidos en la conversacion. Prioriza ALTA o CRITICA para fallas totales/de seguridad, MEDIA para lo demas.\n4. Si el cliente dice que ya se solucino o no necesita nada mas, cerra la conversacion sin ticket.\n\nNunca inventes datos que el cliente no dio - si falta el nombre de la sede y el cliente tiene mas de una, deja sucursalId en null (el sistema le va a preguntar directamente cual es).\n\nDevolve SOLO un JSON con esta forma exacta:\n{\n  \"accion\": \"PREGUNTAR\" o \"SUGERIR_SOLUCION\" o \"CREAR_TICKET\" o \"CERRAR_SIN_TICKET\",\n  \"mensaje\": \"el texto que le vas a responder al cliente, en español, tono cordial y breve\",\n  \"ticket\": null o { \"titulo\": \"...\", \"descripcion\": \"...\", \"prioridad\": \"CRITICA\" o \"ALTA\" o \"MEDIA\" o \"BAJA\", \"sucursalId\": \"...\" o null, \"activoId\": \"...\" o null }\n}`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  conversacionId: contexto.conversacionId,\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  accion: ai.accion,\n  mensajeAsistente: ai.mensaje,\n  ticket: ai.ticket || undefined,\n} }];"
       },
-      "id": "ia-extraer",
-      "name": "IA - Extraer datos del ticket",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        880,
-        -100
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR",
-          "name": "OpenAI API Key"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const ai = JSON.parse($input.first().json.choices[0].message.content);\nconst contexto = $('Contexto cliente').item.json;\nreturn [{ json: {\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  titulo: ai.titulo,\n  descripcion: ai.descripcion,\n  prioridad: ai.prioridad || 'MEDIA',\n  tipo: ai.tipo || 'CORRECTIVO',\n  sucursalId: ai.sucursalId || undefined,\n  activoId: ai.activoId || undefined,\n} }];"
-      },
-      "id": "parsear-ia",
-      "name": "Parsear respuesta IA",
+      "id": "ia-decidir-paso",
+      "name": "IA: decidir siguiente paso",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1100,
-        -100
-      ]
+      "position": [880, -100]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://nexit.tuempresa.com/api/n8n/crear-ticket-chat",
+        "url": "https://nexit.tuempresa.com/api/n8n/conversacion/turno",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
-            }
-          ]
-        },
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json) }}"
+        "jsonBody": "={{ JSON.stringify({ conversacionId: $json.conversacionId, accion: $json.accion, mensajeAsistente: $json.mensajeAsistente, ticket: $json.ticket }) }}"
       },
-      "id": "crear-ticket-chat",
-      "name": "Crear ticket (chat)",
+      "id": "guardar-turno-cliente",
+      "name": "Guardar turno",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1320,
-        -100
-      ]
+      "position": [1100, -100]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{$json.canal}}",
-                    "rightValue": "TELEGRAM",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{$json.canal}}",
-                    "rightValue": "WHATSAPP",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            }
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "TELEGRAM", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "WHATSAPP", "operator": { "type": "string", "operation": "equals" } }] } }
           ]
         }
       },
-      "id": "switch-canal",
+      "id": "switch-canal-cliente",
       "name": "Switch por canal",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [
-        1320,
-        200
-      ]
+      "position": [1320, 0]
     },
     {
-      "parameters": {
-        "chatId": "={{ $json.identificador }}",
-        "text": "={{ $json.mensaje }}"
-      },
-      "id": "telegram-responder",
+      "parameters": { "chatId": "={{ $json.identificador }}", "text": "={{ $json.mensaje }}" },
+      "id": "telegram-responder-cliente",
       "name": "Telegram - Responder",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        1540,
-        100
-      ],
-      "credentials": {
-        "telegramApi": {
-          "id": "REEMPLAZAR",
-          "name": "NexIT Telegram Bot"
-        }
-      }
+      "position": [1540, -100],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
     },
     {
-      "parameters": {
-        "from": "whatsapp:+14155238886",
-        "to": "=whatsapp:{{ $json.identificador }}",
-        "message": "={{ $json.mensaje }}"
-      },
-      "id": "twilio-responder",
+      "parameters": { "from": "whatsapp:+14155238886", "to": "=whatsapp:{{ $json.identificador }}", "message": "={{ $json.mensaje }}" },
+      "id": "twilio-responder-cliente",
       "name": "Twilio - Responder",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [
-        1540,
-        300
-      ],
-      "credentials": {
-        "twilioApi": {
-          "id": "REEMPLAZAR",
-          "name": "NexIT Twilio"
-        }
-      }
+      "position": [1540, 100],
+      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
     }
   ],
   "connections": {
-    "Telegram Trigger": {
-      "main": [
-        [
-          {
-            "node": "Normalizar Telegram",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Webhook WhatsApp (Twilio)": {
-      "main": [
-        [
-          {
-            "node": "Normalizar WhatsApp",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalizar Telegram": {
-      "main": [
-        [
-          {
-            "node": "Contexto cliente",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalizar WhatsApp": {
-      "main": [
-        [
-          {
-            "node": "Contexto cliente",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Contexto cliente": {
-      "main": [
-        [
-          {
-            "node": "IF encontrado",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
+    "Telegram Trigger": { "main": [[{ "node": "Normalizar Telegram", "type": "main", "index": 0 }]] },
+    "Webhook WhatsApp (Twilio)": { "main": [[{ "node": "Normalizar WhatsApp", "type": "main", "index": 0 }]] },
+    "Normalizar Telegram": { "main": [[{ "node": "Guardar mensaje", "type": "main", "index": 0 }]] },
+    "Normalizar WhatsApp": { "main": [[{ "node": "Guardar mensaje", "type": "main", "index": 0 }]] },
+    "Guardar mensaje": { "main": [[{ "node": "IF encontrado", "type": "main", "index": 0 }]] },
     "IF encontrado": {
       "main": [
-        [
-          {
-            "node": "IA - Extraer datos del ticket",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Switch por canal",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "IA: decidir siguiente paso", "type": "main", "index": 0 }],
+        [{ "node": "Switch por canal", "type": "main", "index": 0 }]
       ]
     },
-    "IA - Extraer datos del ticket": {
-      "main": [
-        [
-          {
-            "node": "Parsear respuesta IA",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parsear respuesta IA": {
-      "main": [
-        [
-          {
-            "node": "Crear ticket (chat)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Crear ticket (chat)": {
-      "main": [
-        [
-          {
-            "node": "Switch por canal",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
+    "IA: decidir siguiente paso": { "main": [[{ "node": "Guardar turno", "type": "main", "index": 0 }]] },
+    "Guardar turno": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
     "Switch por canal": {
       "main": [
-        [
-          {
-            "node": "Telegram - Responder",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Twilio - Responder",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Telegram - Responder", "type": "main", "index": 0 }],
+        [{ "node": "Twilio - Responder", "type": "main", "index": 0 }]
       ]
     }
   }
