@@ -155,10 +155,15 @@ export async function generarTicketsPreventivos({ diasVentana, usuarioId }: Gene
         titulo: ticket.titulo,
         prioridad: ticket.prioridad,
         esReasignacion: false,
+        origen: "PROGRAMADO",
         tecnicoNombre: plan.tecnicoAsignado.nombre,
         tecnicoEmail: plan.tecnicoAsignado.email,
         tecnicoTelegramChatId: plan.tecnicoAsignado.telegramChatId,
         tecnicoWhatsapp: plan.tecnicoAsignado.whatsappTelefono,
+        reportadoPorNombre: coordinador.nombre,
+        reportadoPorEmail: coordinador.email,
+        reportadoPorTelegramChatId: coordinador.telegramChatId,
+        reportadoPorWhatsapp: coordinador.whatsappTelefono,
       });
     }
 

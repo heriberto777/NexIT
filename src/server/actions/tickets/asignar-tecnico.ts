@@ -21,7 +21,7 @@ export async function asignarTecnico(input: AsignarTicketInput) {
   const { ticketId, tecnicoId } = asignarTicketSchema.parse(input);
 
   const [ticket, tecnico] = await Promise.all([
-    prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: { cliente: true } }),
+    prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: { cliente: true, creadoPor: true } }),
     prisma.usuario.findUniqueOrThrow({ where: { id: tecnicoId } }),
   ]);
 
@@ -68,10 +68,15 @@ export async function asignarTecnico(input: AsignarTicketInput) {
     titulo: ticket.titulo,
     prioridad: ticket.prioridad,
     esReasignacion: Boolean(ticket.tecnicoAsignadoId),
+    origen: ticket.origen,
     tecnicoNombre: tecnico.nombre,
     tecnicoEmail: tecnico.email,
     tecnicoTelegramChatId: tecnico.telegramChatId,
     tecnicoWhatsapp: tecnico.whatsappTelefono,
+    reportadoPorNombre: ticket.creadoPor.nombre,
+    reportadoPorEmail: ticket.creadoPor.email,
+    reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
+    reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
   });
 
   return { id: actualizado.id, estado: actualizado.estado };

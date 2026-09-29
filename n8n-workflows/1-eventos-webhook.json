@@ -6,18 +6,13 @@
         "httpMethod": "POST",
         "path": "nexit-events",
         "responseMode": "responseNode",
-        "options": {
-          "rawBody": true
-        }
+        "options": { "rawBody": true }
       },
       "id": "webhook-nexit",
       "name": "Webhook NexIT",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
@@ -27,85 +22,24 @@
       "name": "Verificar firma HMAC",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        220,
-        0
-      ]
+      "position": [220, 0]
     },
     {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { \"recibido\": true } }}"
-      },
+      "parameters": { "respondWith": "json", "responseBody": "={{ { \"recibido\": true } }}" },
       "id": "responder-ok",
       "name": "Respond 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        440,
-        0
-      ]
+      "position": [440, 0]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{$json.evento}}",
-                    "rightValue": "TICKET_CREADO",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{$json.evento}}",
-                    "rightValue": "TICKET_CAMBIO_ESTADO",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{$json.evento}}",
-                    "rightValue": "SLA_EN_RIESGO",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{$json.evento}}",
-                    "rightValue": "TICKET_ASIGNADO",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              }
-            }
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "TICKET_CREADO", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "TICKET_CAMBIO_ESTADO", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "SLA_EN_RIESGO", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "TICKET_ASIGNADO", "operator": { "type": "string", "operation": "equals" } }] } }
           ]
         }
       },
@@ -113,34 +47,17 @@
       "name": "Switch por evento",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [
-        660,
-        0
-      ]
+      "position": [660, 0]
     },
     {
       "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{$json.data.origen}}",
-              "rightValue": "PORTAL",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ]
-        }
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.origen}}", "rightValue": "PORTAL", "operator": { "type": "string", "operation": "equals" } }] }
       },
       "id": "if-origen-portal",
       "name": "IF origen PORTAL",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        880,
-        -200
-      ]
+      "position": [880, -420]
     },
     {
       "parameters": {
@@ -153,34 +70,62 @@
       "name": "Email confirmacion ticket",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
-      "position": [
-        1100,
-        -260
-      ]
+      "position": [1100, -480]
     },
     {
       "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{$json.data.estadoNuevo}}",
-              "rightValue": "ESPERANDO_VALIDACION",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ]
-        }
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorTelegramChatId}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+      },
+      "id": "if-cliente-telegram-creado",
+      "name": "IF cliente tiene Telegram (creado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, -380]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
+        "text": "=Hola {{$json.data.reportadoPorNombre}}! Registramos tu solicitud \"{{$json.data.titulo}}\" (ticket #{{$json.data.numeroTicket}}) con prioridad {{$json.data.prioridad}}. Te avisaremos cuando un tecnico la atienda."
+      },
+      "id": "telegram-confirmacion-creado",
+      "name": "Telegram confirmacion ticket",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1320, -420],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorWhatsapp}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+      },
+      "id": "if-cliente-whatsapp-creado",
+      "name": "IF cliente tiene WhatsApp (creado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, -280]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
+        "message": "=Hola {{$json.data.reportadoPorNombre}}! Registramos tu solicitud \"{{$json.data.titulo}}\" (ticket #{{$json.data.numeroTicket}}) con prioridad {{$json.data.prioridad}}. Te avisaremos cuando un tecnico la atienda."
+      },
+      "id": "twilio-confirmacion-creado",
+      "name": "Twilio confirmacion ticket",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1320, -280],
+      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.estadoNuevo}}", "rightValue": "ESPERANDO_VALIDACION", "operator": { "type": "string", "operation": "equals" } }] }
       },
       "id": "if-esperando-validacion",
       "name": "IF ESPERANDO_VALIDACION",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        880,
-        0
-      ]
+      "position": [880, -120]
     },
     {
       "parameters": {
@@ -193,10 +138,52 @@
       "name": "Email revisar y aprobar",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
-      "position": [
-        1100,
-        40
-      ]
+      "position": [1100, -180]
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorTelegramChatId}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+      },
+      "id": "if-cliente-telegram-validacion",
+      "name": "IF cliente tiene Telegram (validacion)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, -80]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
+        "text": "=El tecnico finalizo la visita del ticket #{{$json.data.numeroTicket}}. Ingresa a {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}} para revisar el informe y aprobar o rechazar."
+      },
+      "id": "telegram-revisar-aprobar",
+      "name": "Telegram revisar y aprobar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1320, -120],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorWhatsapp}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+      },
+      "id": "if-cliente-whatsapp-validacion",
+      "name": "IF cliente tiene WhatsApp (validacion)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 20]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
+        "message": "=El tecnico finalizo la visita del ticket #{{$json.data.numeroTicket}}. Ingresa a {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}} para revisar el informe y aprobar o rechazar."
+      },
+      "id": "twilio-revisar-aprobar",
+      "name": "Twilio revisar y aprobar",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1320, 20],
+      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
     },
     {
       "parameters": {
@@ -207,34 +194,18 @@
       "name": "Telegram alerta SLA",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        880,
-        240
-      ]
+      "position": [880, 140],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
     },
     {
       "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{$json.data.tecnicoTelegramChatId}}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            }
-          ]
-        }
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.tecnicoTelegramChatId}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
       },
       "id": "if-tecnico-telegram",
       "name": "IF técnico tiene Telegram",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        880,
-        420
-      ]
+      "position": [880, 260]
     },
     {
       "parameters": {
@@ -245,34 +216,18 @@
       "name": "Telegram aviso asignacion",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        1100,
-        380
-      ]
+      "position": [1100, 220],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
     },
     {
       "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{$json.data.tecnicoWhatsapp}}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            }
-          ]
-        }
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.tecnicoWhatsapp}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
       },
       "id": "if-tecnico-whatsapp",
       "name": "IF técnico tiene WhatsApp",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        880,
-        560
-      ]
+      "position": [880, 320]
     },
     {
       "parameters": {
@@ -284,130 +239,117 @@
       "name": "Twilio aviso asignacion",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [
-        1100,
-        560
-      ]
+      "position": [1100, 320],
+      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.origen}}", "rightValue": "PORTAL", "operator": { "type": "string", "operation": "equals" } }] }
+      },
+      "id": "if-origen-portal-asignado",
+      "name": "IF origen PORTAL (asignado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 420]
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorTelegramChatId}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+      },
+      "id": "if-cliente-telegram-asignado",
+      "name": "IF cliente tiene Telegram (asignado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
+        "text": "=Un tecnico ({{$json.data.tecnicoNombre}}) fue asignado a tu ticket #{{$json.data.numeroTicket}} y ya esta trabajando en tu solicitud."
+      },
+      "id": "telegram-aviso-asignacion-cliente",
+      "name": "Telegram aviso asignacion (cliente)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1320, 380],
+      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorWhatsapp}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+      },
+      "id": "if-cliente-whatsapp-asignado",
+      "name": "IF cliente tiene WhatsApp (asignado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 500]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
+        "message": "=Un tecnico ({{$json.data.tecnicoNombre}}) fue asignado a tu ticket #{{$json.data.numeroTicket}} y ya esta trabajando en tu solicitud."
+      },
+      "id": "twilio-aviso-asignacion-cliente",
+      "name": "Twilio aviso asignacion (cliente)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1320, 500],
+      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
     }
   ],
   "connections": {
-    "Webhook NexIT": {
-      "main": [
-        [
-          {
-            "node": "Verificar firma HMAC",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Verificar firma HMAC": {
-      "main": [
-        [
-          {
-            "node": "Respond 200",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Respond 200": {
-      "main": [
-        [
-          {
-            "node": "Switch por evento",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
+    "Webhook NexIT": { "main": [[{ "node": "Verificar firma HMAC", "type": "main", "index": 0 }]] },
+    "Verificar firma HMAC": { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Respond 200": { "main": [[{ "node": "Switch por evento", "type": "main", "index": 0 }]] },
     "Switch por evento": {
       "main": [
+        [{ "node": "IF origen PORTAL", "type": "main", "index": 0 }],
+        [{ "node": "IF ESPERANDO_VALIDACION", "type": "main", "index": 0 }],
+        [{ "node": "Telegram alerta SLA", "type": "main", "index": 0 }],
         [
-          {
-            "node": "IF origen PORTAL",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "IF ESPERANDO_VALIDACION",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Telegram alerta SLA",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "IF técnico tiene Telegram",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "IF técnico tiene WhatsApp",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "IF técnico tiene Telegram", "type": "main", "index": 0 },
+          { "node": "IF técnico tiene WhatsApp", "type": "main", "index": 0 },
+          { "node": "IF origen PORTAL (asignado)", "type": "main", "index": 0 }
         ]
       ]
     },
     "IF origen PORTAL": {
       "main": [
         [
-          {
-            "node": "Email confirmacion ticket",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "Email confirmacion ticket", "type": "main", "index": 0 },
+          { "node": "IF cliente tiene Telegram (creado)", "type": "main", "index": 0 },
+          { "node": "IF cliente tiene WhatsApp (creado)", "type": "main", "index": 0 }
         ],
         []
       ]
     },
+    "IF cliente tiene Telegram (creado)": { "main": [[{ "node": "Telegram confirmacion ticket", "type": "main", "index": 0 }], []] },
+    "IF cliente tiene WhatsApp (creado)": { "main": [[{ "node": "Twilio confirmacion ticket", "type": "main", "index": 0 }], []] },
     "IF ESPERANDO_VALIDACION": {
       "main": [
         [
-          {
-            "node": "Email revisar y aprobar",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "Email revisar y aprobar", "type": "main", "index": 0 },
+          { "node": "IF cliente tiene Telegram (validacion)", "type": "main", "index": 0 },
+          { "node": "IF cliente tiene WhatsApp (validacion)", "type": "main", "index": 0 }
         ],
         []
       ]
     },
-    "IF técnico tiene Telegram": {
+    "IF cliente tiene Telegram (validacion)": { "main": [[{ "node": "Telegram revisar y aprobar", "type": "main", "index": 0 }], []] },
+    "IF cliente tiene WhatsApp (validacion)": { "main": [[{ "node": "Twilio revisar y aprobar", "type": "main", "index": 0 }], []] },
+    "IF técnico tiene Telegram": { "main": [[{ "node": "Telegram aviso asignacion", "type": "main", "index": 0 }], []] },
+    "IF técnico tiene WhatsApp": { "main": [[{ "node": "Twilio aviso asignacion", "type": "main", "index": 0 }], []] },
+    "IF origen PORTAL (asignado)": {
       "main": [
         [
-          {
-            "node": "Telegram aviso asignacion",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "IF cliente tiene Telegram (asignado)", "type": "main", "index": 0 },
+          { "node": "IF cliente tiene WhatsApp (asignado)", "type": "main", "index": 0 }
         ],
         []
       ]
     },
-    "IF técnico tiene WhatsApp": {
-      "main": [
-        [
-          {
-            "node": "Twilio aviso asignacion",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    }
+    "IF cliente tiene Telegram (asignado)": { "main": [[{ "node": "Telegram aviso asignacion (cliente)", "type": "main", "index": 0 }], []] },
+    "IF cliente tiene WhatsApp (asignado)": { "main": [[{ "node": "Twilio aviso asignacion (cliente)", "type": "main", "index": 0 }], []] }
   }
 }

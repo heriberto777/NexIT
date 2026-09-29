@@ -55,13 +55,24 @@ export type EventoWebhook =
       titulo: string;
       prioridad: string;
       esReasignacion: boolean;
-      // A diferencia de los demás eventos (destinatario: quien reportó el ticket), acá
-      // el destinatario es el TÉCNICO recién asignado — es a él a quien hay que avisarle
-      // que tiene trabajo nuevo, no al cliente.
+      // Igual que en TICKET_CREADO: cuando origen="PROGRAMADO" el "reportador" es el
+      // coordinador que corrió la generación automática, no un contacto real del
+      // cliente — el workflow de n8n debe filtrar por `origen` antes de notificarle al
+      // reportador (el coordinador ya sabe que generó el ticket, no hace falta avisarle
+      // que "le asignaron un técnico a su ticket").
+      origen: string;
+      // Dos destinatarios distintos en el mismo evento: el TÉCNICO recién asignado
+      // (que tiene trabajo nuevo) Y el cliente que reportó el ticket (a quien antes no
+      // le llegaba ningún aviso de que alguien ya estaba viendo su problema — ni
+      // siquiera por email). El workflow de n8n arma un mensaje para cada uno.
       tecnicoNombre: string;
       tecnicoEmail: string;
       tecnicoTelegramChatId: string | null;
       tecnicoWhatsapp: string | null;
+      reportadoPorNombre: string;
+      reportadoPorEmail: string;
+      reportadoPorTelegramChatId: string | null;
+      reportadoPorWhatsapp: string | null;
     };
 
 const TIMEOUT_MS = 8000;
