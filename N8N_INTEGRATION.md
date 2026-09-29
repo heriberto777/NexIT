@@ -155,80 +155,109 @@ forma de enterarse de trabajo nuevo salvo entrando a la app o preguntando por ch
 > `tecnicoWhatsapp`) y el **cliente** que reportó el ticket
 > (`reportadoPorNombre`/`reportadoPorEmail`/`reportadoPorTelegramChatId`/
 > `reportadoPorWhatsapp`) — antes el cliente no se enteraba en absoluto de que alguien
-> ya estaba viendo su problema. Mismo criterio que `TICKET_CREADO` para `origen`: si es
-> `"PROGRAMADO"`, el "reportador" es el coordinador que generó el ticket automáticamente
-> desde un preventivo, no un contacto real del cliente — el workflow filtra por
-> `origen == "PORTAL"` antes de notificarle al reportador (ver §3.e). Los 4 campos de
-> contacto son `null` si esa persona nunca vinculó ese canal desde `/perfil`.
+> ya estaba viendo su problema.
+>
+> **`origen` distingue "hay un contacto real del cliente" de "no lo hay"** — pero a
+> diferencia de `TICKET_CREADO` (donde el filtro es solo `"PORTAL"`, ver abajo), acá el
+> workflow filtra por `origen == "PORTAL" || origen == "CHATBOT"`: ambos son un cliente
+> real reportando directo (por el portal web o por el asistente de IA en
+> Telegram/WhatsApp), mientras que `"PROGRAMADO"` es el coordinador que generó el
+> ticket automáticamente desde un preventivo, y `"TELEFONO"` es el staff que lo cargó a
+> mano — a ninguno de esos dos tiene sentido avisarle "se te asignó un técnico" como si
+> fuera el cliente. (`TICKET_CREADO` sí excluye `CHATBOT` a propósito: ese cliente ya
+> recibió su confirmación dentro de la misma conversación de chat — ver §6 —, mandarle
+> otra por este evento sería duplicado.) Los 4 campos de contacto son `null` si esa
+> persona nunca vinculó ese canal desde `/perfil`.
 
-## 2. Verificar la firma HMAC en n8n
+## 2. Verificar la identidad del request en n8n
 
-El paso crítico es que n8n reciba el **body crudo** (los mismos bytes que NexIT
-firmó), no el JSON ya re-parseado — si n8n lo reserializa antes de calcular el HMAC,
-el resultado no va a coincidir aunque el contenido sea "igual" (cambia el orden de
-llaves, espacios, etc.).
+NexIT manda el secreto de dos formas en paralelo en cada webhook — usa la que te
+resulte más simple en tu versión de n8n:
 
-1. **Nodo Webhook**: método `POST`, en **Options** activa **"Raw Body"** (o
-   "Response Data" según tu versión) para que el body llegue como string crudo en vez
-   de objeto ya parseado. Configura **Respond**: "Using Respond to Webhook Node" (así
-   controlas cuándo responder, en vez de que n8n responda automáticamente antes de
-   terminar de procesar).
+- `Authorization: Bearer <WEBHOOK_SECRET>` — un string plano, no depende de tener el
+  body crudo ni de ningún módulo nativo. **Es la que usa el JSON importable de §5.**
+- `X-NexIT-Signature: sha256=<hmac>` — firma HMAC del body completo, más estricta
+  (protege contra que alguien con la URL pero sin el secreto reenvíe un payload
+  interceptado), pero exige que n8n reciba el **body crudo** (los mismos bytes que
+  NexIT firmó) — si n8n lo reserializa antes de calcular el HMAC, el resultado no va a
+  coincidir aunque el contenido sea "igual" (cambia el orden de llaves, espacios,
+  etc.). En la práctica esto depende mucho de la versión/config de n8n: en instancias
+  con Task Runners (n8n self-hosted moderno) además el nodo Code no puede hacer
+  `require('crypto')` (error `Module 'crypto' is disallowed`), y la opción "Raw Body"
+  del nodo Webhook no siempre entrega el body como string en vez de objeto ya
+  parseado — si te pasa esto último, no vale la pena pelear con reserializar el JSON
+  a mano (nunca va a dar el mismo hash byte a byte); usá Bearer.
 
-2. **Verificar la firma** — dos formas, usa la que prefieras:
+### Opción recomendada — verificar el header `Authorization` (Bearer)
 
-   **Opción A — nodo Crypto** (sin `require`, más simple):
-   - Operation: `Hmac`
-   - Type: `SHA256`
-   - Value: `{{$json.body}}` (el string crudo del paso 1 — el nombre exacto del
-     campo puede variar según tu versión de n8n; revísalo ejecutando el workflow una
-     vez con datos de prueba y mirando la pestaña "JSON" del nodo Webhook)
-   - Secret: tu `WEBHOOK_SECRET`, idealmente como variable de entorno de n8n
-     (`{{$env.WEBHOOK_SECRET}}`) en vez de pegarlo literal en el nodo
-   - Output Property Name: `firmaCalculada`
+Un solo nodo **IF** comparando:
+`={{ $json.headers.authorization }}` **igual a** `={{ 'Bearer ' + $env.WEBHOOK_SECRET }}`
 
-   Después, un nodo **IF** comparando:
-   `={{ 'sha256=' + $json.firmaCalculada }}` **igual a**
-   `={{ $('Webhook').item.json.headers['x-nexit-signature'] }}`
+Después, en la salida `true`, un nodo **Code** que parsea el body — sin `require`,
+funciona en cualquier versión, y es robusto a que el Webhook entregue `body` como
+string crudo O ya como objeto parseado (no hace falta saber cuál de las dos hace tu
+instancia):
 
-   **Opción B — nodo Code** (todo en un paso, requiere que tu instancia de n8n
-   permita `require('crypto')` en Code nodes — es un módulo built-in de Node, casi
-   siempre permitido por defecto):
+```js
+const raw = $('Webhook NexIT').item.json.body;
+return [{ json: typeof raw === 'string' ? JSON.parse(raw) : raw }];
+```
 
-   ```js
-   const crypto = require('crypto');
-   const secret = $env.WEBHOOK_SECRET;
-   const rawBody = $input.first().json.body; // ajusta el nombre según tu versión
-   const firmaRecibida = $input.first().json.headers['x-nexit-signature'] || '';
-   const firmaCalculada = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+(Ajustá `'Webhook NexIT'` al nombre real de tu nodo Webhook si le pusiste otro.)
 
-   if (firmaRecibida !== firmaCalculada) {
-     throw new Error('Firma inválida — posible request falsificado');
-   }
+### Opción avanzada — verificar también la firma HMAC
 
-   return [{ json: JSON.parse(rawBody) }];
-   ```
+Si además de Bearer querés la protección extra de la firma, primero confirmá que tu
+nodo Webhook realmente entrega el body como string: ejecutá el workflow una vez con
+datos de prueba y mirá la pestaña "JSON" del nodo Webhook — si `body` aparece como
+string (no como `{ evento: ..., data: {...} }` ya parseado), podés agregar:
 
-   Con la Opción B, un `throw` dentro de un Code node detiene el workflow y lo marca
-   como fallido — suficiente para rechazar el request sin construir un branch de error
-   aparte, aunque no le da un 401 explícito al llamador (NexIT no le importa el código
-   de estado; ya despachó el webhook en segundo plano y no reintenta).
+**Nodo Crypto** ("Calcular HMAC") antes del IF de arriba:
+- Action: `HMAC`, Type: `SHA256`, Encoding: `hex`
+- Value: `{{$json.body}}` (el string crudo)
+- Secret: `{{$env.WEBHOOK_SECRET}}`
+- Output/Data Property Name: `firmaCalculada`
 
-3. Si usaste la Opción A, agrega después del IN un nodo **Code** para convertir el
-   string crudo en objeto: `return [{ json: JSON.parse($json.body) }];` — a partir de
-   aquí, todos los ejemplos de expresiones (`{{$json.evento}}`, `{{$json.data...}}`)
-   asumen que ya pasaste por este parseo.
+Y cambiá la condición del IF a comparar
+`={{ 'sha256=' + $json.firmaCalculada }}` con
+`={{ $('Webhook NexIT').item.json.headers['x-nexit-signature'] }}` en vez de (o además
+de) el Bearer.
+
+**Alternativa, todo en un nodo Code** (solo si tu instancia permite `require('crypto')`
+— probalo con datos de prueba antes de confiar en esta opción; en instancias con Task
+Runners falla):
+
+```js
+const crypto = require('crypto');
+const secret = $env.WEBHOOK_SECRET;
+const rawBody = $input.first().json.body; // ajusta el nombre según tu versión
+const firmaRecibida = $input.first().json.headers['x-nexit-signature'] || '';
+const firmaCalculada = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+
+if (firmaRecibida !== firmaCalculada) {
+  throw new Error('Firma inválida — posible request falsificado');
+}
+
+return [{ json: JSON.parse(rawBody) }];
+```
+
+Un `throw` dentro de un Code node detiene el workflow y lo marca como fallido —
+suficiente para rechazar el request sin construir un branch de error aparte, aunque no
+le da un 401 explícito al llamador (NexIT no le importa el código de estado; ya
+despachó el webhook en segundo plano y no reintenta).
 
 ## 3. Workflow: enrutar por tipo de evento
 
 Con el body ya verificado y parseado, arma el resto así:
 
 ```
-Webhook → Crypto/Code (firma) → IF (firma válida) ─┬─ false → (fin, sin responder = 401 implícito, o Respond to Webhook 401)
-                                                     └─ true → Respond to Webhook (200 "recibido")
+Webhook → IF Verificar Bearer ─┬─ false → (fin, sin responder = 401 implícito, o Respond to Webhook 401)
+                                └─ true → Code (parsear body) → Respond to Webhook (200 "recibido")
                                                               → Switch (por $json.evento)
                                                                  ├─ TICKET_CREADO
                                                                  ├─ TICKET_CAMBIO_ESTADO
-                                                                 └─ SLA_EN_RIESGO
+                                                                 ├─ SLA_EN_RIESGO
+                                                                 └─ TICKET_ASIGNADO
 ```
 
 Responder ANTES del Switch es intencional: NexIT ya despachó el webhook de forma
@@ -312,7 +341,7 @@ Switch[TICKET_ASIGNADO] ─┬─ IF ($json.data.tecnicoTelegramChatId != null)
                           │                {{$json.data.titulo}}"
                           ├─ IF ($json.data.tecnicoWhatsapp != null)
                           │    └─ true → Twilio sendMessage al TÉCNICO (mismo texto)
-                          └─ IF ($json.data.origen == "PORTAL")
+                          └─ IF ($json.data.origen == "PORTAL" || $json.data.origen == "CHATBOT")
                                └─ true → IF ($json.data.reportadoPorTelegramChatId != null)
                                             └─ true → Telegram sendMessage al CLIENTE
                                                  chatId: {{$json.data.reportadoPorTelegramChatId}}
@@ -326,10 +355,12 @@ Switch[TICKET_ASIGNADO] ─┬─ IF ($json.data.tecnicoTelegramChatId != null)
 Las tres ramas que cuelgan directo del Switch (técnico Telegram, técnico WhatsApp, IF
 origen) son independientes entre sí — un técnico que vinculó ambos canales recibe el
 aviso por los dos, y en paralelo se evalúa si corresponde avisarle también al cliente.
-El IF de `origen` filtra igual que en §3.a: si el ticket vino de un plan preventivo
-(`origen: "PROGRAMADO"`), el "reportador" es el coordinador que lo generó, no un
-contacto real del cliente — no tiene sentido avisarle "te asignaron un técnico" a
-alguien que ya sabía que el ticket se iba a crear.
+El IF de `origen` acepta `PORTAL` **o** `CHATBOT` (ambos son un cliente real
+reportando directo) — si el ticket vino de un plan preventivo (`origen: "PROGRAMADO"`)
+o fue cargado a mano por soporte (`"TELEFONO"`), el "reportador" es un coordinador/
+staff, no un contacto real del cliente, y no tiene sentido avisarle "te asignaron un
+técnico" a alguien que ya sabía que el ticket se iba a crear.
+
 ## 4. Cron del chequeo de SLA (`Schedule Trigger`)
 
 ```
@@ -376,40 +407,130 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         "httpMethod": "POST",
         "path": "nexit-events",
         "responseMode": "responseNode",
-        "options": { "rawBody": true }
+        "options": {
+          "rawBody": true
+        }
       },
       "id": "webhook-nexit",
       "name": "Webhook NexIT",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst secret = $env.WEBHOOK_SECRET;\nconst rawBody = $input.first().json.body;\nconst firmaRecibida = $input.first().json.headers['x-nexit-signature'] || '';\nconst firmaCalculada = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');\nif (firmaRecibida !== firmaCalculada) {\n  throw new Error('Firma invalida');\n}\nreturn [{ json: JSON.parse(rawBody) }];"
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $(\"Webhook NexIT\").item.json.headers.authorization }}",
+              "rightValue": "={{ \"Bearer \" + $env.WEBHOOK_SECRET }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
       },
-      "id": "verificar-firma",
-      "name": "Verificar firma HMAC",
-      "type": "n8n-nodes-base.code",
+      "id": "verificar-bearer",
+      "name": "Verificar Bearer",
+      "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
-      "parameters": { "respondWith": "json", "responseBody": "={{ { \"recibido\": true } }}" },
+      "parameters": {
+        "jsCode": "const raw = $('Webhook NexIT').item.json.body;\nreturn [{ json: typeof raw === 'string' ? JSON.parse(raw) : raw }];"
+      },
+      "id": "parsear-body",
+      "name": "Parsear body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"recibido\": true } }}"
+      },
       "id": "responder-ok",
       "name": "Respond 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [440, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "TICKET_CREADO", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "TICKET_CAMBIO_ESTADO", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "SLA_EN_RIESGO", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "TICKET_ASIGNADO", "operator": { "type": "string", "operation": "equals" } }] } }
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "TICKET_CREADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "TICKET_CAMBIO_ESTADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "SLA_EN_RIESGO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "TICKET_ASIGNADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
           ]
         }
       },
@@ -417,17 +538,34 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Switch por evento",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [660, 0]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.origen}}", "rightValue": "PORTAL", "operator": { "type": "string", "operation": "equals" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.origen}}",
+              "rightValue": "PORTAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
       },
       "id": "if-origen-portal",
       "name": "IF origen PORTAL",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, -420]
+      "position": [
+        1320,
+        -420
+      ]
     },
     {
       "parameters": {
@@ -440,17 +578,34 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Email confirmacion ticket",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
-      "position": [1100, -480]
+      "position": [
+        1540,
+        -480
+      ]
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorTelegramChatId}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorTelegramChatId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
       },
       "id": "if-cliente-telegram-creado",
       "name": "IF cliente tiene Telegram (creado)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, -380]
+      "position": [
+        1540,
+        -380
+      ]
     },
     {
       "parameters": {
@@ -461,18 +616,40 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Telegram confirmacion ticket",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1320, -420],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        1760,
+        -420
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorWhatsapp}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorWhatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
       },
       "id": "if-cliente-whatsapp-creado",
       "name": "IF cliente tiene WhatsApp (creado)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, -280]
+      "position": [
+        1540,
+        -280
+      ]
     },
     {
       "parameters": {
@@ -484,18 +661,40 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Twilio confirmacion ticket",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [1320, -280],
-      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+      "position": [
+        1760,
+        -280
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.estadoNuevo}}", "rightValue": "ESPERANDO_VALIDACION", "operator": { "type": "string", "operation": "equals" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.estadoNuevo}}",
+              "rightValue": "ESPERANDO_VALIDACION",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
       },
       "id": "if-esperando-validacion",
       "name": "IF ESPERANDO_VALIDACION",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, -120]
+      "position": [
+        1320,
+        -120
+      ]
     },
     {
       "parameters": {
@@ -508,17 +707,34 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Email revisar y aprobar",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
-      "position": [1100, -180]
+      "position": [
+        1540,
+        -180
+      ]
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorTelegramChatId}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorTelegramChatId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
       },
       "id": "if-cliente-telegram-validacion",
       "name": "IF cliente tiene Telegram (validacion)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, -80]
+      "position": [
+        1540,
+        -80
+      ]
     },
     {
       "parameters": {
@@ -529,18 +745,40 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Telegram revisar y aprobar",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1320, -120],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        1760,
+        -120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorWhatsapp}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorWhatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
       },
       "id": "if-cliente-whatsapp-validacion",
       "name": "IF cliente tiene WhatsApp (validacion)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, 20]
+      "position": [
+        1540,
+        20
+      ]
     },
     {
       "parameters": {
@@ -552,8 +790,16 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Twilio revisar y aprobar",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [1320, 20],
-      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+      "position": [
+        1760,
+        20
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
     },
     {
       "parameters": {
@@ -564,18 +810,40 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Telegram alerta SLA",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [880, 140],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        1320,
+        140
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.tecnicoTelegramChatId}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.tecnicoTelegramChatId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
       },
       "id": "if-tecnico-telegram",
       "name": "IF técnico tiene Telegram",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 260]
+      "position": [
+        1320,
+        260
+      ]
     },
     {
       "parameters": {
@@ -586,18 +854,40 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Telegram aviso asignacion",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1100, 220],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        1540,
+        220
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.tecnicoWhatsapp}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.tecnicoWhatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
       },
       "id": "if-tecnico-whatsapp",
       "name": "IF técnico tiene WhatsApp",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 320]
+      "position": [
+        1320,
+        320
+      ]
     },
     {
       "parameters": {
@@ -609,28 +899,73 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Twilio aviso asignacion",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [1100, 320],
-      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+      "position": [
+        1540,
+        320
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.origen}}", "rightValue": "PORTAL", "operator": { "type": "string", "operation": "equals" } }] }
+        "conditions": {
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.origen}}",
+              "rightValue": "PORTAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{$json.data.origen}}",
+              "rightValue": "CHATBOT",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
       },
       "id": "if-origen-portal-asignado",
       "name": "IF origen PORTAL (asignado)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 420]
+      "position": [
+        1320,
+        420
+      ]
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorTelegramChatId}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorTelegramChatId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
       },
       "id": "if-cliente-telegram-asignado",
       "name": "IF cliente tiene Telegram (asignado)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, 400]
+      "position": [
+        1540,
+        400
+      ]
     },
     {
       "parameters": {
@@ -641,18 +976,40 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Telegram aviso asignacion (cliente)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1320, 380],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        1760,
+        380
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.reportadoPorWhatsapp}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorWhatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
       },
       "id": "if-cliente-whatsapp-asignado",
       "name": "IF cliente tiene WhatsApp (asignado)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, 500]
+      "position": [
+        1540,
+        500
+      ]
     },
     {
       "parameters": {
@@ -664,63 +1021,263 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Twilio aviso asignacion (cliente)",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [1320, 500],
-      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+      "position": [
+        1760,
+        500
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
     }
   ],
   "connections": {
-    "Webhook NexIT": { "main": [[{ "node": "Verificar firma HMAC", "type": "main", "index": 0 }]] },
-    "Verificar firma HMAC": { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
-    "Respond 200": { "main": [[{ "node": "Switch por evento", "type": "main", "index": 0 }]] },
+    "Webhook NexIT": {
+      "main": [
+        [
+          {
+            "node": "Verificar Bearer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200": {
+      "main": [
+        [
+          {
+            "node": "Switch por evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Switch por evento": {
       "main": [
-        [{ "node": "IF origen PORTAL", "type": "main", "index": 0 }],
-        [{ "node": "IF ESPERANDO_VALIDACION", "type": "main", "index": 0 }],
-        [{ "node": "Telegram alerta SLA", "type": "main", "index": 0 }],
         [
-          { "node": "IF técnico tiene Telegram", "type": "main", "index": 0 },
-          { "node": "IF técnico tiene WhatsApp", "type": "main", "index": 0 },
-          { "node": "IF origen PORTAL (asignado)", "type": "main", "index": 0 }
+          {
+            "node": "IF origen PORTAL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF ESPERANDO_VALIDACION",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram alerta SLA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF técnico tiene Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF técnico tiene WhatsApp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF origen PORTAL (asignado)",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "IF origen PORTAL": {
       "main": [
         [
-          { "node": "Email confirmacion ticket", "type": "main", "index": 0 },
-          { "node": "IF cliente tiene Telegram (creado)", "type": "main", "index": 0 },
-          { "node": "IF cliente tiene WhatsApp (creado)", "type": "main", "index": 0 }
+          {
+            "node": "Email confirmacion ticket",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene Telegram (creado)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene WhatsApp (creado)",
+            "type": "main",
+            "index": 0
+          }
         ],
         []
       ]
     },
-    "IF cliente tiene Telegram (creado)": { "main": [[{ "node": "Telegram confirmacion ticket", "type": "main", "index": 0 }], []] },
-    "IF cliente tiene WhatsApp (creado)": { "main": [[{ "node": "Twilio confirmacion ticket", "type": "main", "index": 0 }], []] },
+    "IF cliente tiene Telegram (creado)": {
+      "main": [
+        [
+          {
+            "node": "Telegram confirmacion ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF cliente tiene WhatsApp (creado)": {
+      "main": [
+        [
+          {
+            "node": "Twilio confirmacion ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
     "IF ESPERANDO_VALIDACION": {
       "main": [
         [
-          { "node": "Email revisar y aprobar", "type": "main", "index": 0 },
-          { "node": "IF cliente tiene Telegram (validacion)", "type": "main", "index": 0 },
-          { "node": "IF cliente tiene WhatsApp (validacion)", "type": "main", "index": 0 }
+          {
+            "node": "Email revisar y aprobar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene Telegram (validacion)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene WhatsApp (validacion)",
+            "type": "main",
+            "index": 0
+          }
         ],
         []
       ]
     },
-    "IF cliente tiene Telegram (validacion)": { "main": [[{ "node": "Telegram revisar y aprobar", "type": "main", "index": 0 }], []] },
-    "IF cliente tiene WhatsApp (validacion)": { "main": [[{ "node": "Twilio revisar y aprobar", "type": "main", "index": 0 }], []] },
-    "IF técnico tiene Telegram": { "main": [[{ "node": "Telegram aviso asignacion", "type": "main", "index": 0 }], []] },
-    "IF técnico tiene WhatsApp": { "main": [[{ "node": "Twilio aviso asignacion", "type": "main", "index": 0 }], []] },
+    "IF cliente tiene Telegram (validacion)": {
+      "main": [
+        [
+          {
+            "node": "Telegram revisar y aprobar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF cliente tiene WhatsApp (validacion)": {
+      "main": [
+        [
+          {
+            "node": "Twilio revisar y aprobar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF técnico tiene Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram aviso asignacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF técnico tiene WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Twilio aviso asignacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
     "IF origen PORTAL (asignado)": {
       "main": [
         [
-          { "node": "IF cliente tiene Telegram (asignado)", "type": "main", "index": 0 },
-          { "node": "IF cliente tiene WhatsApp (asignado)", "type": "main", "index": 0 }
+          {
+            "node": "IF cliente tiene Telegram (asignado)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene WhatsApp (asignado)",
+            "type": "main",
+            "index": 0
+          }
         ],
         []
       ]
     },
-    "IF cliente tiene Telegram (asignado)": { "main": [[{ "node": "Telegram aviso asignacion (cliente)", "type": "main", "index": 0 }], []] },
-    "IF cliente tiene WhatsApp (asignado)": { "main": [[{ "node": "Twilio aviso asignacion (cliente)", "type": "main", "index": 0 }], []] }
+    "IF cliente tiene Telegram (asignado)": {
+      "main": [
+        [
+          {
+            "node": "Telegram aviso asignacion (cliente)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF cliente tiene WhatsApp (asignado)": {
+      "main": [
+        [
+          {
+            "node": "Twilio aviso asignacion (cliente)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Parsear body": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Bearer": {
+      "main": [
+        [
+          {
+            "node": "Parsear body",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
   }
 }
 ```
