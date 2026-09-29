@@ -119,6 +119,39 @@ justamente el caso que más urge escalar. Cada corrida del cron reevalúa todos 
 tickets abiertos con SLA: uno que sigue en riesgo genera un nuevo evento en cada
 corrida (recordatorio), no solo la primera vez.
 
+### `TICKET_ASIGNADO`
+
+Se dispara al asignar o reasignar un técnico (`asignarTecnico()`), y también cuando un
+ticket generado automáticamente desde un plan preventivo nace ya con técnico asignado
+(`generarTicketsPreventivos()`) — en ambos casos, sin este evento, el técnico no tenía
+forma de enterarse de trabajo nuevo salvo entrando a la app o preguntando por chat.
+
+```json
+{
+  "evento": "TICKET_ASIGNADO",
+  "timestamp": "2026-09-28T14:00:00.000Z",
+  "data": {
+    "ticketId": "cmud08cs7001ldng8qep2s38e",
+    "numeroTicket": "TCK-0002",
+    "clienteNombre": "Hospital San Rafael",
+    "titulo": "Switch de piso 3 no responde",
+    "prioridad": "CRITICA",
+    "esReasignacion": false,
+    "tecnicoNombre": "María Gómez",
+    "tecnicoEmail": "tecnico@nexit.dev",
+    "tecnicoTelegramChatId": "555000111",
+    "tecnicoWhatsapp": null
+  }
+}
+```
+
+> **A diferencia de los otros eventos**, acá el destinatario es el **técnico**, no
+> quien reportó el ticket — los campos son `tecnicoNombre`/`tecnicoEmail`/
+> `tecnicoTelegramChatId`/`tecnicoWhatsapp` en vez de `reportadoPor...`.
+> `tecnicoTelegramChatId`/`tecnicoWhatsapp` son `null` si el técnico nunca vinculó ese
+> canal desde `/perfil` — mismo criterio que los demás eventos, chequealo con un IF
+> antes de mandar el nodo de Telegram/WhatsApp.
+
 ## 2. Verificar la firma HMAC en n8n
 
 El paso crítico es que n8n reciba el **body crudo** (los mismos bytes que NexIT
@@ -273,6 +306,26 @@ Switch[SLA_EN_RIESGO] → Telegram (sendMessage a un GRUPO, no a un usuario) o S
 Sin IF adicional aquí: `/api/cron/sla-check` solo dispara este evento para tickets que
 YA están en `en_riesgo` o `vencido` — el filtro ya ocurrió del lado de NexIT.
 
+### e) `TICKET_ASIGNADO` → avisar al técnico que tiene trabajo nuevo
+
+```
+Switch[TICKET_ASIGNADO] → IF ($json.data.tecnicoTelegramChatId != null)
+                            └─ true → Telegram sendMessage
+                                 chatId: {{$json.data.tecnicoTelegramChatId}}
+                                 text: "{{$json.data.esReasignacion ? '🔄 Te reasignaron' : '🆕 Te asignaron'}}
+                                        el ticket #{{$json.data.numeroTicket}} ({{$json.data.clienteNombre}})
+                                        Prioridad: {{$json.data.prioridad}}
+                                        {{$json.data.titulo}}"
+                         → IF ($json.data.tecnicoWhatsapp != null)
+                            └─ true → Twilio (nodo Twilio, no HTTP Request)
+                                 From: whatsapp:<tu número Twilio>
+                                 To:   =whatsapp:{{$json.data.tecnicoWhatsapp}}
+                                 Message: mismo texto que el de Telegram
+```
+
+Igual que en §3.d, ambos IF son independientes (no un if/else) — un técnico que vinculó
+los dos canales recibe el aviso por ambos.
+
 ## 4. Cron del chequeo de SLA (`Schedule Trigger`)
 
 ```
@@ -319,13 +372,18 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         "httpMethod": "POST",
         "path": "nexit-events",
         "responseMode": "responseNode",
-        "options": { "rawBody": true }
+        "options": {
+          "rawBody": true
+        }
       },
       "id": "webhook-nexit",
       "name": "Webhook NexIT",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -335,23 +393,85 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Verificar firma HMAC",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
-      "parameters": { "respondWith": "json", "responseBody": "={{ { \"recibido\": true } }}" },
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"recibido\": true } }}"
+      },
       "id": "responder-ok",
       "name": "Respond 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "TICKET_CREADO", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "TICKET_CAMBIO_ESTADO", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.evento}}", "rightValue": "SLA_EN_RIESGO", "operator": { "type": "string", "operation": "equals" } }] } }
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "TICKET_CREADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "TICKET_CAMBIO_ESTADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "SLA_EN_RIESGO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "TICKET_ASIGNADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
           ]
         }
       },
@@ -359,17 +479,34 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Switch por evento",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.origen}}", "rightValue": "PORTAL", "operator": { "type": "string", "operation": "equals" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.origen}}",
+              "rightValue": "PORTAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
       },
       "id": "if-origen-portal",
       "name": "IF origen PORTAL",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, -200]
+      "position": [
+        880,
+        -200
+      ]
     },
     {
       "parameters": {
@@ -382,17 +519,34 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Email confirmacion ticket",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
-      "position": [1100, -260]
+      "position": [
+        1100,
+        -260
+      ]
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.data.estadoNuevo}}", "rightValue": "ESPERANDO_VALIDACION", "operator": { "type": "string", "operation": "equals" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.estadoNuevo}}",
+              "rightValue": "ESPERANDO_VALIDACION",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
       },
       "id": "if-esperando-validacion",
       "name": "IF ESPERANDO_VALIDACION",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -405,7 +559,10 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Email revisar y aprobar",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
-      "position": [1100, 40]
+      "position": [
+        1100,
+        40
+      ]
     },
     {
       "parameters": {
@@ -416,22 +573,208 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "name": "Telegram alerta SLA",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [880, 240]
+      "position": [
+        880,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.tecnicoTelegramChatId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-tecnico-telegram",
+      "name": "IF técnico tiene Telegram",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.data.tecnicoTelegramChatId}}",
+        "text": "={{$json.data.esReasignacion ? '🔄 Te reasignaron' : '🆕 Te asignaron'}} el ticket #{{$json.data.numeroTicket}} ({{$json.data.clienteNombre}})\nPrioridad: {{$json.data.prioridad}}\n{{$json.data.titulo}}"
+      },
+      "id": "telegram-aviso-asignacion",
+      "name": "Telegram aviso asignacion",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.tecnicoWhatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-tecnico-whatsapp",
+      "name": "IF técnico tiene WhatsApp",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.tecnicoWhatsapp}}",
+        "message": "={{$json.data.esReasignacion ? '🔄 Te reasignaron' : '🆕 Te asignaron'}} el ticket #{{$json.data.numeroTicket}} ({{$json.data.clienteNombre}})\nPrioridad: {{$json.data.prioridad}}\n{{$json.data.titulo}}"
+      },
+      "id": "twilio-aviso-asignacion",
+      "name": "Twilio aviso asignacion",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        560
+      ]
     }
   ],
   "connections": {
-    "Webhook NexIT": { "main": [[{ "node": "Verificar firma HMAC", "type": "main", "index": 0 }]] },
-    "Verificar firma HMAC": { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
-    "Respond 200": { "main": [[{ "node": "Switch por evento", "type": "main", "index": 0 }]] },
-    "Switch por evento": {
+    "Webhook NexIT": {
       "main": [
-        [{ "node": "IF origen PORTAL", "type": "main", "index": 0 }],
-        [{ "node": "IF ESPERANDO_VALIDACION", "type": "main", "index": 0 }],
-        [{ "node": "Telegram alerta SLA", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Verificar firma HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "IF origen PORTAL": { "main": [[{ "node": "Email confirmacion ticket", "type": "main", "index": 0 }], []] },
-    "IF ESPERANDO_VALIDACION": { "main": [[{ "node": "Email revisar y aprobar", "type": "main", "index": 0 }], []] }
+    "Verificar firma HMAC": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200": {
+      "main": [
+        [
+          {
+            "node": "Switch por evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch por evento": {
+      "main": [
+        [
+          {
+            "node": "IF origen PORTAL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF ESPERANDO_VALIDACION",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram alerta SLA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF técnico tiene Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF técnico tiene WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF origen PORTAL": {
+      "main": [
+        [
+          {
+            "node": "Email confirmacion ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF ESPERANDO_VALIDACION": {
+      "main": [
+        [
+          {
+            "node": "Email revisar y aprobar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF técnico tiene Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram aviso asignacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF técnico tiene WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Twilio aviso asignacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
   }
 }
 ```

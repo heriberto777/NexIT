@@ -5,6 +5,7 @@ import { requireUsuario } from "@/server/auth/session";
 import { asignarTicketSchema } from "@/lib/zod/ticket.schema";
 import type { AsignarTicketInput } from "@/lib/zod/ticket.schema";
 import { ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
+import { emitirEvento } from "@/server/services/webhook.service";
 
 const ROLES_PERMITIDOS = ["COORDINADOR", "ADMIN"] as const;
 
@@ -20,7 +21,7 @@ export async function asignarTecnico(input: AsignarTicketInput) {
   const { ticketId, tecnicoId } = asignarTicketSchema.parse(input);
 
   const [ticket, tecnico] = await Promise.all([
-    prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } }),
+    prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: { cliente: true } }),
     prisma.usuario.findUniqueOrThrow({ where: { id: tecnicoId } }),
   ]);
 
@@ -57,6 +58,20 @@ export async function asignarTecnico(input: AsignarTicketInput) {
     });
 
     return ticketActualizado;
+  });
+
+  emitirEvento({
+    tipo: "TICKET_ASIGNADO",
+    ticketId: actualizado.id,
+    numeroTicket: actualizado.numeroTicket,
+    clienteNombre: ticket.cliente.nombre,
+    titulo: ticket.titulo,
+    prioridad: ticket.prioridad,
+    esReasignacion: Boolean(ticket.tecnicoAsignadoId),
+    tecnicoNombre: tecnico.nombre,
+    tecnicoEmail: tecnico.email,
+    tecnicoTelegramChatId: tecnico.telegramChatId,
+    tecnicoWhatsapp: tecnico.whatsappTelefono,
   });
 
   return { id: actualizado.id, estado: actualizado.estado };

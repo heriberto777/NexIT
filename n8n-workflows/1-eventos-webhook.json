@@ -91,6 +91,20 @@
                   }
                 ]
               }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "TICKET_ASIGNADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
             }
           ]
         }
@@ -197,6 +211,83 @@
         880,
         240
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.tecnicoTelegramChatId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-tecnico-telegram",
+      "name": "IF técnico tiene Telegram",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.data.tecnicoTelegramChatId}}",
+        "text": "={{$json.data.esReasignacion ? '🔄 Te reasignaron' : '🆕 Te asignaron'}} el ticket #{{$json.data.numeroTicket}} ({{$json.data.clienteNombre}})\nPrioridad: {{$json.data.prioridad}}\n{{$json.data.titulo}}"
+      },
+      "id": "telegram-aviso-asignacion",
+      "name": "Telegram aviso asignacion",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.tecnicoWhatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-tecnico-whatsapp",
+      "name": "IF técnico tiene WhatsApp",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.tecnicoWhatsapp}}",
+        "message": "={{$json.data.esReasignacion ? '🔄 Te reasignaron' : '🆕 Te asignaron'}} el ticket #{{$json.data.numeroTicket}} ({{$json.data.clienteNombre}})\nPrioridad: {{$json.data.prioridad}}\n{{$json.data.titulo}}"
+      },
+      "id": "twilio-aviso-asignacion",
+      "name": "Twilio aviso asignacion",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        560
+      ]
     }
   ],
   "connections": {
@@ -255,6 +346,18 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "IF técnico tiene Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF técnico tiene WhatsApp",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -275,6 +378,30 @@
         [
           {
             "node": "Email revisar y aprobar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF técnico tiene Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram aviso asignacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF técnico tiene WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Twilio aviso asignacion",
             "type": "main",
             "index": 0
           }

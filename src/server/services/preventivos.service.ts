@@ -68,6 +68,7 @@ export async function generarTicketsPreventivos({ diasVentana, usuarioId }: Gene
     include: {
       activo: { include: { sucursal: { include: { cliente: true } } } },
       sucursal: { include: { cliente: true } },
+      tecnicoAsignado: true,
     },
   });
 
@@ -141,6 +142,25 @@ export async function generarTicketsPreventivos({ diasVentana, usuarioId }: Gene
       reportadoPorTelegramChatId: coordinador.telegramChatId,
       reportadoPorWhatsapp: coordinador.whatsappTelefono,
     });
+
+    // Este ticket nace YA asignado (viene del plan) — a diferencia de asignarTecnico(),
+    // acá no hay una acción posterior que dispare TICKET_ASIGNADO, así que el técnico
+    // no se enteraría del trabajo nuevo si no se emite explícitamente acá también.
+    if (plan.tecnicoAsignado) {
+      emitirEvento({
+        tipo: "TICKET_ASIGNADO",
+        ticketId: ticket.id,
+        numeroTicket: ticket.numeroTicket,
+        clienteNombre: cliente.nombre,
+        titulo: ticket.titulo,
+        prioridad: ticket.prioridad,
+        esReasignacion: false,
+        tecnicoNombre: plan.tecnicoAsignado.nombre,
+        tecnicoEmail: plan.tecnicoAsignado.email,
+        tecnicoTelegramChatId: plan.tecnicoAsignado.telegramChatId,
+        tecnicoWhatsapp: plan.tecnicoAsignado.whatsappTelefono,
+      });
+    }
 
     generados.push({ id: ticket.id, numeroTicket: ticket.numeroTicket, planTitulo: plan.titulo });
   }

@@ -46,6 +46,22 @@ export type EventoWebhook =
       tecnicoAsignadoNombre: string | null;
       estadoSla: "en_riesgo" | "vencido";
       minutosRestantes: number;
+    }
+  | {
+      tipo: "TICKET_ASIGNADO";
+      ticketId: string;
+      numeroTicket: string;
+      clienteNombre: string;
+      titulo: string;
+      prioridad: string;
+      esReasignacion: boolean;
+      // A diferencia de los demás eventos (destinatario: quien reportó el ticket), acá
+      // el destinatario es el TÉCNICO recién asignado — es a él a quien hay que avisarle
+      // que tiene trabajo nuevo, no al cliente.
+      tecnicoNombre: string;
+      tecnicoEmail: string;
+      tecnicoTelegramChatId: string | null;
+      tecnicoWhatsapp: string | null;
     };
 
 const TIMEOUT_MS = 8000;
