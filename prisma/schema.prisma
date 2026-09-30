@@ -405,6 +405,11 @@ model Ticket {
   estado              EstadoTicket                 @default(ABIERTO)
   titulo              String
   descripcion         String
+  // Solo la puebla el asistente de IA conversacional (origen=CHATBOT) al crear el
+  // ticket — una sugerencia informativa para que el técnico llegue con contexto, nunca
+  // un diagnóstico del cliente ni un paso que haya bloqueado la creación del ticket.
+  // Visible solo para staff/técnico (nunca en el portal del cliente).
+  sugerenciaIA        String?
   creadoPorId         String
   creadoPor           Usuario                      @relation("TicketCreador", fields: [creadoPorId], references: [id])
   tecnicoAsignadoId   String?

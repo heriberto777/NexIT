@@ -169,6 +169,13 @@ export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, 
         </nav>
       </header>
 
+      {ticket.sugerenciaIA && (
+        <div className="mx-4 mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
+          <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-violet-700">🤖 Sugerencia de la IA</p>
+          {ticket.sugerenciaIA}
+        </div>
+      )}
+
       {error && <div className="mx-4 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
       <main className="flex-1 space-y-4 px-4 py-4">

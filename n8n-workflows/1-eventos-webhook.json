@@ -129,6 +129,34 @@
                   }
                 ]
               }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "CONTACTO_CREADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "CONTACTO_NO_IDENTIFICADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
             }
           ]
         }
@@ -145,10 +173,19 @@
     {
       "parameters": {
         "conditions": {
+          "combinator": "or",
           "conditions": [
             {
               "leftValue": "={{$json.data.origen}}",
               "rightValue": "PORTAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{$json.data.origen}}",
+              "rightValue": "TELEFONO",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -529,6 +566,14 @@
                 "type": "string",
                 "operation": "equals"
               }
+            },
+            {
+              "leftValue": "={{$json.data.origen}}",
+              "rightValue": "TELEFONO",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -759,6 +804,87 @@
           "name": "NexIT Twilio"
         }
       }
+    },
+    {
+      "parameters": {
+        "fromEmail": "notificaciones@nexit.tuempresa.com",
+        "toEmail": "={{$json.data.email}}",
+        "subject": "=Bienvenido a NexIT — acceso a tu Portal",
+        "text": "=Hola {{$json.data.nombre}}, un representante de {{$json.data.clienteNombre}} te registró en NexIT para dar seguimiento a tus solicitudes de soporte.\n\nIngresa en {{$env.NEXIT_BASE_URL}}/login con:\nUsuario: {{$json.data.email}}\nContraseña temporal: {{$json.data.passwordTemporal}}\n\nTe recomendamos cambiarla ni bien inicies sesión, desde tu Perfil."
+      },
+      "id": "email-contacto-creado",
+      "name": "Email bienvenida contacto",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.whatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-cliente-whatsapp-contacto-creado",
+      "name": "IF contacto tiene WhatsApp",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.whatsapp}}",
+        "message": "=Hola {{$json.data.nombre}}! Te registramos en NexIT para dar seguimiento a tus solicitudes de soporte. Ingresa en {{$env.NEXIT_BASE_URL}}/login con tu correo ({{$json.data.email}}) y la contraseña temporal: {{$json.data.passwordTemporal}}"
+      },
+      "id": "twilio-contacto-creado",
+      "name": "Twilio bienvenida contacto",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        860
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.NEXIT_TELEGRAM_CHAT_ID}}",
+        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\"{{$json.data.texto}}\"\n\nNo hay ningún usuario de NexIT con ese chat/teléfono vinculado. Un representante debe contactarlo y, si corresponde, levantar el ticket manualmente desde \"Crear ticket\"."
+      },
+      "id": "telegram-contacto-no-identificado",
+      "name": "Telegram contacto no identificado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        980
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     }
   ],
   "connections": {
@@ -825,6 +951,25 @@
           },
           {
             "node": "IF origen PORTAL (asignado)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email bienvenida contacto",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF contacto tiene WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram contacto no identificado",
             "type": "main",
             "index": 0
           }
@@ -1027,6 +1172,18 @@
         [
           {
             "node": "Twilio aviso cancelacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF contacto tiene WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Twilio bienvenida contacto",
             "type": "main",
             "index": 0
           }

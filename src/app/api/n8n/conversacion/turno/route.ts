@@ -19,9 +19,9 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   // `ticket` solo importa cuando accion=CREAR_TICKET — si la IA mandó un objeto
-  // parcial/con campos en null para las otras acciones (PREGUNTAR, SUGERIR_SOLUCION,
-  // CERRAR_SIN_TICKET), se ignora por completo en vez de dejar que su forma inválida
-  // tumbe un turno que ni siquiera necesita crear un ticket.
+  // parcial/con campos en null para las otras acciones (PREGUNTAR, CERRAR_SIN_TICKET),
+  // se ignora por completo en vez de dejar que su forma inválida tumbe un turno que ni
+  // siquiera necesita crear un ticket.
   if (body && typeof body === "object" && body.accion !== "CREAR_TICKET") {
     delete (body as Record<string, unknown>).ticket;
   }
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     return responder({ ok: true, mensaje: mensajeAsistente }, 200);
   }
 
-  if (accion === "PREGUNTAR" || accion === "SUGERIR_SOLUCION") {
+  if (accion === "PREGUNTAR") {
     await prisma.conversacionChat.update({ where: { id: conversacionId }, data: { actualizadaAt: new Date() } });
     return responder({ ok: true, mensaje: mensajeAsistente }, 200);
   }
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   if (!usuario.clienteId || !usuario.cliente) {
     return responder({ ok: false, error: "USUARIO_SIN_CLIENTE", mensaje: "Tu usuario no está asociado a ninguna empresa." }, 409);
   }
-  const { titulo, descripcion, tipo, categoriaSoporte, prioridad, sucursalId, activoId } = datosTicket!;
+  const { titulo, descripcion, tipo, categoriaSoporte, prioridad, sucursalId, activoId, sugerenciaIA } = datosTicket!;
 
   const sucursales = await prisma.sucursal.findMany({ where: { clienteId: usuario.clienteId }, orderBy: { nombre: "asc" } });
   let sucursalResuelta = sucursalId ? sucursales.find((s) => s.id === sucursalId) : undefined;
@@ -108,6 +108,7 @@ export async function POST(request: Request) {
         estado: "ABIERTO",
         titulo,
         descripcion: `[Reportado por ${canal === "TELEGRAM" ? "Telegram" : "WhatsApp"} — vía asistente IA conversacional]\n\n${descripcion}`,
+        sugerenciaIA: sugerenciaIA ?? null,
         creadoPorId: usuario.id,
         slaId: sla?.id,
         origen: "CHATBOT",

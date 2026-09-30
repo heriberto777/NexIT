@@ -9,7 +9,7 @@ Todo evento se envía como `POST` a `WEBHOOK_N8N_URL` con este sobre común:
 
 ```json
 {
-  "evento": "TICKET_CREADO | TICKET_CAMBIO_ESTADO | SLA_EN_RIESGO",
+  "evento": "TICKET_CREADO | TICKET_CAMBIO_ESTADO | SLA_EN_RIESGO | TICKET_ASIGNADO | CONTACTO_CREADO | CONTACTO_NO_IDENTIFICADO",
   "timestamp": "2026-09-22T19:35:41.001Z",
   "data": { /* específico de cada evento, ver abajo */ }
 }
@@ -28,8 +28,10 @@ en NexIT. Si no lo está, el payload llega sin firmar (no recomendado en producc
 
 ### `TICKET_CREADO`
 
-Se dispara al crear un ticket desde `/portal` (`origen: "PORTAL"`) o al generarse
-automáticamente desde un plan preventivo (`origen: "PROGRAMADO"`).
+Se dispara al crear un ticket desde `/portal` (`origen: "PORTAL"`), desde el asistente
+de IA conversacional (`origen: "CHATBOT"`, ver §6), desde "Crear ticket" en
+`/tickets/nuevo` cuando el staff reporta algo por teléfono (`origen: "TELEFONO"`), o al
+generarse automáticamente desde un plan preventivo (`origen: "PROGRAMADO"`).
 
 ```json
 {
@@ -52,11 +54,14 @@ automáticamente desde un plan preventivo (`origen: "PROGRAMADO"`).
 ```
 
 > **Importante sobre `reportadoPorEmail`**: el modelo `Cliente` de NexIT no tiene un
-> email propio de empresa — solo `Usuario.email`. Cuando `origen: "PORTAL"`,
-> `reportadoPorEmail` es el correo del cliente que reportó la falla (destinatario
-> correcto para la confirmación). Cuando `origen: "PROGRAMADO"`, es el correo del
-> **coordinador** que corrió la generación automática, no un contacto del cliente — tu
-> workflow debe filtrar por `origen` antes de mandar el email de confirmación (ver §3).
+> email propio de empresa — solo `Usuario.email`. Cuando `origen` es `PORTAL`,
+> `CHATBOT` o `TELEFONO`, `reportadoPorEmail` es siempre un contacto real del cliente
+> (destinatario correcto para la confirmación) — en `TELEFONO`, `crear-ticket.ts` busca
+> o crea ese contacto antes de emitir el evento (ver §3.f, `CONTACTO_CREADO`), nunca usa
+> el email del miembro del staff que llenó el formulario. Cuando `origen: "PROGRAMADO"`,
+> sigue siendo el correo del **coordinador** que corrió la generación automática, no un
+> contacto del cliente — tu workflow debe filtrar por `origen` antes de mandar el email
+> de confirmación (ver §3).
 
 > **`reportadoPorTelegramChatId` / `reportadoPorWhatsapp`**: `null` si ese usuario
 > nunca vinculó el canal desde `/perfil` (los 4 roles tienen esa opción en su perfil).
@@ -164,17 +169,72 @@ forma de enterarse de trabajo nuevo salvo entrando a la app o preguntando por ch
 > `reportadoPorWhatsapp`) — antes el cliente no se enteraba en absoluto de que alguien
 > ya estaba viendo su problema.
 >
-> **`origen` distingue "hay un contacto real del cliente" de "no lo hay"** — pero a
-> diferencia de `TICKET_CREADO` (donde el filtro es solo `"PORTAL"`, ver abajo), acá el
-> workflow filtra por `origen == "PORTAL" || origen == "CHATBOT"`: ambos son un cliente
-> real reportando directo (por el portal web o por el asistente de IA en
-> Telegram/WhatsApp), mientras que `"PROGRAMADO"` es el coordinador que generó el
-> ticket automáticamente desde un preventivo, y `"TELEFONO"` es el staff que lo cargó a
-> mano — a ninguno de esos dos tiene sentido avisarle "se te asignó un técnico" como si
-> fuera el cliente. (`TICKET_CREADO` sí excluye `CHATBOT` a propósito: ese cliente ya
-> recibió su confirmación dentro de la misma conversación de chat — ver §6 —, mandarle
-> otra por este evento sería duplicado.) Los 4 campos de contacto son `null` si esa
-> persona nunca vinculó ese canal desde `/perfil`.
+> **`origen` distingue "hay un contacto real del cliente" de "no lo hay"** — acá el
+> workflow filtra por `origen == "PORTAL" || origen == "CHATBOT" || origen ==
+> "TELEFONO"`: los tres son un cliente real (reportando por el portal web, por el
+> asistente de IA en Telegram/WhatsApp, o por teléfono con el staff buscando/creando su
+> contacto en `/tickets/nuevo` — ver §3.f), mientras que `"PROGRAMADO"` sigue siendo el
+> coordinador que generó el ticket automáticamente desde un preventivo — a ese no tiene
+> sentido avisarle "se te asignó un técnico" como si fuera el cliente. (`TICKET_CREADO`
+> excluye `CHATBOT` a propósito, ver abajo: ese cliente ya recibió su confirmación
+> dentro de la misma conversación de chat — ver §6 —, mandarle otra por ese evento sería
+> duplicado; pero `TICKET_ASIGNADO` sí lo incluye, porque "te asignaron un técnico" es
+> información nueva que el chat inicial no le dio.) Los 4 campos de contacto son `null`
+> si esa persona nunca vinculó ese canal desde `/perfil`.
+
+### `CONTACTO_CREADO`
+
+Se dispara cuando el staff crea un ticket interno (`/tickets/nuevo`) para un contacto
+que todavía no existía en NexIT — ver §3.f. El contacto nace como `Usuario` rol
+`CLIENTE` con acceso al Portal, pero nadie le avisó todavía que esa cuenta existe.
+
+```json
+{
+  "evento": "CONTACTO_CREADO",
+  "timestamp": "2026-09-30T15:00:00.000Z",
+  "data": {
+    "usuarioId": "cmuz08cs7001ldng8qep2s38e",
+    "nombre": "Ana Torres",
+    "email": "ana.torres@hospitalsanrafael.com",
+    "passwordTemporal": "Xk29fQpLmN==",
+    "clienteNombre": "Hospital San Rafael",
+    "whatsapp": null
+  }
+}
+```
+
+> `passwordTemporal` viaja en texto plano por este evento — es la naturaleza del patrón
+> "contraseña temporal por correo/chat" que ya usa `resetear-password-usuario.ts` en la
+> app. No se guarda en ningún otro lugar de NexIT; una vez enviada, solo vive en la
+> conversación de correo/WhatsApp del contacto. `whatsapp` es `null` si el staff no lo
+> cargó al crear el contacto (Telegram nunca viaja acá — un contacto recién creado
+> todavía no pudo vincularlo desde `/perfil`).
+
+### `CONTACTO_NO_IDENTIFICADO`
+
+Se dispara desde `/api/n8n/conversacion/mensaje` cuando llega un mensaje de Telegram o
+WhatsApp de un `chat_id`/teléfono que no está vinculado a ningún `Usuario` — no hay a
+quién notificarle nada del lado del cliente, así que esto es exclusivamente un aviso
+interno para que un Coordinador contacte a la persona y levante el ticket a mano.
+
+```json
+{
+  "evento": "CONTACTO_NO_IDENTIFICADO",
+  "timestamp": "2026-09-30T15:05:00.000Z",
+  "data": {
+    "canal": "WHATSAPP",
+    "identificador": "+18095551234",
+    "texto": "Hola, tengo un problema con la impresora"
+  }
+}
+```
+
+> No hay reintento ni deduplicación: cada mensaje de un contacto no identificado dispara
+> su propio evento — si la misma persona escribe varias veces, tu chat interno recibirá
+> varios avisos. Es una limitación conocida y aceptable dado el volumen esperado de este
+> caso (poco frecuente); si se vuelve un problema, se puede agregar una ventana de
+> supresión del lado de n8n (por ejemplo, con un nodo que descarte repeticiones del mismo
+> `identificador` dentro de X minutos).
 
 ## 2. Verificar la identidad del request en n8n
 
@@ -264,7 +324,9 @@ Webhook → IF Verificar Bearer ─┬─ false → (fin, sin responder = 401 im
                                                                  ├─ TICKET_CREADO
                                                                  ├─ TICKET_CAMBIO_ESTADO
                                                                  ├─ SLA_EN_RIESGO
-                                                                 └─ TICKET_ASIGNADO
+                                                                 ├─ TICKET_ASIGNADO
+                                                                 ├─ CONTACTO_CREADO
+                                                                 └─ CONTACTO_NO_IDENTIFICADO
 ```
 
 Responder ANTES del Switch es intencional: NexIT ya despachó el webhook de forma
@@ -275,7 +337,7 @@ Webhook" en segundo plano igual.
 ### a) `TICKET_CREADO` → confirmación al cliente (email + Telegram + WhatsApp)
 
 ```
-Switch[TICKET_CREADO] → IF ($json.data.origen == "PORTAL")
+Switch[TICKET_CREADO] → IF ($json.data.origen == "PORTAL" || $json.data.origen == "TELEFONO")
                           ├─ true  → Send Email (SMTP)
                           │            To: {{$json.data.reportadoPorEmail}}
                           │            Subject: Ticket #{{$json.data.numeroTicket}} recibido
@@ -291,13 +353,23 @@ Switch[TICKET_CREADO] → IF ($json.data.origen == "PORTAL")
                           │                    To:   =whatsapp:{{$json.data.reportadoPorWhatsapp}}
                           └─ false → NoOp (origen PROGRAMADO: el "reportador" es un
                                       coordinador, no un contacto del cliente — no se le
-                                      manda una "confirmación de tu reporte")
+                                      manda una "confirmación de tu reporte". Origen
+                                      CHATBOT tampoco entra acá a propósito: ese cliente
+                                      ya recibió su confirmación dentro de la misma
+                                      conversación de chat, ver §6 — mandarle otra por
+                                      este evento sería duplicado)
 ```
 
 Los tres envíos (email, Telegram, WhatsApp) son independientes entre sí, no
 if/else — un cliente que vinculó los dos canales de chat además del email recibe la
 confirmación por los tres. Los IF de Telegram/WhatsApp filtran por `null` porque un
 `chat_id`/teléfono vacío rompe esos nodos en vez de simplemente no hacer nada.
+
+`TELEFONO` se sumó a este filtro junto con el cambio que hace que "Crear ticket"
+(`/tickets/nuevo`) ya no le atribuya el ticket al miembro del staff que lo cargó, sino
+al contacto real del cliente (buscado o creado en el mismo formulario, ver §3.f) — antes
+de eso, `reportadoPorEmail` en origen `TELEFONO` apuntaba al staff, así que agregar esta
+rama habría significado notificarle a la persona equivocada.
 
 ### b) `TICKET_CAMBIO_ESTADO` → aviso de visita lista para aprobar (email + Telegram + WhatsApp)
 
@@ -351,7 +423,8 @@ Switch[TICKET_ASIGNADO] ─┬─ IF ($json.data.tecnicoTelegramChatId != null)
                           │                {{$json.data.titulo}}"
                           ├─ IF ($json.data.tecnicoWhatsapp != null)
                           │    └─ true → Twilio sendMessage al TÉCNICO (mismo texto)
-                          └─ IF ($json.data.origen == "PORTAL" || $json.data.origen == "CHATBOT")
+                          └─ IF ($json.data.origen == "PORTAL" || $json.data.origen == "CHATBOT"
+                                  || $json.data.origen == "TELEFONO")
                                └─ true → IF ($json.data.reportadoPorTelegramChatId != null)
                                             └─ true → Telegram sendMessage al CLIENTE
                                                  chatId: {{$json.data.reportadoPorTelegramChatId}}
@@ -365,11 +438,11 @@ Switch[TICKET_ASIGNADO] ─┬─ IF ($json.data.tecnicoTelegramChatId != null)
 Las tres ramas que cuelgan directo del Switch (técnico Telegram, técnico WhatsApp, IF
 origen) son independientes entre sí — un técnico que vinculó ambos canales recibe el
 aviso por los dos, y en paralelo se evalúa si corresponde avisarle también al cliente.
-El IF de `origen` acepta `PORTAL` **o** `CHATBOT` (ambos son un cliente real
-reportando directo) — si el ticket vino de un plan preventivo (`origen: "PROGRAMADO"`)
-o fue cargado a mano por soporte (`"TELEFONO"`), el "reportador" es un coordinador/
-staff, no un contacto real del cliente, y no tiene sentido avisarle "te asignaron un
-técnico" a alguien que ya sabía que el ticket se iba a crear.
+El IF de `origen` acepta `PORTAL`, `CHATBOT` **o** `TELEFONO` — los tres son un cliente
+real (el de `TELEFONO` fue buscado o creado en `/tickets/nuevo`, ver §3.f). Solo queda
+afuera `"PROGRAMADO"`: ahí el "reportador" sigue siendo el coordinador que generó el
+ticket automáticamente desde un preventivo, no un contacto real del cliente, y no tiene
+sentido avisarle "te asignaron un técnico" a quien ya sabía que el ticket se iba a crear.
 
 ### e) `TICKET_CAMBIO_ESTADO` (`estadoNuevo == "CANCELADO"`) → avisar al cliente de la cancelación
 
@@ -390,10 +463,47 @@ IF CANCELADO ($json.data.estadoNuevo == "CANCELADO")
 Antes de esto, cancelar un ticket (`cancelarTicket()`, botón "Cancelar ticket" en
 `/tickets/[id]`) no emitía ningún evento — el cliente que reportó el problema nunca se
 enteraba de que su solicitud había sido cancelada, ni siquiera por email. No hay
-distinción por `origen` aquí (a diferencia de a) y d)): un ticket `PROGRAMADO` o
-`TELEFONO` cancelado también tiene un `reportadoPor*` que vale la pena notificar,
-porque a esa persona (coordinador o staff) igual le sirve saber que se decidió
-cancelarlo, no solo que se creó o asignó.
+distinción por `origen` aquí (a diferencia de a) y d)): sea `reportadoPor*` un contacto
+real del cliente o el coordinador que generó el ticket desde un preventivo
+(`PROGRAMADO`), a esa persona igual le sirve saber que se decidió cancelarlo, no solo
+que se creó o asignó.
+
+### f) `CONTACTO_CREADO` → bienvenida con acceso al Portal
+
+```
+Switch[CONTACTO_CREADO] → Send Email (SMTP)
+                             To: {{$json.data.email}}
+                             Subject: Bienvenido a NexIT — acceso a tu Portal
+                             Body: "Hola {{$json.data.nombre}}, un representante de
+                                    {{$json.data.clienteNombre}} te registró en NexIT.
+                                    Ingresa en {{$env.NEXIT_BASE_URL}}/login con:
+                                    Usuario: {{$json.data.email}}
+                                    Contraseña temporal: {{$json.data.passwordTemporal}}"
+                           → IF ($json.data.whatsapp != null)
+                                └─ true → Twilio sendMessage (mismo mensaje, sin asunto)
+```
+
+Sin IF de `origen` (este evento no lo trae — siempre es la misma situación: un contacto
+recién creado desde "Crear ticket" en `/tickets/nuevo`, ver §3 más abajo). No hay rama
+de Telegram: un contacto que se acaba de crear todavía no tuvo oportunidad de vincularlo
+desde `/perfil`.
+
+### g) `CONTACTO_NO_IDENTIFICADO` → alerta interna, no al contacto
+
+```
+Switch[CONTACTO_NO_IDENTIFICADO] → Telegram sendMessage a un GRUPO interno (no al remitente)
+                                      chatId: {{$env.NEXIT_TELEGRAM_CHAT_ID}}
+                                      Texto: "📵 Contacto no identificado por
+                                              {{$json.data.canal}} ({{$json.data.identificador}}):
+                                              '{{$json.data.texto}}'
+                                              Un representante debe contactarlo y levantar
+                                              el ticket manualmente."
+```
+
+Mismo `$env.NEXIT_TELEGRAM_CHAT_ID` que usa la alerta de SLA en riesgo (§3.c) — un chat
+interno de soporte, no el contacto que escribió. El representante que lo vea entra a
+"Crear ticket" (`/tickets/nuevo`) en NexIT, donde el mismo formulario le permite buscar
+al contacto por nombre/correo o crearlo si es la primera vez.
 
 ## 4. Cron del chequeo de SLA (`Schedule Trigger`)
 
@@ -564,6 +674,34 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
                   }
                 ]
               }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "CONTACTO_CREADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.evento}}",
+                    "rightValue": "CONTACTO_NO_IDENTIFICADO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
             }
           ]
         }
@@ -580,10 +718,19 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "conditions": {
+          "combinator": "or",
           "conditions": [
             {
               "leftValue": "={{$json.data.origen}}",
               "rightValue": "PORTAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{$json.data.origen}}",
+              "rightValue": "TELEFONO",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -964,6 +1111,14 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
                 "type": "string",
                 "operation": "equals"
               }
+            },
+            {
+              "leftValue": "={{$json.data.origen}}",
+              "rightValue": "TELEFONO",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -1194,6 +1349,87 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
           "name": "NexIT Twilio"
         }
       }
+    },
+    {
+      "parameters": {
+        "fromEmail": "notificaciones@nexit.tuempresa.com",
+        "toEmail": "={{$json.data.email}}",
+        "subject": "=Bienvenido a NexIT — acceso a tu Portal",
+        "text": "=Hola {{$json.data.nombre}}, un representante de {{$json.data.clienteNombre}} te registró en NexIT para dar seguimiento a tus solicitudes de soporte.\n\nIngresa en {{$env.NEXIT_BASE_URL}}/login con:\nUsuario: {{$json.data.email}}\nContraseña temporal: {{$json.data.passwordTemporal}}\n\nTe recomendamos cambiarla ni bien inicies sesión, desde tu Perfil."
+      },
+      "id": "email-contacto-creado",
+      "name": "Email bienvenida contacto",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.whatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-cliente-whatsapp-contacto-creado",
+      "name": "IF contacto tiene WhatsApp",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.whatsapp}}",
+        "message": "=Hola {{$json.data.nombre}}! Te registramos en NexIT para dar seguimiento a tus solicitudes de soporte. Ingresa en {{$env.NEXIT_BASE_URL}}/login con tu correo ({{$json.data.email}}) y la contraseña temporal: {{$json.data.passwordTemporal}}"
+      },
+      "id": "twilio-contacto-creado",
+      "name": "Twilio bienvenida contacto",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        860
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.NEXIT_TELEGRAM_CHAT_ID}}",
+        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\"{{$json.data.texto}}\"\n\nNo hay ningún usuario de NexIT con ese chat/teléfono vinculado. Un representante debe contactarlo y, si corresponde, levantar el ticket manualmente desde \"Crear ticket\"."
+      },
+      "id": "telegram-contacto-no-identificado",
+      "name": "Telegram contacto no identificado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        980
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     }
   ],
   "connections": {
@@ -1260,6 +1496,25 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
           },
           {
             "node": "IF origen PORTAL (asignado)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email bienvenida contacto",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF contacto tiene WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram contacto no identificado",
             "type": "main",
             "index": 0
           }
@@ -1469,6 +1724,18 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         []
       ]
     },
+    "IF contacto tiene WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Twilio bienvenida contacto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
     "Parsear body": {
       "main": [
         [
@@ -1554,16 +1821,25 @@ cliente ya contó en el mensaje anterior.
 Cliente:   Hola
 Asistente: Hola Juan! Contame, ¿qué problema tenés con algún equipo?          [PREGUNTAR]
 Cliente:   El UPS de la sala de servidores está pitando
-Asistente: Eso suele pasar cuando el UPS está a batería por un corte de luz.
-           ¿Revisaste que haya corriente normal y que esté bien conectado?    [SUGERIR_SOLUCION]
-Cliente:   Ya revisé, la corriente está bien y sigue pitando
-Asistente: Entendido, voy a crear un ticket para que un técnico lo revise.
-           ✅ Ticket #TCK-0006 creado (prioridad alta).                       [CREAR_TICKET]
+Asistente: Ya te generé un ticket para que un técnico lo revise (✅ #TCK-0006,
+           prioridad alta). Mientras llega, podés revisar que haya corriente
+           normal y que esté bien conectado, pero ya no tenés que hacer nada
+           más — quedó en manos del técnico.                                 [CREAR_TICKET]
 ```
 
 Si en el primer intercambio el cliente hubiera contestado "ah listo, ya se apagó solo",
 la IA habría respondido `CERRAR_SIN_TICKET` y ahí termina, sin generar nada en
 `/admin/tickets`.
+
+> **Por qué el ticket se crea de inmediato, sin pedirle al cliente que pruebe nada
+> primero:** el diseño anterior tenía un paso intermedio (`SUGERIR_SOLUCION`) que
+> esperaba a que el cliente confirmara si una sugerencia simple (reiniciar, revisar
+> corriente/cables) había funcionado antes de escalar. En la práctica, no todo contacto
+> tiene el conocimiento o las facilidades para seguir ese tipo de procedimiento por
+> chat — y ese paso solo demoraba que un técnico real se enterara. Ahora la sugerencia
+> (si la hay) viaja como **dato informativo** en `ticket.sugerenciaIA`, guardado en el
+> ticket para que el técnico llegue con contexto — nunca como una condición que bloquee
+> o retrase la creación.
 
 ### b) Modelo de datos
 
@@ -1604,17 +1880,25 @@ cliente (sucursales y sus activos) para que la IA decida con memoria real.
 }
 
 // 200 — no vinculado
-{ "encontrado": false, "mensaje": "No encontramos tu número vinculado a NexIT...", "canal": "TELEGRAM", "identificador": "000000000" }
+{ "encontrado": false, "mensaje": "No encontramos tu número vinculado a NexIT. En breve un representante te contactará para ayudarte.", "canal": "TELEGRAM", "identificador": "000000000" }
 ```
+
+> **Cuando no se encuentra**, no hay forma segura de saber a qué cliente/sede pertenece
+> quien escribe — listarle todos los clientes de NexIT para que elija sería un problema
+> de confusión (y de privacidad entre clientes distintos). En vez de eso, este endpoint
+> dispara `CONTACTO_NO_IDENTIFICADO` (ver §1 y §3) para avisarle a un chat interno de
+> soporte, y responde con un mensaje que le pone la pelota a un representante humano, no
+> a la IA — el representante usa "Crear ticket" (`/tickets/nuevo`) para levantarlo,
+> pantalla que ya busca o crea el contacto correspondiente.
 
 **`POST /api/n8n/conversacion/turno`** — body `{ conversacionId, accion, mensajeAsistente, ticket? }`
 
 Persiste la respuesta de la IA (`mensajeAsistente`) como un mensaje `ASISTENTE`, y según
 `accion`:
 
-- `PREGUNTAR` / `SUGERIR_SOLUCION` — no hace nada más; la conversación sigue `ACTIVA`.
+- `PREGUNTAR` — no hace nada más; la conversación sigue `ACTIVA`.
 - `CERRAR_SIN_TICKET` — marca la conversación `RESUELTA_SIN_TICKET`.
-- `CREAR_TICKET` — requiere `ticket: { titulo, descripcion, prioridad, sucursalId?, activoId?, tipo?, categoriaSoporte? }` (el schema lo exige con `.refine()` solo para esta acción). Crea el ticket (`origen: "CHATBOT"`), vincula la conversación (`CONVERTIDA_A_TICKET`), y dispara `TICKET_CREADO`. Mismo manejo de `SUCURSAL_AMBIGUA` que el flujo anterior si el cliente tiene más de una sede y la IA no mandó `sucursalId`.
+- `CREAR_TICKET` — requiere `ticket: { titulo, descripcion, prioridad, sucursalId?, activoId?, tipo?, categoriaSoporte?, sugerenciaIA? }` (el schema lo exige con `.refine()` solo para esta acción). Crea el ticket (`origen: "CHATBOT"`), guarda `sugerenciaIA` tal cual la mandó el modelo (o `null` si no aplicó ninguna), vincula la conversación (`CONVERTIDA_A_TICKET`), y dispara `TICKET_CREADO`. Mismo manejo de `SUCURSAL_AMBIGUA` que el flujo anterior si el cliente tiene más de una sede y la IA no mandó `sucursalId`.
 
 ```json
 // 200 — CREAR_TICKET exitoso
@@ -1622,7 +1906,7 @@ Persiste la respuesta de la IA (`mensajeAsistente`) como un mensaje `ASISTENTE`,
   "ok": true,
   "ticketId": "...",
   "numeroTicket": "TCK-0006",
-  "mensaje": "Entendido, voy a crear un ticket para que un técnico lo revise.\n\n✅ Ticket #TCK-0006 creado (prioridad alta). Te avisaremos cuando un técnico lo atienda.",
+  "mensaje": "Ya te generé un ticket para que un técnico lo revise.\n\n✅ Ticket #TCK-0006 creado (prioridad alta). Te avisaremos cuando un técnico lo atienda.",
   "canal": "TELEGRAM",
   "identificador": "999888777"
 }
@@ -1632,18 +1916,26 @@ Notá que `mensaje` en la respuesta es `mensajeAsistente` + un sufijo de confirm
 arma NexIT (nunca la IA) — así el número de ticket que se le muestra al cliente es
 siempre el real, nunca algo que el modelo podría llegar a inventar.
 
-### d) El prompt: preguntar y sugerir antes de crear
+> `sugerenciaIA` no viaja en esta respuesta ni en el evento `TICKET_CREADO` — vive solo
+> en la fila del ticket, y solo se muestra en `/tickets/[id]` y en el wizard de
+> ejecución del técnico (nunca en `/portal`, para que el cliente no la confunda con un
+> diagnóstico oficial).
+
+### d) El prompt: preguntar, y crear el ticket sin retrasarlo
 
 El nodo "IA: decidir siguiente paso" le manda al modelo el historial completo + las
-sucursales/activos del cliente, y le exige devolver un JSON con `accion` +`mensaje` +
+sucursales/activos del cliente, y le exige devolver un JSON con `accion` + `mensaje` +
 `ticket` (null salvo que `accion = CREAR_TICKET`). Las reglas clave del prompt:
 
 1. Un saludo o mensaje sin detalle técnico → `PREGUNTAR`, nunca crear ticket todavía.
-2. Problema con una solución simple y segura para que el cliente pruebe él mismo
-   (reiniciar, revisar corriente/cables) → `SUGERIR_SOLUCION` primero.
-3. Sugerencia ya descartada por el cliente, o problema evidentemente grave (no
-   enciende, olor a quemado, corte total) → recién ahí `CREAR_TICKET`.
-4. Cliente dice que ya se resolvió → `CERRAR_SIN_TICKET`.
+2. En cuanto hay un problema concreto (equipo + síntoma) → `CREAR_TICKET` de inmediato.
+   Si existe una sugerencia breve y segura (reiniciar, revisar corriente/cables), va en
+   `ticket.sugerenciaIA` como dato informativo para el técnico — nunca como excusa para
+   retrasar la creación ni como paso que el cliente tiene que confirmar antes.
+3. Cliente dice que ya se resolvió solo (antes de llegar al punto 2) → `CERRAR_SIN_TICKET`.
+
+Ajustá este prompt libremente según el tipo de fallas más comunes de tus clientes —
+está pensado como punto de partida, no como texto final.
 
 Ajustá este prompt libremente según el tipo de fallas más comunes de tus clientes —
 está pensado como punto de partida, no como texto final.
@@ -1829,7 +2121,7 @@ URL/body del nodo Code si usás otro).
     },
     {
       "parameters": {
-        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nconst historialTexto = contexto.historial.map((m) => `${m.rol === 'USUARIO' ? 'Cliente' : 'Asistente'}: ${m.contenido}`).join('\\n');\n\nconst prompt = `Sos el asistente de soporte tecnico de NexIT, atendiendo por chat a ${contexto.usuarioNombre} de ${contexto.clienteNombre}.\n\nSucursales y equipos (activos) de este cliente:\n${JSON.stringify(contexto.sucursales)}\n\nHistorial completo de la conversacion (el ultimo mensaje es el mas reciente):\n${historialTexto}\n\nTu trabajo, en este orden:\n1. Si el ultimo mensaje del cliente es un saludo o no tiene detalle tecnico (\"hola\", \"tengo un problema\"), NO crees un ticket todavia - respondé con una pregunta concreta para entender que pasa (que equipo, que sintoma exacto, desde cuando).\n2. Si ya entendiste el problema y existe una solucion simple y segura que el cliente pueda intentar el mismo (reiniciar el equipo, revisar que este enchufado/con corriente, verificar un cable), sugerisela y pregunta si funciono - todavia sin crear ticket.\n3. Si el cliente ya confirmo que la sugerencia no resolvio nada, o el problema es evidentemente grave o no autogestionable (no enciende, olor a quemado, chispas, corte total, dano fisico), crea el ticket con los datos ya reunidos en la conversacion. Prioriza ALTA o CRITICA para fallas totales/de seguridad, MEDIA para lo demas.\n4. Si el cliente dice que ya se solucino o no necesita nada mas, cerra la conversacion sin ticket.\n\nNunca inventes datos que el cliente no dio - si falta el nombre de la sede y el cliente tiene mas de una, deja sucursalId en null (el sistema le va a preguntar directamente cual es).\n\nDevolve SOLO un JSON con esta forma exacta:\n{\n  \"accion\": \"PREGUNTAR\" o \"SUGERIR_SOLUCION\" o \"CREAR_TICKET\" o \"CERRAR_SIN_TICKET\",\n  \"mensaje\": \"el texto que le vas a responder al cliente, en español, tono cordial y breve\",\n  \"ticket\": null o { \"titulo\": \"...\", \"descripcion\": \"...\", \"prioridad\": \"CRITICA\" o \"ALTA\" o \"MEDIA\" o \"BAJA\", \"sucursalId\": \"...\" o null, \"activoId\": \"...\" o null }\n}`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  conversacionId: contexto.conversacionId,\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  accion: ai.accion,\n  mensajeAsistente: ai.mensaje,\n  ticket: ai.ticket && ai.ticket.titulo ? ai.ticket : undefined,\n} }];"
+        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nconst historialTexto = contexto.historial.map((m) => `${m.rol === 'USUARIO' ? 'Cliente' : 'Asistente'}: ${m.contenido}`).join('\n');\n\nconst prompt = `Sos el asistente de soporte tecnico de NexIT, atendiendo por chat a ${contexto.usuarioNombre} de ${contexto.clienteNombre}.\n\nSucursales y equipos (activos) de este cliente:\n${JSON.stringify(contexto.sucursales)}\n\nHistorial completo de la conversacion (el ultimo mensaje es el mas reciente):\n${historialTexto}\n\nTu trabajo, en este orden:\n1. Si el ultimo mensaje del cliente es un saludo o no tiene detalle tecnico (\"hola\", \"tengo un problema\"), NO crees un ticket todavia - respondé con una pregunta concreta para entender que pasa (que equipo, que sintoma exacto, desde cuando).\n2. En cuanto tengas un problema concreto (equipo + sintoma), crea el ticket DE INMEDIATO - no le pidas al cliente que pruebe nada primero ni esperes que confirme si funciono. Muchos contactos no tienen el conocimiento ni las facilidades para seguir un procedimiento tecnico por chat, y hacerlo esperar solo demora que un tecnico real se entere. Si conoces una sugerencia breve y segura para que intente mientras el tecnico llega (reiniciar el equipo, revisar corriente/cables), incluila en ticket.sugerenciaIA como dato informativo para el tecnico - nunca la uses como excusa para retrasar el ticket, y en tu mensaje al cliente aclara que igual ya se genero el ticket. Prioriza ALTA o CRITICA para fallas totales/de seguridad, MEDIA para el resto.\n3. Si el cliente dice que ya se soluciono solo (antes de llegar al punto 2), cerra la conversacion sin ticket.\n\nNunca inventes datos que el cliente no dio - si falta el nombre de la sede y el cliente tiene mas de una, deja sucursalId en null (el sistema le va a preguntar directamente cual es).\n\nDevolve SOLO un JSON con esta forma exacta:\n{\n  \"accion\": \"PREGUNTAR\" o \"CREAR_TICKET\" o \"CERRAR_SIN_TICKET\",\n  \"mensaje\": \"el texto que le vas a responder al cliente, en español, tono cordial y breve - si accion=CREAR_TICKET, mencionale que ya se genero el ticket, nunca le pidas que pruebe algo antes\",\n  \"ticket\": null o { \"titulo\": \"...\", \"descripcion\": \"...\", \"prioridad\": \"CRITICA\" o \"ALTA\" o \"MEDIA\" o \"BAJA\", \"sucursalId\": \"...\" o null, \"activoId\": \"...\" o null, \"sugerenciaIA\": \"...\" o null }\n}`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  conversacionId: contexto.conversacionId,\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  accion: ai.accion,\n  mensajeAsistente: ai.mensaje,\n  ticket: ai.ticket && ai.ticket.titulo ? ai.ticket : undefined,\n} }];"
       },
       "id": "ia-decidir-paso",
       "name": "IA: decidir siguiente paso",

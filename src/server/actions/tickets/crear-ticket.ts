@@ -1,5 +1,7 @@
 "use server";
 
+import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { siguienteNumeroTicket } from "@/server/services/numero-ticket.service";
@@ -9,10 +11,17 @@ import type { CrearTicketInput } from "@/lib/zod/ticket.schema";
 
 const ROLES_PERMITIDOS = ["ADMIN", "COORDINADOR", "TECNICO"] as const;
 
-// Creación manual por staff — el caso principal es "el cliente llamó por teléfono en
-// vez de entrar al portal". A diferencia de crearTicketPortal (que fija tipo=CORRECTIVO
-// y saca clienteId de la sesión), aquí el staff elige el cliente y cualquiera de los 3
-// tipos de ticket.
+// Mismo patrón que resetear-password-usuario.ts: una temporal aleatoria en vez de
+// pedirle una al staff, mostrada una sola vez (acá ni siquiera se muestra — viaja
+// directo al contacto por el webhook de bienvenida).
+function generarPasswordTemporal(): string {
+  return crypto.randomBytes(9).toString("base64url");
+}
+
+// Creación manual por staff (Admin/Coordinador/Técnico) — típicamente cuando un cliente
+// llama por teléfono en vez de reportar desde el portal. clienteId viaja en el input
+// (a diferencia de crearTicketPortalSchema, donde sale de la sesión) porque aquí el
+// staff elige a qué cliente pertenece.
 export async function crearTicket(input: CrearTicketInput) {
   const usuario = await requireUsuario();
   if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
@@ -29,8 +38,8 @@ export async function crearTicket(input: CrearTicketInput) {
     titulo,
     descripcion,
     prioridad,
-    contactoNombre,
-    contactoTelefono,
+    contactoUsuarioId,
+    contactoNuevo,
   } = crearTicketSchema.parse(input);
 
   const sucursal = await prisma.sucursal.findUniqueOrThrow({ where: { id: sucursalId } });
@@ -45,6 +54,39 @@ export async function crearTicket(input: CrearTicketInput) {
     }
   }
 
+  // Resuelve quién es el contacto real que reportó el problema — de acá sale
+  // creadoPorId, y por lo tanto a quién le llegan las notificaciones (TICKET_CREADO,
+  // TICKET_ASIGNADO, etc.). Antes esto se perdía: el ticket quedaba a nombre de
+  // `usuario` (el miembro del staff que llenó el formulario) y el contacto real solo
+  // aparecía como texto suelto en la descripción, sin forma de notificarle nada.
+  let contacto: { id: string; nombre: string; email: string; telegramChatId: string | null; whatsappTelefono: string | null };
+  let passwordTemporalNueva: string | null = null;
+
+  if (contactoUsuarioId) {
+    const existente = await prisma.usuario.findUnique({ where: { id: contactoUsuarioId } });
+    if (!existente || existente.rol !== "CLIENTE" || existente.clienteId !== clienteId) {
+      throw new Error("El contacto seleccionado no pertenece a este cliente");
+    }
+    contacto = existente;
+  } else {
+    const { nombre, email, whatsapp } = contactoNuevo!;
+    const yaExiste = await prisma.usuario.findUnique({ where: { email } });
+    if (yaExiste) {
+      throw new Error("Ya existe un usuario con ese correo — búscalo arriba en vez de crear uno nuevo");
+    }
+    passwordTemporalNueva = generarPasswordTemporal();
+    contacto = await prisma.usuario.create({
+      data: {
+        nombre,
+        email,
+        passwordHash: await bcrypt.hash(passwordTemporalNueva, 10),
+        rol: "CLIENTE",
+        clienteId,
+        whatsappTelefono: whatsapp ?? null,
+      },
+    });
+  }
+
   const contrato = await prisma.contrato.findFirst({
     where: { clienteId, estado: "ACTIVO" },
     orderBy: { fechaInicio: "desc" },
@@ -53,16 +95,9 @@ export async function crearTicket(input: CrearTicketInput) {
     ? await prisma.contratoSla.findFirst({ where: { contratoId: contrato.id, prioridad } })
     : null;
 
-  // El contacto telefónico no tiene columna propia en Ticket — se deja al inicio de la
-  // descripción, igual que ubicacionNoCatalogada en el flujo del portal, para que quede
-  // visible en el detalle del ticket y en el PDF sin necesitar una migración nueva.
-  const descripcionFinal = [
-    `[Reportado por teléfono — contacto: ${contactoNombre}, ${contactoTelefono}]`,
-    ubicacionNoCatalogada ? `[Equipo/ubicación no catalogada: ${ubicacionNoCatalogada}]` : null,
-    descripcion,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const descripcionFinal = ubicacionNoCatalogada
+    ? `[Equipo/ubicación no catalogada: ${ubicacionNoCatalogada}]\n\n${descripcion}`
+    : descripcion;
 
   const numeroTicket = await siguienteNumeroTicket();
 
@@ -79,11 +114,11 @@ export async function crearTicket(input: CrearTicketInput) {
         estado: "ABIERTO",
         titulo,
         descripcion: descripcionFinal,
-        creadoPorId: usuario.id,
+        creadoPorId: contacto.id,
         slaId: sla?.id,
         origen: "TELEFONO",
       },
-      include: { cliente: true, creadoPor: true },
+      include: { cliente: true },
     });
 
     await tx.ticketHistorial.create({
@@ -91,12 +126,24 @@ export async function crearTicket(input: CrearTicketInput) {
         ticketId: nuevo.id,
         usuarioId: usuario.id,
         estadoNuevo: "ABIERTO",
-        comentario: `Ticket creado por ${usuario.nombre} (${usuario.rol}) — reportado por teléfono`,
+        comentario: `Ticket creado por ${usuario.nombre} (${usuario.rol}) — reportado por teléfono, contacto: ${contacto.nombre}`,
       },
     });
 
     return nuevo;
   });
+
+  if (passwordTemporalNueva) {
+    emitirEvento({
+      tipo: "CONTACTO_CREADO",
+      usuarioId: contacto.id,
+      nombre: contacto.nombre,
+      email: contacto.email,
+      passwordTemporal: passwordTemporalNueva,
+      clienteNombre: ticket.cliente.nombre,
+      whatsapp: contacto.whatsappTelefono,
+    });
+  }
 
   emitirEvento({
     tipo: "TICKET_CREADO",
@@ -107,10 +154,10 @@ export async function crearTicket(input: CrearTicketInput) {
     titulo: ticket.titulo,
     prioridad: ticket.prioridad,
     origen: "TELEFONO",
-    reportadoPorNombre: usuario.nombre,
-    reportadoPorEmail: usuario.email,
-    reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
-    reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
+    reportadoPorNombre: contacto.nombre,
+    reportadoPorEmail: contacto.email,
+    reportadoPorTelegramChatId: contacto.telegramChatId,
+    reportadoPorWhatsapp: contacto.whatsappTelefono,
   });
 
   return { id: ticket.id, numeroTicket: ticket.numeroTicket };

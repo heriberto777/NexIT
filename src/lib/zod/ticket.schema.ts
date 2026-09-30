@@ -17,24 +17,56 @@ export const estadoTicketSchema = z.enum([
   "CANCELADO",
 ]);
 
+// Vacío/undefined se guarda como null (no vincular WhatsApp todavía) — nunca como
+// string vacío, para que el índice @unique de Usuario.whatsappTelefono no choque entre
+// dos contactos que "no tienen" el canal vinculado (mismo patrón que perfil.schema.ts).
+const whatsappOpcional = z
+  .string()
+  .trim()
+  .max(20)
+  .optional()
+  .transform((v) => (v ? v : undefined));
+
+// El contacto que reportó el problema: o ya existe en NexIT (se busca por cliente,
+// ver buscar-contactos-cliente.ts) o es la primera vez que se le atiende y hay que
+// crearle una cuenta de una vez — nunca queda solo como texto suelto en la
+// descripción, porque de ahí es de donde salen las notificaciones reales (ver
+// reportadoPor* en webhook.service.ts).
+const contactoNuevoSchema = z.object({
+  nombre: z.string().trim().min(2, "Indica el nombre del contacto").max(120),
+  email: z.string().trim().email("Correo inválido"),
+  whatsapp: whatsappOpcional,
+});
+
 // Creación manual por staff (Admin/Coordinador/Técnico) — típicamente cuando un cliente
 // llama por teléfono en vez de reportar desde el portal. clienteId viaja en el input
 // (a diferencia de crearTicketPortalSchema, donde sale de la sesión) porque aquí el
 // staff elige a qué cliente pertenece.
-export const crearTicketSchema = z.object({
-  clienteId: z.string().cuid(),
-  sucursalId: z.string().cuid(),
-  activoId: optionalCuid(),
-  ubicacionNoCatalogada: z.string().trim().max(200).optional(),
-  tipo: tipoTicketSchema,
-  categoriaSoporte: categoriaSoporteSchema,
-  titulo: z.string().trim().min(5, "El título debe tener al menos 5 caracteres").max(120),
-  descripcion: z.string().trim().min(20, "Describe el problema con al menos 20 caracteres").max(4000),
-  prioridad: prioridadSchema,
-  contactoNombre: z.string().trim().min(2, "Indica con quién se habló").max(120),
-  contactoTelefono: z.string().trim().min(7, "Indica un teléfono de contacto").max(20),
-});
+export const crearTicketSchema = z
+  .object({
+    clienteId: z.string().cuid(),
+    sucursalId: z.string().cuid(),
+    activoId: optionalCuid(),
+    ubicacionNoCatalogada: z.string().trim().max(200).optional(),
+    tipo: tipoTicketSchema,
+    categoriaSoporte: categoriaSoporteSchema,
+    titulo: z.string().trim().min(5, "El título debe tener al menos 5 caracteres").max(120),
+    descripcion: z.string().trim().min(20, "Describe el problema con al menos 20 caracteres").max(4000),
+    prioridad: prioridadSchema,
+    contactoUsuarioId: optionalCuid(),
+    contactoNuevo: contactoNuevoSchema.optional(),
+  })
+  .refine((data) => Boolean(data.contactoUsuarioId) !== Boolean(data.contactoNuevo), {
+    message: "Selecciona un contacto existente o completa los datos de uno nuevo",
+    path: ["contactoUsuarioId"],
+  });
 export type CrearTicketInput = z.infer<typeof crearTicketSchema>;
+
+export const buscarContactosClienteSchema = z.object({
+  clienteId: z.string().cuid(),
+  query: z.string().trim().max(120),
+});
+export type BuscarContactosClienteInput = z.infer<typeof buscarContactosClienteSchema>;
 
 // Asignación por el coordinador
 export const asignarTicketSchema = z.object({

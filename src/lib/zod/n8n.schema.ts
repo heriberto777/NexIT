@@ -43,12 +43,17 @@ export const mensajeConversacionSchema = z.object({
 });
 export type MensajeConversacionInput = z.infer<typeof mensajeConversacionSchema>;
 
-export const accionTurnoSchema = z.enum(["PREGUNTAR", "SUGERIR_SOLUCION", "CREAR_TICKET", "CERRAR_SIN_TICKET"]);
+// SUGERIR_SOLUCION existió como paso intermedio ("probá esto antes de escalar"), pero
+// no siempre el contacto tiene el conocimiento o las facilidades para seguir un
+// procedimiento — ahora la IA crea el ticket apenas hay un problema concreto, y una
+// sugerencia seria (si la hay) viaja como dato informativo del ticket
+// (`ticket.sugerenciaIA`), no como un paso que bloquee o retrase la creación.
+export const accionTurnoSchema = z.enum(["PREGUNTAR", "CREAR_TICKET", "CERRAR_SIN_TICKET"]);
 
 // Los datos del ticket son opcionales a nivel de schema porque solo hacen falta cuando
 // accion=CREAR_TICKET — el refine exige que vengan completos en ese caso puntual, sin
-// forzar al resto de las acciones (PREGUNTAR/SUGERIR_SOLUCION/CERRAR_SIN_TICKET) a
-// mandar un objeto ticket vacío/dummy.
+// forzar al resto de las acciones (PREGUNTAR/CERRAR_SIN_TICKET) a mandar un objeto
+// ticket vacío/dummy.
 export const turnoConversacionSchema = z
   .object({
     conversacionId: z.string().cuid(),
@@ -63,6 +68,10 @@ export const turnoConversacionSchema = z
         prioridad: prioridadSchema.default("MEDIA"),
         sucursalId: optionalCuid(),
         activoId: optionalCuid(),
+        // Sugerencia breve y segura para el contacto mientras el técnico llega (o null
+        // si no hay ninguna sugerencia razonable) — queda guardada en el ticket como
+        // contexto para el técnico, nunca visible en el Portal del cliente.
+        sugerenciaIA: z.string().trim().max(2000).optional(),
       })
       .optional(),
   })

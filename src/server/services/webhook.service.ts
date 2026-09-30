@@ -13,9 +13,11 @@ export type EventoWebhook =
       prioridad: string;
       origen: string;
       // El modelo Cliente no tiene email propio (solo Sucursal.contactoTelefono, sin
-      // email) — el destinatario real es quien creó el ticket. En origen PORTAL es el
-      // cliente que reportó la falla; en PROGRAMADO es el coordinador que corrió el
-      // job, no un contacto del cliente (el workflow de n8n debe distinguir por `origen`).
+      // email) — el destinatario real es quien creó el ticket. En origen PORTAL,
+      // TELEFONO y CHATBOT es siempre un contacto real del cliente (crear-ticket.ts
+      // busca o crea ese Usuario antes de emitir este evento); en PROGRAMADO sigue
+      // siendo el coordinador que corrió el job, no un contacto del cliente (el
+      // workflow de n8n debe distinguir por `origen`).
       reportadoPorNombre: string;
       reportadoPorEmail: string;
       // null si el usuario nunca vinculó ese canal desde /perfil — el workflow de n8n
@@ -76,6 +78,28 @@ export type EventoWebhook =
       reportadoPorEmail: string;
       reportadoPorTelegramChatId: string | null;
       reportadoPorWhatsapp: string | null;
+    }
+  | {
+      // Se emite cuando el staff crea un ticket interno para un contacto que todavía
+      // no existía en NexIT (ver crear-ticket.ts) — el contacto recién creado no tiene
+      // forma de enterarse de su acceso al Portal si nadie se lo avisa.
+      tipo: "CONTACTO_CREADO";
+      usuarioId: string;
+      nombre: string;
+      email: string;
+      passwordTemporal: string;
+      clienteNombre: string;
+      whatsapp: string | null;
+    }
+  | {
+      // Mensaje de Telegram/WhatsApp de un chat_id/teléfono que no está vinculado a
+      // ningún Usuario — no hay a quién notificarle un "ticket creado", así que esto va
+      // a un chat interno de soporte para que un Coordinador contacte a la persona y
+      // levante el ticket manualmente (ver /api/n8n/conversacion/mensaje).
+      tipo: "CONTACTO_NO_IDENTIFICADO";
+      canal: string;
+      identificador: string;
+      texto: string;
     };
 
 const TIMEOUT_MS = 8000;
@@ -85,7 +109,8 @@ const TIMEOUT_MS = 8000;
 // de la Server Action que originó el evento. Los errores solo se registran.
 export function emitirEvento(evento: EventoWebhook): void {
   void enviarWebhook(evento).catch((error) => {
-    registrarError("webhook", error, { evento: evento.tipo, ticketId: evento.ticketId });
+    const ticketId = "ticketId" in evento ? evento.ticketId : undefined;
+    registrarError("webhook", error, { evento: evento.tipo, ticketId });
   });
 }
 

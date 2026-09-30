@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { crearTicketSchema, type CrearTicketInput } from "@/lib/zod/ticket.schema";
 import { crearTicket } from "@/server/actions/tickets/crear-ticket";
+import { buscarContactosCliente } from "@/server/actions/tickets/buscar-contactos-cliente";
 import { Button } from "@/components/ui/button";
+
+interface ContactoEncontrado {
+  id: string;
+  nombre: string;
+  email: string;
+  whatsappTelefono: string | null;
+}
 
 interface Activo {
   id: string;
@@ -47,10 +55,17 @@ export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
   const [error, setError] = useState<string | null>(null);
   const [sinActivo, setSinActivo] = useState(false);
 
+  const [busqueda, setBusqueda] = useState("");
+  const [resultados, setResultados] = useState<ContactoEncontrado[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [contactoSeleccionado, setContactoSeleccionado] = useState<ContactoEncontrado | null>(null);
+  const [modoNuevoContacto, setModoNuevoContacto] = useState(false);
+
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CrearTicketInput>({
     resolver: zodResolver(crearTicketSchema),
@@ -61,6 +76,43 @@ export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
   const sucursalId = watch("sucursalId");
   const sucursalesDelCliente = clientes.find((c) => c.id === clienteId)?.sucursales ?? [];
   const activosDeSucursal = sucursalesDelCliente.find((s) => s.id === sucursalId)?.activos ?? [];
+
+  // Cambiar de cliente invalida cualquier contacto ya elegido — buscarlo de nuevo evita
+  // enviar un contactoUsuarioId que pertenece a otro cliente.
+  function resetContacto() {
+    setContactoSeleccionado(null);
+    setModoNuevoContacto(false);
+    setBusqueda("");
+    setResultados([]);
+    setValue("contactoUsuarioId", undefined);
+    setValue("contactoNuevo", undefined);
+  }
+
+  useEffect(() => {
+    if (!clienteId || !busqueda.trim() || busqueda.trim().length < 2) {
+      setResultados([]);
+      return;
+    }
+    setBuscando(true);
+    const timeout = setTimeout(() => {
+      buscarContactosCliente({ clienteId, query: busqueda.trim() })
+        .then(setResultados)
+        .finally(() => setBuscando(false));
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [clienteId, busqueda]);
+
+  function seleccionarContacto(contacto: ContactoEncontrado) {
+    setContactoSeleccionado(contacto);
+    setValue("contactoUsuarioId", contacto.id);
+    setValue("contactoNuevo", undefined);
+  }
+
+  function activarNuevoContacto() {
+    setModoNuevoContacto(true);
+    setContactoSeleccionado(null);
+    setValue("contactoUsuarioId", undefined);
+  }
 
   async function onSubmit(values: CrearTicketInput) {
     setError(null);
@@ -78,7 +130,10 @@ export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-        <select {...register("clienteId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <select
+          {...register("clienteId", { onChange: resetContacto })}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        >
           <option value="">Selecciona un cliente...</option>
           {clientes.map((c) => (
             <option key={c.id} value={c.id}>
@@ -88,6 +143,89 @@ export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
         </select>
         {errors.clienteId && <p className="mt-1 text-xs text-red-600">{errors.clienteId.message}</p>}
       </div>
+
+      {clienteId && (
+        <div className="rounded-lg border border-gray-200 p-3">
+          <label className="mb-1 block text-sm font-medium text-gray-700">Contacto que reporta</label>
+
+          {contactoSeleccionado ? (
+            <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-sm">
+              <div>
+                <p className="font-medium text-gray-900">{contactoSeleccionado.nombre}</p>
+                <p className="text-xs text-gray-600">{contactoSeleccionado.email}</p>
+              </div>
+              <button type="button" onClick={resetContacto} className="text-xs text-blue-600 underline">
+                Cambiar
+              </button>
+            </div>
+          ) : modoNuevoContacto ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <input
+                    {...register("contactoNuevo.nombre")}
+                    placeholder="Nombre del contacto"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  {errors.contactoNuevo?.nombre && <p className="mt-1 text-xs text-red-600">{errors.contactoNuevo.nombre.message}</p>}
+                </div>
+                <div>
+                  <input
+                    {...register("contactoNuevo.email")}
+                    placeholder="Correo (para su acceso al Portal)"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  {errors.contactoNuevo?.email && <p className="mt-1 text-xs text-red-600">{errors.contactoNuevo.email.message}</p>}
+                </div>
+              </div>
+              <input
+                {...register("contactoNuevo.whatsapp")}
+                placeholder="WhatsApp (opcional, con código de país)"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-500">
+                Se crea con acceso al Portal y se le avisa por correo{"/"}WhatsApp con una contraseña temporal.
+              </p>
+              <button type="button" onClick={resetContacto} className="text-xs text-blue-600 underline">
+                Mejor buscar uno existente
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar por nombre o correo..."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              {buscando && <p className="text-xs text-gray-400">Buscando...</p>}
+              {resultados.length > 0 && (
+                <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                  {resultados.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => seleccionarContacto(c)}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                      >
+                        <p className="font-medium text-gray-900">{c.nombre}</p>
+                        <p className="text-xs text-gray-500">{c.email}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {busqueda.trim().length >= 2 && !buscando && resultados.length === 0 && (
+                <p className="text-xs text-gray-400">No hay contactos que coincidan.</p>
+              )}
+              <button type="button" onClick={activarNuevoContacto} className="text-xs text-blue-600 underline">
+                + Es un contacto nuevo
+              </button>
+            </div>
+          )}
+          {errors.contactoUsuarioId && <p className="mt-1 text-xs text-red-600">{errors.contactoUsuarioId.message}</p>}
+        </div>
+      )}
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Sede</label>
@@ -161,19 +299,6 @@ export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
               </option>
             ))}
           </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Nombre de quien llamó</label>
-          <input {...register("contactoNombre")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Ana Torres" />
-          {errors.contactoNombre && <p className="mt-1 text-xs text-red-600">{errors.contactoNombre.message}</p>}
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Teléfono de contacto</label>
-          <input {...register("contactoTelefono")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="809-555-0100" />
-          {errors.contactoTelefono && <p className="mt-1 text-xs text-red-600">{errors.contactoTelefono.message}</p>}
         </div>
       </div>
 

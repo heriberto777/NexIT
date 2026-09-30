@@ -150,6 +150,13 @@ export default async function TicketDetailPage({ params }: PageProps) {
         </dl>
       </header>
 
+      {ticket.sugerenciaIA && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-violet-700">🤖 Sugerencia de la IA (solo staff/técnico)</p>
+          <p className="text-sm text-violet-900">{ticket.sugerenciaIA}</p>
+        </div>
+      )}
+
       {sesion?.rol === "TECNICO" && ESTADOS_CON_WIZARD_ACTIVO.has(ticket.estado) && (
         <Link
           href={`/tickets/${ticket.id}/ejecucion`}

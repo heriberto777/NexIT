@@ -4,6 +4,9 @@ export interface TicketEjecucionData {
   estado: string;
   titulo: string;
   descripcion: string;
+  // Solo presente cuando origen=CHATBOT y la IA dejó una sugerencia — contexto para el
+  // técnico antes de ir, nunca un diagnóstico confirmado.
+  sugerenciaIA: string | null;
   // Usados para reanudar el wizard en el paso correcto si el técnico recarga la página
   // o vuelve más tarde — ver calcularPasoInicial() en execution-wizard.tsx.
   fechaInicioAtencion: Date | null;
