@@ -159,18 +159,18 @@ model ConfiguracionSistema {
 
   // Parámetros operativos — default global de SLA para tickets sin contrato asignado,
   // y ventana de anticipación por defecto al generar tickets preventivos
-  slaHorasCritica             Int @default(4)
-  slaHorasAlta                Int @default(8)
-  slaHorasMedia               Int @default(24)
-  slaHorasBaja                Int @default(48)
-  diasAnticipacionPreventivos Int @default(7)
+  slaHorasCritica              Int @default(4)
+  slaHorasAlta                 Int @default(8)
+  slaHorasMedia                Int @default(24)
+  slaHorasBaja                 Int @default(48)
+  diasAnticipacionPreventivos  Int @default(7)
   // Mínimo de fotos "antes"/"después" que exige el paso de evidencia del wizard de
   // ejecución para poder avanzar — antes era 2 fijo en el código (MIN_FOTOS en
   // evidence-step.tsx), sin forma de ajustarlo por instalación.
-  fotosMinimasEvidencia       Int @default(1)
+  fotosMinimasEvidencia        Int @default(1)
   // Tamaño máximo (MB) por foto subida (evidencia general o por ítem de checklist) —
   // antes 8 fijo en MAX_BYTES en cada ruta de subida.
-  evidenciaMaxMB              Int @default(8)
+  evidenciaMaxMB               Int @default(8)
   // Ventana (días) para marcar un plan preventivo como "Próximo a vencer" en vez de
   // "Programado" — antes DIAS_VENTANA_PROXIMO fijo en lib/utils/plan-preventivo.ts.
   // Distinto de diasAnticipacionPreventivos (arriba): ese controla cuándo se GENERA el
@@ -389,39 +389,45 @@ model PlanMantenimientoPreventivo {
 // ---------- Tickets ----------
 
 model Ticket {
-  id                  String                       @id @default(cuid())
-  numeroTicket        String                       @unique
-  clienteId           String
-  cliente             Cliente                      @relation(fields: [clienteId], references: [id])
-  sucursalId          String
-  sucursal            Sucursal                     @relation(fields: [sucursalId], references: [id])
-  activoId            String?
-  activo              Activo?                      @relation(fields: [activoId], references: [id])
-  planPreventivoId    String?
-  planPreventivo      PlanMantenimientoPreventivo? @relation(fields: [planPreventivoId], references: [id])
-  tipo                TipoTicket
-  categoriaSoporte    CategoriaSoporte
-  prioridad           Prioridad
-  estado              EstadoTicket                 @default(ABIERTO)
-  titulo              String
-  descripcion         String
+  id                      String                       @id @default(cuid())
+  numeroTicket            String                       @unique
+  clienteId               String
+  cliente                 Cliente                      @relation(fields: [clienteId], references: [id])
+  sucursalId              String
+  sucursal                Sucursal                     @relation(fields: [sucursalId], references: [id])
+  activoId                String?
+  activo                  Activo?                      @relation(fields: [activoId], references: [id])
+  planPreventivoId        String?
+  planPreventivo          PlanMantenimientoPreventivo? @relation(fields: [planPreventivoId], references: [id])
+  tipo                    TipoTicket
+  categoriaSoporte        CategoriaSoporte
+  prioridad               Prioridad
+  estado                  EstadoTicket                 @default(ABIERTO)
+  titulo                  String
+  descripcion             String
   // Solo la puebla el asistente de IA conversacional (origen=CHATBOT) al crear el
   // ticket — una sugerencia informativa para que el técnico llegue con contexto, nunca
   // un diagnóstico del cliente ni un paso que haya bloqueado la creación del ticket.
   // Visible solo para staff/técnico (nunca en el portal del cliente).
-  sugerenciaIA        String?
-  creadoPorId         String
-  creadoPor           Usuario                      @relation("TicketCreador", fields: [creadoPorId], references: [id])
-  tecnicoAsignadoId   String?
-  tecnicoAsignado     Usuario?                     @relation("TicketTecnico", fields: [tecnicoAsignadoId], references: [id])
-  slaId               String?
-  sla                 ContratoSla?                 @relation(fields: [slaId], references: [id])
-  origen              OrigenTicket                 @default(PORTAL)
-  fechaCreacion       DateTime                     @default(now())
-  fechaAsignacion     DateTime?
-  fechaInicioAtencion DateTime?
-  fechaResolucion     DateTime?
-  fechaCierre         DateTime?
+  sugerenciaIA            String?
+  // El técnico puede marcar que este ticket puntual no requiere evidencia fotográfica
+  // (no todo soporte deja algo fotografiable) — motivo obligatorio, queda auditable en
+  // TicketHistorial. finalizar-visita.ts salta el mínimo de fotos cuando esto es true;
+  // subir una foto igual (registrar evidencia) lo vuelve a poner en false.
+  evidenciaNoAplica       Boolean                      @default(false)
+  evidenciaNoAplicaMotivo String?
+  creadoPorId             String
+  creadoPor               Usuario                      @relation("TicketCreador", fields: [creadoPorId], references: [id])
+  tecnicoAsignadoId       String?
+  tecnicoAsignado         Usuario?                     @relation("TicketTecnico", fields: [tecnicoAsignadoId], references: [id])
+  slaId                   String?
+  sla                     ContratoSla?                 @relation(fields: [slaId], references: [id])
+  origen                  OrigenTicket                 @default(PORTAL)
+  fechaCreacion           DateTime                     @default(now())
+  fechaAsignacion         DateTime?
+  fechaInicioAtencion     DateTime?
+  fechaResolucion         DateTime?
+  fechaCierre             DateTime?
 
   historial           TicketHistorial[]
   checklistRespuestas TicketChecklistRespuesta[]

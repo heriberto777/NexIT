@@ -23,11 +23,13 @@ export async function finalizarVisita(input: FinalizarVisitaInput) {
   if (ticket.firmas.length === 0) {
     throw new Error("No se puede cerrar la visita sin firma de conformidad");
   }
-  if (ticket.evidencias.filter((e) => e.tipo === "FOTO_ANTES").length === 0) {
-    throw new Error("Falta al menos una foto de 'antes'");
-  }
-  if (ticket.evidencias.filter((e) => e.tipo === "FOTO_DESPUES").length === 0) {
-    throw new Error("Falta al menos una foto de 'después'");
+  if (!ticket.evidenciaNoAplica) {
+    if (ticket.evidencias.filter((e) => e.tipo === "FOTO_ANTES").length === 0) {
+      throw new Error("Falta al menos una foto de 'antes'");
+    }
+    if (ticket.evidencias.filter((e) => e.tipo === "FOTO_DESPUES").length === 0) {
+      throw new Error("Falta al menos una foto de 'después'");
+    }
   }
 
   const estadoNuevo = "ESPERANDO_VALIDACION" as const;

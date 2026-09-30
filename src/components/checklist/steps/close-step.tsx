@@ -8,6 +8,7 @@ interface Props {
   fotosAntes: number;
   fotosDespues: number;
   firmaCapturada: boolean;
+  evidenciaNoAplica: boolean;
   onFinalizar: (notasInternas: string | undefined) => void;
   onGuardarParaDespues: () => void;
 }
@@ -17,11 +18,13 @@ export function CloseStep({
   fotosAntes,
   fotosDespues,
   firmaCapturada,
+  evidenciaNoAplica,
   onFinalizar,
   onGuardarParaDespues,
 }: Props) {
   const [notas, setNotas] = useState("");
-  const listoParaCerrar = firmaCapturada && fotosAntes > 0 && fotosDespues > 0;
+  const evidenciaLista = evidenciaNoAplica || (fotosAntes > 0 && fotosDespues > 0);
+  const listoParaCerrar = firmaCapturada && evidenciaLista;
 
   return (
     <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
@@ -29,8 +32,14 @@ export function CloseStep({
 
       <ul className="space-y-1 text-sm text-gray-600">
         <li>{firmaCapturada ? "✓" : "○"} Firma de conformidad</li>
-        <li>{fotosAntes > 0 ? "✓" : "○"} Fotos antes ({fotosAntes})</li>
-        <li>{fotosDespues > 0 ? "✓" : "○"} Fotos después ({fotosDespues})</li>
+        {evidenciaNoAplica ? (
+          <li>✓ Evidencia fotográfica (marcada como no aplica)</li>
+        ) : (
+          <>
+            <li>{fotosAntes > 0 ? "✓" : "○"} Fotos antes ({fotosAntes})</li>
+            <li>{fotosDespues > 0 ? "✓" : "○"} Fotos después ({fotosDespues})</li>
+          </>
+        )}
       </ul>
 
       <div>

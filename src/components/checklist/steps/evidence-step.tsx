@@ -10,13 +10,29 @@ interface Props {
   ticketId: string;
   evidencias: EvidenciaPlana[];
   fotosMinimas: number;
+  evidenciaNoAplica: boolean;
+  motivoNoAplica: string | null;
+  isPending: boolean;
   onEvidenciaSubida: (evidencia: EvidenciaPlana) => void;
+  onMarcarNoAplica: (motivo: string) => void;
   onContinue: () => void;
 }
 
-export function EvidenceStep({ ticketId, evidencias, fotosMinimas, onEvidenciaSubida, onContinue }: Props) {
+export function EvidenceStep({
+  ticketId,
+  evidencias,
+  fotosMinimas,
+  evidenciaNoAplica,
+  motivoNoAplica,
+  isPending,
+  onEvidenciaSubida,
+  onMarcarNoAplica,
+  onContinue,
+}: Props) {
   const [uploading, setUploading] = useState<"FOTO_ANTES" | "FOTO_DESPUES" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mostrarFormNoAplica, setMostrarFormNoAplica] = useState(false);
+  const [motivo, setMotivo] = useState("");
   const antesInputRef = useRef<HTMLInputElement>(null);
   const despuesInputRef = useRef<HTMLInputElement>(null);
   const antesGaleriaRef = useRef<HTMLInputElement>(null);
@@ -46,12 +62,26 @@ export function EvidenceStep({ ticketId, evidencias, fotosMinimas, onEvidenciaSu
     }
   }
 
-  const puedeContinuar = fotosAntes.length >= fotosMinimas && fotosDespues.length >= fotosMinimas;
+  const puedeContinuar = evidenciaNoAplica || (fotosAntes.length >= fotosMinimas && fotosDespues.length >= fotosMinimas);
+
+  function confirmarNoAplica() {
+    if (motivo.trim().length < 5) return;
+    onMarcarNoAplica(motivo.trim());
+    setMostrarFormNoAplica(false);
+  }
 
   return (
     <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-gray-900">3. Evidencia Fotográfica</h2>
       {error && <p className="text-xs text-red-600">{error}</p>}
+
+      {evidenciaNoAplica && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          ⚠️ Marcado como &quot;no requiere evidencia&quot;. Motivo: {motivoNoAplica}
+          <br />
+          <span className="text-xs">Si igual subes una foto abajo, esta marca se quita sola.</span>
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <PhotoZone
@@ -71,6 +101,37 @@ export function EvidenceStep({ ticketId, evidencias, fotosMinimas, onEvidenciaSu
           onSelect={(file) => handleFile("FOTO_DESPUES", file)}
         />
       </div>
+
+      {!evidenciaNoAplica && !puedeContinuar && (
+        <div className="rounded-lg border border-gray-200 p-3">
+          {mostrarFormNoAplica ? (
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-gray-600">
+                ¿Por qué este ticket no necesita evidencia fotográfica?
+              </label>
+              <textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={2}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="Ej. Se resolvió por teléfono guiando al usuario, no hubo intervención física."
+              />
+              <div className="flex gap-2">
+                <Button type="button" variant="ghost" onClick={() => setMostrarFormNoAplica(false)} className="flex-1">
+                  Cancelar
+                </Button>
+                <Button type="button" disabled={isPending || motivo.trim().length < 5} onClick={confirmarNoAplica} className="flex-1">
+                  Confirmar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setMostrarFormNoAplica(true)} className="text-xs text-blue-600 underline">
+              Este caso no requiere evidencia fotográfica
+            </button>
+          )}
+        </div>
+      )}
 
       <Button type="button" disabled={!puedeContinuar} onClick={onContinue} className="w-full">
         Continuar

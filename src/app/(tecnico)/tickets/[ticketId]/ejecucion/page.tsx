@@ -76,6 +76,8 @@ export default async function EjecucionPage({ params }: PageProps) {
         titulo: ticket.titulo,
         descripcion: ticket.descripcion,
         sugerenciaIA: ticket.sugerenciaIA,
+        evidenciaNoAplica: ticket.evidenciaNoAplica,
+        evidenciaNoAplicaMotivo: ticket.evidenciaNoAplicaMotivo,
         fechaInicioAtencion: ticket.fechaInicioAtencion,
         tieneFirma: ticket.firmas.length > 0,
         cliente: { nombre: ticket.cliente.nombre },

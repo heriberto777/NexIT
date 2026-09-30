@@ -239,27 +239,35 @@ export default async function TicketDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      {evidenciasResueltas.length > 0 && (
+      {(evidenciasResueltas.length > 0 || ticket.evidenciaNoAplica) && (
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-semibold text-gray-900">Evidencia fotográfica</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="mb-1 text-xs font-medium text-gray-500">Antes ({fotosAntes.length})</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {fotosAntes.map((f) => (
-                  <ImageThumbnail key={f.id} src={f.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
-                ))}
+          {ticket.evidenciaNoAplica && (
+            <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              ⚠️ El técnico marcó que este ticket no requería evidencia fotográfica. Motivo:{" "}
+              {ticket.evidenciaNoAplicaMotivo}
+            </p>
+          )}
+          {evidenciasResueltas.length > 0 && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="mb-1 text-xs font-medium text-gray-500">Antes ({fotosAntes.length})</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {fotosAntes.map((f) => (
+                    <ImageThumbnail key={f.id} src={f.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-gray-500">Después ({fotosDespues.length})</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {fotosDespues.map((f) => (
+                    <ImageThumbnail key={f.id} src={f.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
+                  ))}
+                </div>
               </div>
             </div>
-            <div>
-              <p className="mb-1 text-xs font-medium text-gray-500">Después ({fotosDespues.length})</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {fotosDespues.map((f) => (
-                  <ImageThumbnail key={f.id} src={f.urlArchivo} alt="" className="aspect-square rounded-md object-cover" />
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </section>
       )}
 

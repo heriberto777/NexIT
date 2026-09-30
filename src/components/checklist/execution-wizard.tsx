@@ -12,6 +12,7 @@ import { guardarChecklist } from "@/server/actions/tickets/ejecucion/guardar-che
 import { registrarRepuesto } from "@/server/actions/tickets/ejecucion/registrar-repuesto";
 import { capturarFirma } from "@/server/actions/tickets/ejecucion/capturar-firma";
 import { finalizarVisita } from "@/server/actions/tickets/ejecucion/finalizar-visita";
+import { marcarEvidenciaNoAplica } from "@/server/actions/tickets/ejecucion/marcar-evidencia-no-aplica";
 import { CheckInStep } from "./steps/check-in-step";
 import { ChecklistStep } from "./steps/checklist-step";
 import { EvidenceStep } from "./steps/evidence-step";
@@ -42,7 +43,9 @@ function calcularPasoInicial(ticket: TicketEjecucionData, evidenciasIniciales: E
 
   const fotosAntes = evidenciasIniciales.filter((e) => e.tipo === "FOTO_ANTES").length;
   const fotosDespues = evidenciasIniciales.filter((e) => e.tipo === "FOTO_DESPUES").length;
-  if (fotosAntes >= fotosMinimasEvidencia && fotosDespues >= fotosMinimasEvidencia) return 4; // evidencia mínima ya cumplida -> repuestos
+  // "No aplica" satisface el paso de evidencia igual que llegar al mínimo de fotos —
+  // si no, recargar la página lo mandaría de vuelta al paso 3 a pesar de la excepción.
+  if (ticket.evidenciaNoAplica || (fotosAntes >= fotosMinimasEvidencia && fotosDespues >= fotosMinimasEvidencia)) return 4;
   if (fotosAntes > 0 || fotosDespues > 0) return 3; // ya empezó a subir fotos
   return 2; // ya hizo check-in — evita repetirlo y duplicar el historial
 }
@@ -55,6 +58,8 @@ export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, 
 
   const [checkedIn, setCheckedIn] = useState(Boolean(ticket.fechaInicioAtencion));
   const [evidencias, setEvidencias] = useState<EvidenciaPlana[]>(evidenciasIniciales);
+  const [evidenciaNoAplica, setEvidenciaNoAplica] = useState(ticket.evidenciaNoAplica);
+  const [motivoNoAplica, setMotivoNoAplica] = useState(ticket.evidenciaNoAplicaMotivo);
   const [repuestosAgregados, setRepuestosAgregados] = useState<{ nombre: string; cantidad: number }[]>([]);
   const [firmaCapturada, setFirmaCapturada] = useState(ticket.tieneFirma);
   const [finalizado, setFinalizado] = useState(false);
@@ -92,6 +97,16 @@ export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, 
     runAction(
       () => guardarChecklist(values),
       () => setStep(3),
+    );
+  }
+
+  function handleMarcarNoAplica(motivo: string) {
+    runAction(
+      () => marcarEvidenciaNoAplica({ ticketId: ticket.id, motivo }),
+      () => {
+        setEvidenciaNoAplica(true);
+        setMotivoNoAplica(motivo);
+      },
     );
   }
 
@@ -203,7 +218,17 @@ export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, 
             ticketId={ticket.id}
             evidencias={evidencias}
             fotosMinimas={fotosMinimasEvidencia}
-            onEvidenciaSubida={(evidencia) => setEvidencias((prev) => [...prev, evidencia])}
+            evidenciaNoAplica={evidenciaNoAplica}
+            motivoNoAplica={motivoNoAplica}
+            isPending={isPending}
+            onEvidenciaSubida={(evidencia) => {
+              setEvidencias((prev) => [...prev, evidencia]);
+              // El endpoint de subida ya limpia el flag del lado del servidor si venía
+              // marcado — reflejarlo también acá evita un "no aplica" fantasma en el UI.
+              setEvidenciaNoAplica(false);
+              setMotivoNoAplica(null);
+            }}
+            onMarcarNoAplica={handleMarcarNoAplica}
             onContinue={() => setStep(4)}
           />
         )}
@@ -234,6 +259,7 @@ export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, 
             fotosAntes={fotosAntes}
             fotosDespues={fotosDespues}
             firmaCapturada={firmaCapturada}
+            evidenciaNoAplica={evidenciaNoAplica}
             onFinalizar={handleFinalizar}
             onGuardarParaDespues={() => router.back()}
           />

@@ -14,3 +14,9 @@ export const finalizarVisitaSchema = z.object({
   notasInternas: z.string().trim().max(2000).optional(),
 });
 export type FinalizarVisitaInput = z.infer<typeof finalizarVisitaSchema>;
+
+export const marcarEvidenciaNoAplicaSchema = z.object({
+  ticketId: z.string().cuid(),
+  motivo: z.string().trim().min(5, "Explica brevemente por qué no aplica").max(500),
+});
+export type MarcarEvidenciaNoAplicaInput = z.infer<typeof marcarEvidenciaNoAplicaSchema>;

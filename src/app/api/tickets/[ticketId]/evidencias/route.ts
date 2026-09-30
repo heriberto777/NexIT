@@ -47,14 +47,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     pathPrefix: `tickets/${ticketId}/evidencias`,
   });
 
-  const evidencia = await prisma.evidencia.create({
-    data: {
-      ticketId,
-      tipo,
-      urlArchivo: key,
-      usuarioId: usuario.id,
-    },
-  });
+  const [evidencia] = await prisma.$transaction([
+    prisma.evidencia.create({
+      data: {
+        ticketId,
+        tipo,
+        urlArchivo: key,
+        usuarioId: usuario.id,
+      },
+    }),
+    // Si el técnico había marcado "no aplica" y de todas formas sube una foto, el flag
+    // queda desactualizado — una vez que SÍ hay evidencia real, no tiene sentido que el
+    // ticket siga diciendo que no aplicaba.
+    prisma.ticket.updateMany({
+      where: { id: ticketId, evidenciaNoAplica: true },
+      data: { evidenciaNoAplica: false, evidenciaNoAplicaMotivo: null },
+    }),
+  ]);
 
   return NextResponse.json({ ...evidencia, urlArchivo: url }, { status: 201 });
 }
