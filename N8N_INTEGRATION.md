@@ -68,8 +68,10 @@ automáticamente desde un plan preventivo (`origen: "PROGRAMADO"`).
 
 Se dispara en tres transiciones puntuales: check-in del técnico (`EN_DIAGNOSTICO`),
 cierre del wizard de ejecución (`ESPERANDO_VALIDACION`) y aprobación del cliente
-(`RESUELTO`). No se dispara en `REABIERTO` (rechazo del cliente) ni en `CERRADO`
-(cierre administrativo) — no forman parte de los tres eventos de integración pedidos.
+(`RESUELTO`) — más la cancelación por Coordinador/Admin (`CANCELADO`, ver
+`cancelarTicket()`). No se dispara en `REABIERTO` (rechazo del cliente) ni en
+`CERRADO` (cierre administrativo) — no forman parte de los eventos de integración
+pedidos.
 
 ```json
 {
@@ -89,7 +91,12 @@ cierre del wizard de ejecución (`ESPERANDO_VALIDACION`) y aprobación del clien
 }
 ```
 
-`estadoNuevo` es siempre uno de `"EN_DIAGNOSTICO" | "ESPERANDO_VALIDACION" | "RESUELTO"`.
+`estadoNuevo` es siempre uno de
+`"EN_DIAGNOSTICO" | "ESPERANDO_VALIDACION" | "RESUELTO" | "CANCELADO"`.
+
+> **`motivo`**: campo opcional, presente solo cuando `estadoNuevo === "CANCELADO"` —
+> el texto que Coordinador/Admin escribió al cancelar (ver `/tickets/[id]`, panel de
+> gestión). El resto de las transiciones no lo incluyen en el payload.
 
 ### `SLA_EN_RIESGO`
 
@@ -295,25 +302,28 @@ confirmación por los tres. Los IF de Telegram/WhatsApp filtran por `null` porqu
 ### b) `TICKET_CAMBIO_ESTADO` → aviso de visita lista para aprobar (email + Telegram + WhatsApp)
 
 ```
-Switch[TICKET_CAMBIO_ESTADO] → IF ($json.data.estadoNuevo == "ESPERANDO_VALIDACION")
-                                 ├─ true  → Send Email (SMTP)
-                                 │            To: {{$json.data.reportadoPorEmail}}
-                                 │            Subject: Visita completada — Ticket #{{$json.data.numeroTicket}}
-                                 │            Body: "El técnico finalizó la visita para
-                                 │                   '{{$json.data.clienteNombre}}'. Ingresa a
-                                 │                   {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}}
-                                 │                   para revisar el informe y aprobar o rechazar."
-                                 │          → IF ($json.data.reportadoPorTelegramChatId != null)
-                                 │               └─ true → Telegram sendMessage (mismo texto)
-                                 │          → IF ($json.data.reportadoPorWhatsapp != null)
-                                 │               └─ true → Twilio sendMessage (mismo texto)
-                                 └─ false → NoOp (EN_DIAGNOSTICO / RESUELTO: sin acción hoy,
-                                             el Switch deja el branch listo para extender)
+Switch[TICKET_CAMBIO_ESTADO] ─┬─ IF ($json.data.estadoNuevo == "ESPERANDO_VALIDACION")
+                               │    └─ true → Send Email (SMTP)
+                               │                To: {{$json.data.reportadoPorEmail}}
+                               │                Subject: Visita completada — Ticket #{{$json.data.numeroTicket}}
+                               │                Body: "El técnico finalizó la visita para
+                               │                       '{{$json.data.clienteNombre}}'. Ingresa a
+                               │                       {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}}
+                               │                       para revisar el informe y aprobar o rechazar."
+                               │              → IF ($json.data.reportadoPorTelegramChatId != null)
+                               │                   └─ true → Telegram sendMessage (mismo texto)
+                               │              → IF ($json.data.reportadoPorWhatsapp != null)
+                               │                   └─ true → Twilio sendMessage (mismo texto)
+                               └─ IF ($json.data.estadoNuevo == "CANCELADO")   (ver e) más abajo)
 ```
 
 `NEXIT_BASE_URL` es una variable de entorno propia de tu instancia de n8n (ej.
 `https://nexit.tuempresa.com`) — el payload trae `ticketId` pero no la URL base, ya
 que esa es una decisión de despliegue, no algo que la app deba conocer sobre n8n.
+
+Ambos IF cuelgan del mismo branch del Switch (evalúan independientemente
+`estadoNuevo`, no son mutuamente excluyentes en el grafo) — `EN_DIAGNOSTICO` no
+dispara ninguno de los dos, el Switch deja ese caso sin acción hoy.
 
 ### c) `SLA_EN_RIESGO` → alerta al equipo técnico/coordinador
 
@@ -360,6 +370,30 @@ reportando directo) — si el ticket vino de un plan preventivo (`origen: "PROGR
 o fue cargado a mano por soporte (`"TELEFONO"`), el "reportador" es un coordinador/
 staff, no un contacto real del cliente, y no tiene sentido avisarle "te asignaron un
 técnico" a alguien que ya sabía que el ticket se iba a crear.
+
+### e) `TICKET_CAMBIO_ESTADO` (`estadoNuevo == "CANCELADO"`) → avisar al cliente de la cancelación
+
+```
+IF CANCELADO ($json.data.estadoNuevo == "CANCELADO")
+  └─ true → Send Email (SMTP)
+  │           To: {{$json.data.reportadoPorEmail}}
+  │           Subject: Ticket #{{$json.data.numeroTicket}} cancelado
+  │           Body: "Hola {{$json.data.reportadoPorNombre}}, tu ticket
+  │                  #{{$json.data.numeroTicket}} fue cancelado.
+  │                  Motivo: {{$json.data.motivo || 'no especificado'}}."
+  │         → IF ($json.data.reportadoPorTelegramChatId != null)
+  │              └─ true → Telegram sendMessage (mismo texto, sin asunto)
+  │         → IF ($json.data.reportadoPorWhatsapp != null)
+  │              └─ true → Twilio sendMessage (mismo texto)
+```
+
+Antes de esto, cancelar un ticket (`cancelarTicket()`, botón "Cancelar ticket" en
+`/tickets/[id]`) no emitía ningún evento — el cliente que reportó el problema nunca se
+enteraba de que su solicitud había sido cancelada, ni siquiera por email. No hay
+distinción por `origen` aquí (a diferencia de a) y d)): un ticket `PROGRAMADO` o
+`TELEFONO` cancelado también tiene un `reportadoPor*` que vale la pena notificar,
+porque a esa persona (coordinador o staff) igual le sirve saber que se decidió
+cancelarlo, no solo que se creó o asignó.
 
 ## 4. Cron del chequeo de SLA (`Schedule Trigger`)
 
@@ -1031,6 +1065,135 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
           "name": "NexIT Twilio"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.estadoNuevo}}",
+              "rightValue": "CANCELADO",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-cancelado",
+      "name": "IF CANCELADO",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notificaciones@nexit.tuempresa.com",
+        "toEmail": "={{$json.data.reportadoPorEmail}}",
+        "subject": "=Ticket #{{$json.data.numeroTicket}} cancelado",
+        "text": "=Hola {{$json.data.reportadoPorNombre}}, tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+      },
+      "id": "email-cancelado",
+      "name": "Email aviso cancelacion",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorTelegramChatId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-cliente-telegram-cancelado",
+      "name": "IF cliente tiene Telegram (cancelado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
+        "text": "=Tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+      },
+      "id": "telegram-cancelado",
+      "name": "Telegram aviso cancelacion",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        640
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorWhatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-cliente-whatsapp-cancelado",
+      "name": "IF cliente tiene WhatsApp (cancelado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
+        "message": "=Tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+      },
+      "id": "twilio-cancelado",
+      "name": "Twilio aviso cancelacion",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        760
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
     }
   ],
   "connections": {
@@ -1068,6 +1231,11 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         [
           {
             "node": "IF ESPERANDO_VALIDACION",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF CANCELADO",
             "type": "main",
             "index": 0
           }
@@ -1248,6 +1416,52 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         [
           {
             "node": "Twilio aviso asignacion (cliente)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF CANCELADO": {
+      "main": [
+        [
+          {
+            "node": "Email aviso cancelacion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene Telegram (cancelado)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene WhatsApp (cancelado)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF cliente tiene Telegram (cancelado)": {
+      "main": [
+        [
+          {
+            "node": "Telegram aviso cancelacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF cliente tiene WhatsApp (cancelado)": {
+      "main": [
+        [
+          {
+            "node": "Twilio aviso cancelacion",
             "type": "main",
             "index": 0
           }

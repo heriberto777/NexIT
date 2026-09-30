@@ -181,6 +181,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
             tecnicoAsignadoId: ticket.tecnicoAsignadoId,
           }}
           tecnicos={tecnicos.map((t) => ({ id: t.id, nombre: t.nombre }))}
+          hayTrabajoEnProgreso={ticket.evidencias.length > 0 || ticket.checklistRespuestas.length > 0}
         />
       )}
 

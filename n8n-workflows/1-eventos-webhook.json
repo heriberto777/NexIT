@@ -630,6 +630,135 @@
           "name": "NexIT Twilio"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.estadoNuevo}}",
+              "rightValue": "CANCELADO",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-cancelado",
+      "name": "IF CANCELADO",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notificaciones@nexit.tuempresa.com",
+        "toEmail": "={{$json.data.reportadoPorEmail}}",
+        "subject": "=Ticket #{{$json.data.numeroTicket}} cancelado",
+        "text": "=Hola {{$json.data.reportadoPorNombre}}, tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+      },
+      "id": "email-cancelado",
+      "name": "Email aviso cancelacion",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorTelegramChatId}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-cliente-telegram-cancelado",
+      "name": "IF cliente tiene Telegram (cancelado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
+        "text": "=Tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+      },
+      "id": "telegram-cancelado",
+      "name": "Telegram aviso cancelacion",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        640
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.reportadoPorWhatsapp}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-cliente-whatsapp-cancelado",
+      "name": "IF cliente tiene WhatsApp (cancelado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
+        "message": "=Tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+      },
+      "id": "twilio-cancelado",
+      "name": "Twilio aviso cancelacion",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        760
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
     }
   ],
   "connections": {
@@ -667,6 +796,11 @@
         [
           {
             "node": "IF ESPERANDO_VALIDACION",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF CANCELADO",
             "type": "main",
             "index": 0
           }
@@ -847,6 +981,52 @@
         [
           {
             "node": "Twilio aviso asignacion (cliente)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF CANCELADO": {
+      "main": [
+        [
+          {
+            "node": "Email aviso cancelacion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene Telegram (cancelado)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF cliente tiene WhatsApp (cancelado)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF cliente tiene Telegram (cancelado)": {
+      "main": [
+        [
+          {
+            "node": "Telegram aviso cancelacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF cliente tiene WhatsApp (cancelado)": {
+      "main": [
+        [
+          {
+            "node": "Twilio aviso cancelacion",
             "type": "main",
             "index": 0
           }

@@ -25,11 +25,14 @@ interface Props {
     tecnicoAsignadoId: string | null;
   };
   tecnicos: TecnicoOpcion[];
+  // El técnico ya subió evidencia o respondió el checklist — cancelar de todas formas
+  // descarta ese trabajo, así que la UI lo advierte explícitamente antes de confirmar.
+  hayTrabajoEnProgreso: boolean;
 }
 
 // El caller (page.tsx) ya no renderiza este panel para tickets en RESUELTO/CERRADO/
 // CANCELADO — no se repite esa condición aquí.
-export function GestionTicketPanel({ ticket, tecnicos }: Props) {
+export function GestionTicketPanel({ ticket, tecnicos, hayTrabajoEnProgreso }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +155,11 @@ export function GestionTicketPanel({ ticket, tecnicos }: Props) {
       <Modal open={cancelando} onClose={() => setCancelando(false)} title="Cancelar ticket">
         <div className="space-y-3">
           <p className="text-sm text-gray-600">Esta acción no se puede deshacer. Indica el motivo de la cancelación.</p>
+          {hayTrabajoEnProgreso && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              ⚠️ Este ticket ya tiene evidencia y/o checklist cargado por el técnico. Cancelarlo de todas formas descarta ese trabajo.
+            </p>
+          )}
           <textarea
             value={motivoCancelacion}
             onChange={(e) => setMotivoCancelacion(e.target.value)}

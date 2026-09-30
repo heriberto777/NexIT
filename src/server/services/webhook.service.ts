@@ -35,6 +35,9 @@ export type EventoWebhook =
       reportadoPorEmail: string;
       reportadoPorTelegramChatId: string | null;
       reportadoPorWhatsapp: string | null;
+      // Solo tiene contenido cuando estadoNuevo="CANCELADO" (el motivo que cargó
+      // Coordinador/Admin al cancelar) — el resto de las transiciones no lo usan.
+      motivo?: string;
     }
   | {
       tipo: "SLA_EN_RIESGO";

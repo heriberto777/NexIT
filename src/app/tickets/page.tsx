@@ -7,7 +7,7 @@ import { PrioridadBadge } from "@/components/tickets/prioridad-badge";
 import { SlaBadge } from "@/components/tickets/sla-badge";
 import { calcularEstadoSla } from "@/lib/utils/sla";
 import { obtenerConfiguracion, slaHorasPorPrioridad } from "@/server/services/configuracion.service";
-import { ESTADOS_CON_WIZARD_ACTIVO } from "@/lib/utils/ticket-estado";
+import { ESTADOS_CON_WIZARD_ACTIVO, ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { TicketCard } from "@/components/tickets/ticket-card";
 
@@ -46,9 +46,16 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, { dateStyle: "short" });
   const defaultsHoras = slaHorasPorPrioridad(config);
   const conSla = tickets.map((t) => ({ ...t, estadoSla: calcularEstadoSla(t, defaultsHoras) }));
+  // "Total" refleja todo lo que coincide con los filtros (igual que la tabla de abajo,
+  // incluidos cancelados/resueltos/cerrados). "Activos" excluye esos estados terminales
+  // para que no se confunda con "trabajo pendiente" — antes "Sin asignar" tampoco
+  // excluía terminales, así que un ticket CANCELADO sin técnico contaba como si
+  // necesitara asignación.
+  const activos = tickets.filter((t) => !ESTADOS_TERMINALES.has(t.estado));
   const kpis = {
     total: tickets.length,
-    sinAsignar: tickets.filter((t) => !t.tecnicoAsignadoId).length,
+    activos: activos.length,
+    sinAsignar: activos.filter((t) => !t.tecnicoAsignadoId).length,
     slaEnRiesgo: conSla.filter((t) => t.estadoSla === "en_riesgo").length,
     slaVencido: conSla.filter((t) => t.estadoSla === "vencido").length,
   };
@@ -64,8 +71,9 @@ export default async function TicketsPage({ searchParams }: PageProps) {
         </Link>
       </div>
 
-      <div className={`grid grid-cols-2 gap-3 ${esTecnico ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
+      <div className={`grid grid-cols-2 gap-3 ${esTecnico ? "sm:grid-cols-4" : "sm:grid-cols-5"}`}>
         <KpiCard label="Total" value={kpis.total} />
+        <KpiCard label="Activos" value={kpis.activos} />
         {!esTecnico && <KpiCard label="Sin asignar" value={kpis.sinAsignar} />}
         <KpiCard label="SLA en riesgo" value={kpis.slaEnRiesgo} tone="amber" />
         <KpiCard label="SLA vencido" value={kpis.slaVencido} tone="red" />

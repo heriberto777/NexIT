@@ -5,6 +5,8 @@ import { requireUsuario } from "@/server/auth/session";
 import { cancelarTicketSchema } from "@/lib/zod/ticket.schema";
 import type { CancelarTicketInput } from "@/lib/zod/ticket.schema";
 import { ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
+import { emitirEvento } from "@/server/services/webhook.service";
+import { registrarAuditoria } from "@/server/services/auditoria.service";
 
 const ROLES_PERMITIDOS = ["COORDINADOR", "ADMIN"] as const;
 
@@ -16,7 +18,7 @@ export async function cancelarTicket(input: CancelarTicketInput) {
 
   const { ticketId, motivo } = cancelarTicketSchema.parse(input);
 
-  const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+  const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: { cliente: true, creadoPor: true } });
   if (ESTADOS_TERMINALES.has(ticket.estado)) {
     throw new Error(`No se puede cancelar un ticket en estado ${ticket.estado}`);
   }
@@ -38,6 +40,31 @@ export async function cancelarTicket(input: CancelarTicketInput) {
     });
 
     return ticketActualizado;
+  });
+
+  // A diferencia de las demás transiciones (creado/asignado/en diagnóstico/esperando
+  // validación), cancelar no emitía ningún evento — el cliente que reportó el ticket
+  // nunca se enteraba de que se había cancelado, ni siquiera por email.
+  emitirEvento({
+    tipo: "TICKET_CAMBIO_ESTADO",
+    ticketId,
+    numeroTicket: actualizado.numeroTicket,
+    clienteNombre: ticket.cliente.nombre,
+    estadoAnterior: ticket.estado,
+    estadoNuevo: "CANCELADO",
+    reportadoPorNombre: ticket.creadoPor.nombre,
+    reportadoPorEmail: ticket.creadoPor.email,
+    reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
+    reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
+    motivo,
+  });
+
+  await registrarAuditoria({
+    usuario,
+    accion: "ticket.cancelar",
+    entidad: "Ticket",
+    entidadId: ticketId,
+    detalle: `Canceló el ticket ${actualizado.numeroTicket} (estaba en ${ticket.estado}). Motivo: ${motivo}`,
   });
 
   return { id: actualizado.id, estado: actualizado.estado };
