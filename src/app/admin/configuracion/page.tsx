@@ -17,12 +17,27 @@ export default async function ConfiguracionPage() {
     );
   }
 
-  const [config, categoriasRaw] = await Promise.all([
+  const allowDataReset = process.env.ALLOW_DATA_RESET === "true";
+
+  const [config, categoriasRaw, conteoDatosPrueba] = await Promise.all([
     obtenerConfiguracion(),
     prisma.categoriaActivo.findMany({
       include: { _count: { select: { activos: true, checklistTemplates: true } } },
       orderBy: { nombre: "asc" },
     }),
+    allowDataReset
+      ? Promise.all([
+          prisma.ticket.count(),
+          prisma.notificacion.count(),
+          prisma.conversacionChat.count(),
+          prisma.contactoPendiente.count(),
+        ]).then(([tickets, notificaciones, conversaciones, contactosPendientes]) => ({
+          tickets,
+          notificaciones,
+          conversaciones,
+          contactosPendientes,
+        }))
+      : Promise.resolve(null),
   ]);
   const logoUrl = config.empresaLogoUrl ? await storageService.getPublicUrl(config.empresaLogoUrl) : null;
 
@@ -73,6 +88,7 @@ export default async function ConfiguracionPage() {
           activos: c._count.activos,
           checklistTemplates: c._count.checklistTemplates,
         }))}
+        conteoDatosPrueba={conteoDatosPrueba}
       />
     </div>
   );
