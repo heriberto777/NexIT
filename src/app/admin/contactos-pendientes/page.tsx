@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { EliminarContactoPendienteButton } from "@/components/admin/eliminar-contacto-pendiente-button";
 
 export const dynamic = "force-dynamic";
 
@@ -59,12 +60,15 @@ export default async function ContactosPendientesPage() {
                 <td className="px-3 py-2 text-gray-500">{c.canal}</td>
                 <td className="px-3 py-2 text-gray-500">{FORMATO_FECHA.format(c.fechaActualizacion)}</td>
                 <td className="px-3 py-2 text-right">
-                  <Link
-                    href={`/tickets/nuevo?contactoPendienteId=${c.id}`}
-                    className="whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-                  >
-                    Crear ticket con estos datos
-                  </Link>
+                  <div className="flex items-center justify-end gap-3">
+                    <EliminarContactoPendienteButton id={c.id} nombre={c.nombre} />
+                    <Link
+                      href={`/tickets/nuevo?contactoPendienteId=${c.id}`}
+                      className="whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                    >
+                      Crear ticket con estos datos
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

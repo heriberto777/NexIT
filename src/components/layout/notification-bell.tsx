@@ -116,7 +116,12 @@ export function NotificationBell() {
       </button>
 
       {abierto && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-80 max-w-[90vw] rounded-lg border border-gray-200 bg-white shadow-lg">
+        // `fixed` (no `absolute`) en mobile: el wrapper de la campanita es angosto y a
+        // veces queda pegado al borde izquierdo del nav (ej. dentro del menú
+        // hamburguesa) — anclar el panel de 320px a la derecha DE ESE wrapper lo
+        // mandaba fuera de pantalla hacia la izquierda. Desde `sm:` en adelante hay
+        // espacio de sobra, así que ahí sí se ancla al ícono como un dropdown normal.
+        <div className="fixed inset-x-4 top-16 z-30 max-h-[70vh] rounded-lg border border-gray-200 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-w-[90vw] sm:max-h-none">
           <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
             <p className="text-sm font-semibold text-gray-900">Notificaciones</p>
             {noLeidas > 0 && (
