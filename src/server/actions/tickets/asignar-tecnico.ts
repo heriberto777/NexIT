@@ -9,6 +9,9 @@ import { emitirEvento } from "@/server/services/webhook.service";
 import { notificarTecnicoAsignado, notificarCambioEstadoCliente } from "@/server/services/notificacion.service";
 
 const ROLES_PERMITIDOS = ["COORDINADOR", "ADMIN"] as const;
+// Un Admin/Coordinador puede asignarse (o asignarle a otro Admin/Coordinador) un ticket
+// cuando necesita atenderlo él mismo — no solo a un Técnico.
+const ROLES_ASIGNABLES = ["TECNICO", "COORDINADOR", "ADMIN"] as const;
 
 // Cubre tanto la primera asignación (ABIERTO -> ASIGNADO) como una reasignación a otro
 // técnico en cualquier estado posterior — en ese segundo caso el estado del ticket no
@@ -29,8 +32,8 @@ export async function asignarTecnico(input: AsignarTicketInput) {
   if (ESTADOS_TERMINALES.has(ticket.estado)) {
     throw new Error(`No se puede reasignar un ticket en estado ${ticket.estado}`);
   }
-  if (tecnico.rol !== "TECNICO") {
-    throw new Error("El usuario seleccionado no tiene rol Técnico");
+  if (!ROLES_ASIGNABLES.includes(tecnico.rol as (typeof ROLES_ASIGNABLES)[number])) {
+    throw new Error("El usuario seleccionado no puede recibir tickets asignados");
   }
 
   const esPrimeraAsignacion = ticket.estado === "ABIERTO";

@@ -22,7 +22,10 @@ export interface TicketCardData {
 // horizontal en pantallas angostas y perdía contexto si se ocultaban columnas — cada
 // ticket como bloque autocontenido evita ambos problemas. Mismo dato que la tabla,
 // solo presentación distinta (sm:hidden en la tabla, esto visible solo debajo de sm:).
-export function TicketCard({ ticket, fecha, esTecnico }: { ticket: TicketCardData; fecha: string; esTecnico: boolean }) {
+// `esMio` reemplaza a un viejo `esTecnico`: ahora un Admin/Coordinador también puede
+// terminar como responsable de un ticket (ver asignar-tecnico.ts), así que lo que
+// decide si se muestra el botón de acción es la propiedad del ticket, no el rol.
+export function TicketCard({ ticket, fecha, esMio }: { ticket: TicketCardData; fecha: string; esMio: boolean }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-3">
       <div className="flex items-start justify-between gap-2">
@@ -47,7 +50,7 @@ export function TicketCard({ ticket, fecha, esTecnico }: { ticket: TicketCardDat
 
       <p className="mt-2 text-xs text-gray-500">Técnico: {ticket.tecnicoAsignado?.nombre ?? "Sin asignar"}</p>
 
-      {esTecnico && (
+      {esMio && (
         <div className="mt-3">
           {ESTADOS_CON_WIZARD_ACTIVO.has(ticket.estado) ? (
             <Link

@@ -14,7 +14,10 @@ import { Modal } from "@/components/ui/modal";
 interface TecnicoOpcion {
   id: string;
   nombre: string;
+  rol: "ADMIN" | "COORDINADOR" | "TECNICO" | "CLIENTE";
 }
+
+const ETIQUETA_ROL: Record<string, string> = { ADMIN: "Admin", COORDINADOR: "Coordinador" };
 
 interface Props {
   ticket: {
@@ -107,6 +110,7 @@ export function GestionTicketPanel({ ticket, tecnicos, hayTrabajoEnProgreso }: P
             {tecnicos.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.nombre}
+                {ETIQUETA_ROL[t.rol] ? ` (${ETIQUETA_ROL[t.rol]})` : ""}
               </option>
             ))}
           </select>

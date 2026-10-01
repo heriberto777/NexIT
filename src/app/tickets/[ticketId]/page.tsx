@@ -73,8 +73,13 @@ export default async function TicketDetailPage({ params }: PageProps) {
 
   const puedeGestionar =
     (sesion?.rol === "COORDINADOR" || sesion?.rol === "ADMIN") && ESTADOS_GESTIONABLES.has(ticket.estado);
+  // Incluye Admin/Coordinador en el selector — un Admin a veces necesita atender él
+  // mismo un ticket (ver asignar-tecnico.ts), no solo asignarlo a un Técnico.
   const tecnicos = puedeGestionar
-    ? await prisma.usuario.findMany({ where: { rol: "TECNICO", estado: "ACTIVO" }, orderBy: { nombre: "asc" } })
+    ? await prisma.usuario.findMany({
+        where: { rol: { in: ["TECNICO", "COORDINADOR", "ADMIN"] }, estado: "ACTIVO" },
+        orderBy: { nombre: "asc" },
+      })
     : [];
 
   // Cualquiera de los tres roles de staff puede pedir una cotización — el técnico solo
@@ -157,7 +162,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      {sesion?.rol === "TECNICO" && ESTADOS_CON_WIZARD_ACTIVO.has(ticket.estado) && (
+      {sesion?.id === ticket.tecnicoAsignadoId && ESTADOS_CON_WIZARD_ACTIVO.has(ticket.estado) && (
         <Link
           href={`/tickets/${ticket.id}/ejecucion`}
           className="block rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-medium text-white hover:bg-blue-700"
@@ -187,7 +192,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
             prioridad: ticket.prioridad,
             tecnicoAsignadoId: ticket.tecnicoAsignadoId,
           }}
-          tecnicos={tecnicos.map((t) => ({ id: t.id, nombre: t.nombre }))}
+          tecnicos={tecnicos.map((t) => ({ id: t.id, nombre: t.nombre, rol: t.rol }))}
           hayTrabajoEnProgreso={ticket.evidencias.length > 0 || ticket.checklistRespuestas.length > 0}
         />
       )}

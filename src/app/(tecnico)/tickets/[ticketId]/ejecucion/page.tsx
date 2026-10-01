@@ -10,6 +10,8 @@ import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 // y de sesión del técnico — nunca debe pre-renderizarse estáticamente en el build.
 export const dynamic = "force-dynamic";
 
+const ROLES_EJECUTABLES = new Set(["TECNICO", "COORDINADOR", "ADMIN"]);
+
 interface PageProps {
   params: Promise<{ ticketId: string }>;
 }
@@ -36,8 +38,11 @@ export default async function EjecucionPage({ params }: PageProps) {
   // registrar-repuesto, finalizar-visita) ya valida esto por su cuenta, pero sin este
   // check aquí la PANTALLA seguía siendo visible para cualquier técnico que conociera
   // el ticketId — no llegaba a mutar nada, pero sí exponía el detalle del caso.
+  // Un Admin/Coordinador también puede ejecutar el wizard cuando el ticket terminó
+  // asignado a él mismo (ver asignar-tecnico.ts) — la propiedad (no el rol) es lo que
+  // habilita el acceso.
   const sesion = await getSesionActual();
-  if (sesion?.rol !== "TECNICO" || ticket.tecnicoAsignadoId !== sesion.id) {
+  if (!sesion || !ROLES_EJECUTABLES.has(sesion.rol) || ticket.tecnicoAsignadoId !== sesion.id) {
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
         <h1 className="text-lg font-semibold text-gray-900">Acceso restringido</h1>

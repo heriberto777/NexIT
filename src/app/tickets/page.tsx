@@ -14,7 +14,7 @@ import { TicketCard } from "@/components/tickets/ticket-card";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: Promise<{ estado?: string; prioridad?: string; clienteId?: string }>;
+  searchParams: Promise<{ estado?: string; prioridad?: string; clienteId?: string; asignadoAMi?: string }>;
 }
 
 export default async function TicketsPage({ searchParams }: PageProps) {
@@ -27,18 +27,24 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   // El filtro de cliente no se ofrece al técnico (ver más abajo), así que tampoco se
   // respeta si llega por querystring — evita que "vea todo" armando la URL a mano.
   const clienteId = !esTecnico ? params.clienteId || undefined : undefined;
+  // Ahora que un Admin/Coordinador también puede terminar como tecnicoAsignadoId de un
+  // ticket (ver asignar-tecnico.ts), este filtro les da un atajo a "lo mío" sin perder
+  // la vista general que siguen teniendo por defecto. El técnico ya ve solo lo suyo, así
+  // que para él este parámetro no aplica.
+  const asignadoAMi = !esTecnico && params.asignadoAMi === "1";
 
-  const [tickets, clientes, config] = await Promise.all([
+  const whereBase = { estado: estado as never, prioridad: prioridad as never, clienteId };
+
+  const [tickets, asignadosAMiCount, clientes, config] = await Promise.all([
     prisma.ticket.findMany({
       where: {
-        estado: estado as never,
-        prioridad: prioridad as never,
-        clienteId,
-        tecnicoAsignadoId: esTecnico ? sesion.id : undefined,
+        ...whereBase,
+        tecnicoAsignadoId: esTecnico ? sesion.id : asignadoAMi ? sesion!.id : undefined,
       },
       include: { cliente: true, sucursal: true, tecnicoAsignado: true, sla: true },
       orderBy: { fechaCreacion: "desc" },
     }),
+    !esTecnico && sesion ? prisma.ticket.count({ where: { ...whereBase, tecnicoAsignadoId: sesion.id } }) : Promise.resolve(0),
     esTecnico ? Promise.resolve([]) : prisma.cliente.findMany({ orderBy: { nombre: "asc" } }),
     obtenerConfiguracion(),
   ]);
@@ -56,11 +62,29 @@ export default async function TicketsPage({ searchParams }: PageProps) {
     total: tickets.length,
     activos: activos.length,
     sinAsignar: activos.filter((t) => !t.tecnicoAsignadoId).length,
+    asignadosAMi: asignadosAMiCount,
     slaEnRiesgo: conSla.filter((t) => t.estadoSla === "en_riesgo").length,
     slaVencido: conSla.filter((t) => t.estadoSla === "vencido").length,
   };
 
-  const hayFiltros = Boolean(estado || prioridad || clienteId);
+  const hayFiltros = Boolean(estado || prioridad || clienteId || asignadoAMi);
+
+  // La columna de acción aparece para el técnico (siempre ve solo lo suyo) y también
+  // para un Admin/Coordinador que tenga al menos un ticket de esta lista asignado a sí
+  // mismo — evita una columna vacía para quien nunca se autoasigna nada.
+  const mostrarColumnaAccion = esTecnico || tickets.some((t) => t.tecnicoAsignadoId === sesion?.id);
+
+  // Preserva Estado/Prioridad/Cliente al alternar "Asignados a mí" — un simple toggle,
+  // no un formulario propio, para que sea un botón de un clic.
+  const hrefAsignadoAMi = (() => {
+    const sp = new URLSearchParams();
+    if (estado) sp.set("estado", estado);
+    if (prioridad) sp.set("prioridad", prioridad);
+    if (clienteId) sp.set("clienteId", clienteId);
+    if (!asignadoAMi) sp.set("asignadoAMi", "1");
+    const qs = sp.toString();
+    return qs ? `/tickets?${qs}` : "/tickets";
+  })();
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 bg-gray-50 px-4 py-6">
@@ -71,10 +95,13 @@ export default async function TicketsPage({ searchParams }: PageProps) {
         </Link>
       </div>
 
-      <div className={`grid grid-cols-2 gap-3 ${esTecnico ? "sm:grid-cols-4" : "sm:grid-cols-5"}`}>
+      <div className={`grid grid-cols-2 gap-3 ${esTecnico ? "sm:grid-cols-4" : "sm:grid-cols-3 lg:grid-cols-6"}`}>
         <KpiCard label="Total" value={kpis.total} />
         <KpiCard label="Activos" value={kpis.activos} />
         {!esTecnico && <KpiCard label="Sin asignar" value={kpis.sinAsignar} />}
+        {!esTecnico && (
+          <KpiCard label="Asignados a mí" value={kpis.asignadosAMi} href={hrefAsignadoAMi} activo={asignadoAMi} />
+        )}
         <KpiCard label="SLA en riesgo" value={kpis.slaEnRiesgo} tone="amber" />
         <KpiCard label="SLA vencido" value={kpis.slaVencido} tone="red" />
       </div>
@@ -127,7 +154,12 @@ export default async function TicketsPage({ searchParams }: PageProps) {
 
       <div className="space-y-2 sm:hidden">
         {conSla.map((t) => (
-          <TicketCard key={t.id} ticket={t} fecha={FORMATO_FECHA.format(t.fechaCreacion)} esTecnico={esTecnico} />
+          <TicketCard
+            key={t.id}
+            ticket={t}
+            fecha={FORMATO_FECHA.format(t.fechaCreacion)}
+            esMio={t.tecnicoAsignadoId === sesion?.id}
+          />
         ))}
         {tickets.length === 0 && (
           <p className="rounded-xl border border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-400">
@@ -147,7 +179,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
               <th className="px-3 py-2 font-medium">SLA</th>
               <th className="px-3 py-2 font-medium">Técnico</th>
               <th className="px-3 py-2 font-medium">Creado</th>
-              {esTecnico && <th className="px-3 py-2 font-medium" />}
+              {mostrarColumnaAccion && <th className="px-3 py-2 font-medium" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -174,27 +206,28 @@ export default async function TicketsPage({ searchParams }: PageProps) {
                 </td>
                 <td className="px-3 py-2 text-gray-600">{t.tecnicoAsignado?.nombre ?? "—"}</td>
                 <td className="px-3 py-2 text-gray-500">{FORMATO_FECHA.format(t.fechaCreacion)}</td>
-                {esTecnico && (
+                {mostrarColumnaAccion && (
                   <td className="px-3 py-2 text-right">
-                    {ESTADOS_CON_WIZARD_ACTIVO.has(t.estado) ? (
-                      <Link
-                        href={`/tickets/${t.id}/ejecucion`}
-                        className="whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-                      >
-                        Continuar atención
-                      </Link>
-                    ) : (
-                      <Link href={`/tickets/${t.id}`} className="text-xs text-gray-500 underline">
-                        Ver detalle
-                      </Link>
-                    )}
+                    {t.tecnicoAsignadoId === sesion?.id &&
+                      (ESTADOS_CON_WIZARD_ACTIVO.has(t.estado) ? (
+                        <Link
+                          href={`/tickets/${t.id}/ejecucion`}
+                          className="whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                        >
+                          Continuar atención
+                        </Link>
+                      ) : (
+                        <Link href={`/tickets/${t.id}`} className="text-xs text-gray-500 underline">
+                          Ver detalle
+                        </Link>
+                      ))}
                   </td>
                 )}
               </tr>
             ))}
             {tickets.length === 0 && (
               <tr>
-                <td colSpan={esTecnico ? 8 : 7} className="px-3 py-8 text-center text-sm text-gray-400">
+                <td colSpan={mostrarColumnaAccion ? 8 : 7} className="px-3 py-8 text-center text-sm text-gray-400">
                   {esTecnico ? "No tienes tickets asignados por ahora." : "No hay tickets que coincidan con los filtros."}
                 </td>
               </tr>
@@ -206,12 +239,35 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   );
 }
 
-function KpiCard({ label, value, tone }: { label: string; value: number; tone?: "amber" | "red" }) {
+function KpiCard({
+  label,
+  value,
+  tone,
+  href,
+  activo,
+}: {
+  label: string;
+  value: number;
+  tone?: "amber" | "red";
+  href?: string;
+  activo?: boolean;
+}) {
   const toneClass = tone === "red" ? "text-red-600" : tone === "amber" ? "text-amber-600" : "text-gray-900";
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-3">
+  const className = `rounded-xl border p-3 text-left transition-colors ${
+    activo ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"
+  } ${href ? "hover:border-blue-300" : ""}`;
+  const contenido = (
+    <>
       <p className="text-xs text-gray-500">{label}</p>
       <p className={`text-2xl font-semibold ${toneClass}`}>{value}</p>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className={`block ${className}`}>
+        {contenido}
+      </Link>
+    );
+  }
+  return <div className={className}>{contenido}</div>;
 }
