@@ -17,6 +17,7 @@ const NAV_BASE: (NavItem & { rolesPermitidos?: readonly RolUsuario[] })[] = [
   { href: "/admin/checklists", label: "Checklists" },
   { href: "/admin/preventivos", label: "Preventivos" },
   { href: "/admin/inventario", label: "Inventario" },
+  { href: "/admin/contactos-pendientes", label: "Contactos pendientes" },
   { href: "/admin/usuarios", label: "Usuarios", rolesPermitidos: ["ADMIN"] },
   { href: "/admin/configuracion", label: "Configuración", rolesPermitidos: ["ADMIN"] },
   { href: "/admin/logs", label: "Logs", rolesPermitidos: ["ADMIN"] },

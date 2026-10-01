@@ -31,6 +31,15 @@ interface Cliente {
   sucursales: Sucursal[];
 }
 
+interface ContactoInicial {
+  id: string;
+  nombre: string;
+  empresaReportada: string | null;
+  correo: string;
+  telefono: string | null;
+  motivo: string;
+}
+
 const TIPOS = [
   { value: "CORRECTIVO", label: "Correctivo — algo se dañó" },
   { value: "INSTALACION", label: "Instalación — equipo nuevo" },
@@ -50,7 +59,7 @@ const PRIORIDADES = [
   { value: "CRITICA", label: "Crítica" },
 ] as const;
 
-export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
+export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Cliente[]; contactoInicial?: ContactoInicial | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [sinActivo, setSinActivo] = useState(false);
@@ -59,7 +68,9 @@ export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
   const [resultados, setResultados] = useState<ContactoEncontrado[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [contactoSeleccionado, setContactoSeleccionado] = useState<ContactoEncontrado | null>(null);
-  const [modoNuevoContacto, setModoNuevoContacto] = useState(false);
+  // Si venimos de /admin/contactos-pendientes, el contacto siempre es "nuevo" — ya
+  // tiene sus datos recolectados por chat, no tiene sentido buscarlo (todavía no existe).
+  const [modoNuevoContacto, setModoNuevoContacto] = useState(Boolean(contactoInicial));
 
   const {
     register,
@@ -69,7 +80,16 @@ export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
     formState: { errors, isSubmitting },
   } = useForm<CrearTicketInput>({
     resolver: zodResolver(crearTicketSchema),
-    defaultValues: { tipo: "CORRECTIVO", categoriaSoporte: "HARDWARE", prioridad: "MEDIA" },
+    defaultValues: {
+      tipo: "CORRECTIVO",
+      categoriaSoporte: "HARDWARE",
+      prioridad: "MEDIA",
+      descripcion: contactoInicial?.motivo,
+      contactoPendienteId: contactoInicial?.id,
+      contactoNuevo: contactoInicial
+        ? { nombre: contactoInicial.nombre, email: contactoInicial.correo, whatsapp: contactoInicial.telefono ?? undefined }
+        : undefined,
+    },
   });
 
   const clienteId = watch("clienteId");
@@ -128,10 +148,17 @@ export function CrearTicketForm({ clientes }: { clientes: Cliente[] }) {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
+      {contactoInicial && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          ⚠️ Dice ser de <strong>{contactoInicial.empresaReportada ?? "empresa no especificada"}</strong> — confirmá
+          vos cuál es el cliente real antes de continuar, ese dato no está verificado.
+        </p>
+      )}
+
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
         <select
-          {...register("clienteId", { onChange: resetContacto })}
+          {...register("clienteId", { onChange: () => !contactoInicial && resetContacto() })}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
         >
           <option value="">Selecciona un cliente...</option>

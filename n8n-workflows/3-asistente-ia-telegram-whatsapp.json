@@ -278,6 +278,32 @@
           "name": "NexIT Twilio"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/contacto-pendiente/mensaje",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
+      },
+      "id": "post-contacto-pendiente-cliente",
+      "name": "POST contacto-pendiente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        100
+      ]
     }
   ],
   "connections": {
@@ -347,7 +373,7 @@
         ],
         [
           {
-            "node": "Switch por canal",
+            "node": "POST contacto-pendiente",
             "type": "main",
             "index": 0
           }
@@ -388,6 +414,17 @@
         [
           {
             "node": "Twilio - Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST contacto-pendiente": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
             "type": "main",
             "index": 0
           }

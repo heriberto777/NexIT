@@ -92,14 +92,26 @@ export type EventoWebhook =
       whatsapp: string | null;
     }
   | {
-      // Mensaje de Telegram/WhatsApp de un chat_id/teléfono que no está vinculado a
-      // ningún Usuario — no hay a quién notificarle un "ticket creado", así que esto va
-      // a un chat interno de soporte para que un Coordinador contacte a la persona y
-      // levante el ticket manualmente (ver /api/n8n/conversacion/mensaje).
+      // Se emite recién cuando el asistente de chat terminó de recolectar los 5 datos
+      // básicos de un contacto no identificado (ver contacto-pendiente.service.ts) — no
+      // en el primer mensaje, para no spamear al chat interno con cada "Hola" suelto
+      // antes de tener algo accionable. Un Coordinador/Admin decide manualmente a qué
+      // cliente real pertenece desde /admin/contactos-pendientes — `empresaReportada`
+      // es solo lo que la persona escribió, nunca se usa para matchear un Cliente real.
       tipo: "CONTACTO_NO_IDENTIFICADO";
+      contactoPendienteId: string;
       canal: string;
       identificador: string;
-      texto: string;
+      nombre: string;
+      empresaReportada: string;
+      telefonoReportado: string;
+      correoReportado: string;
+      motivo: string;
+      // Teléfonos de WhatsApp de ADMIN/COORDINADOR activos que vincularon el canal —
+      // NexIT ya resuelve la lista porque n8n no tiene forma de consultar la base de
+      // datos. El workflow de n8n itera este arreglo (puede venir vacío) para avisarle
+      // a cada uno, además del aviso al chat interno de Telegram.
+      staffWhatsapp: string[];
     };
 
 const TIMEOUT_MS = 8000;

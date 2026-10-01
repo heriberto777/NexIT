@@ -55,6 +55,9 @@ export const crearTicketSchema = z
     prioridad: prioridadSchema,
     contactoUsuarioId: optionalCuid(),
     contactoNuevo: contactoNuevoSchema.optional(),
+    // Presente cuando el ticket se crea desde /admin/contactos-pendientes — al crearse,
+    // ese registro pasa a CONVERTIDO y queda vinculado al ticket/contacto resultantes.
+    contactoPendienteId: optionalCuid(),
   })
   .refine((data) => Boolean(data.contactoUsuarioId) !== Boolean(data.contactoNuevo), {
     message: "Selecciona un contacto existente o completa los datos de uno nuevo",

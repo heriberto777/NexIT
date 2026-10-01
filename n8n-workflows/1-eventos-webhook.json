@@ -869,7 +869,7 @@
     {
       "parameters": {
         "chatId": "={{$env.NEXIT_TELEGRAM_CHAT_ID}}",
-        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\"{{$json.data.texto}}\"\n\nNo hay ningún usuario de NexIT con ese chat/teléfono vinculado. Un representante debe contactarlo y, si corresponde, levantar el ticket manualmente desde \"Crear ticket\"."
+        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\nNombre: {{$json.data.nombre}}\nEmpresa (reportada por él, sin confirmar): {{$json.data.empresaReportada}}\nTeléfono: {{$json.data.telefonoReportado}}\nCorreo: {{$json.data.correoReportado}}\nMotivo: {{$json.data.motivo}}\n\nNo hay ningún usuario de NexIT con ese chat/teléfono vinculado. Un representante debe confirmar a qué cliente pertenece y crear su ticket desde \"Crear ticket\" en NexIT (o desde /admin/contactos-pendientes)."
       },
       "id": "telegram-contacto-no-identificado",
       "name": "Telegram contacto no identificado",
@@ -883,6 +883,43 @@
         "telegramApi": {
           "id": "REEMPLAZAR",
           "name": "NexIT Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data.staffWhatsapp",
+        "options": {
+          "destinationFieldName": "telefono"
+        }
+      },
+      "id": "split-staff-whatsapp-contacto",
+      "name": "Split staff WhatsApp",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        1080
+      ]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.telefono}}",
+        "message": "=📵 Contacto no identificado por {{$('Switch por evento').item.json.data.canal}}: {{$('Switch por evento').item.json.data.nombre}}, de \"{{$('Switch por evento').item.json.data.empresaReportada}}\" — Tel: {{$('Switch por evento').item.json.data.telefonoReportado}}, correo: {{$('Switch por evento').item.json.data.correoReportado}}. Motivo: {{$('Switch por evento').item.json.data.motivo}}. Contactalo y levantá el ticket en NexIT."
+      },
+      "id": "twilio-staff-contacto-no-identificado",
+      "name": "Twilio aviso staff (contacto no identificado)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        1080
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
         }
       }
     }
@@ -970,6 +1007,11 @@
         [
           {
             "node": "Telegram contacto no identificado",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split staff WhatsApp",
             "type": "main",
             "index": 0
           }
@@ -1212,6 +1254,17 @@
           }
         ],
         []
+      ]
+    },
+    "Split staff WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Twilio aviso staff (contacto no identificado)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   }

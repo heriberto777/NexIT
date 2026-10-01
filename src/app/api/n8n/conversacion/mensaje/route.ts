@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { mensajeConversacionSchema } from "@/lib/zod/n8n.schema";
-import { emitirEvento } from "@/server/services/webhook.service";
 
 export const dynamic = "force-dynamic";
 
@@ -40,15 +39,15 @@ export async function POST(request: Request) {
   });
 
   if (!usuario || usuario.rol !== "CLIENTE" || !usuario.cliente || usuario.estado !== "ACTIVO") {
-    // No hay a quién notificarle un "ticket creado" ni con qué cliente/sede asociarlo
-    // de forma segura — en vez de que la IA intente adivinar o listarle todos los
-    // clientes al que escribe, se avisa a un chat interno de soporte para que un
-    // Coordinador lo contacte y levante el ticket manualmente (ver crear-ticket.ts).
-    emitirEvento({ tipo: "CONTACTO_NO_IDENTIFICADO", canal, identificador, texto });
-    return responder({
-      encontrado: false,
-      mensaje: "No encontramos tu número vinculado a NexIT. En breve un representante te contactará para ayudarte.",
-    });
+    // No hay con qué cliente/sede asociarlo de forma segura — en vez de que la IA
+    // intente adivinar o listarle todos los clientes al que escribe, el workflow de
+    // n8n debe llamar a POST /contacto-pendiente/mensaje para recolectar los datos
+    // básicos (nombre, empresa, teléfono, correo, motivo) antes de avisarle a un
+    // Coordinador (ver contacto-pendiente.service.ts). `texto` viaja de vuelta en la
+    // respuesta (mismo motivo que en contextoTecnicoSchema): ese próximo paso del
+    // workflow ya no tiene el mensaje original disponible, porque esta misma llamada
+    // pisó $json.
+    return responder({ encontrado: false, texto });
   }
 
   const limiteAbandono = new Date(Date.now() - HORAS_ABANDONO * 60 * 60 * 1000);

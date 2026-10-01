@@ -40,6 +40,7 @@ export async function crearTicket(input: CrearTicketInput) {
     prioridad,
     contactoUsuarioId,
     contactoNuevo,
+    contactoPendienteId,
   } = crearTicketSchema.parse(input);
 
   const sucursal = await prisma.sucursal.findUniqueOrThrow({ where: { id: sucursalId } });
@@ -132,6 +133,15 @@ export async function crearTicket(input: CrearTicketInput) {
 
     return nuevo;
   });
+
+  if (contactoPendienteId) {
+    // Solo si seguía PENDIENTE — evita pisar un registro que otro miembro del staff ya
+    // convirtió en paralelo (dos pestañas abiertas sobre el mismo contacto pendiente).
+    await prisma.contactoPendiente.updateMany({
+      where: { id: contactoPendienteId, estado: "PENDIENTE" },
+      data: { estado: "CONVERTIDO", ticketId: ticket.id, contactoCreadoId: contacto.id },
+    });
+  }
 
   if (passwordTemporalNueva) {
     emitirEvento({

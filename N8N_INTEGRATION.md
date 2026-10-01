@@ -212,29 +212,48 @@ que todavía no existía en NexIT — ver §3.f. El contacto nace como `Usuario`
 
 ### `CONTACTO_NO_IDENTIFICADO`
 
-Se dispara desde `/api/n8n/conversacion/mensaje` cuando llega un mensaje de Telegram o
-WhatsApp de un `chat_id`/teléfono que no está vinculado a ningún `Usuario` — no hay a
-quién notificarle nada del lado del cliente, así que esto es exclusivamente un aviso
-interno para que un Coordinador contacte a la persona y levante el ticket a mano.
+Se dispara desde `/api/n8n/contacto-pendiente/mensaje` (ver §6.c) recién cuando un
+contacto no identificado terminó de responder 5 preguntas básicas por chat — no en su
+primer mensaje, para no spamear al chat interno con cada "Hola" suelto antes de tener
+algo accionable. No hay a quién notificarle nada del lado del cliente todavía (no es un
+`Usuario` real), así que esto es un aviso interno para que un Coordinador/Admin
+confirme a qué cliente pertenece y le cree el ticket desde `/admin/contactos-pendientes`.
 
 ```json
 {
   "evento": "CONTACTO_NO_IDENTIFICADO",
   "timestamp": "2026-09-30T15:05:00.000Z",
   "data": {
+    "contactoPendienteId": "cmuzz08cs7001ldng8qep2s38e",
     "canal": "WHATSAPP",
     "identificador": "+18095551234",
-    "texto": "Hola, tengo un problema con la impresora"
+    "nombre": "Pedro Martínez",
+    "empresaReportada": "Constructora ABC",
+    "telefonoReportado": "+18095559999",
+    "correoReportado": "pedro@constructoraabc.com",
+    "motivo": "La impresora de recepción no imprime",
+    "staffWhatsapp": ["+18095550001", "+18095550002"]
   }
 }
 ```
 
-> No hay reintento ni deduplicación: cada mensaje de un contacto no identificado dispara
-> su propio evento — si la misma persona escribe varias veces, tu chat interno recibirá
-> varios avisos. Es una limitación conocida y aceptable dado el volumen esperado de este
-> caso (poco frecuente); si se vuelve un problema, se puede agregar una ventana de
-> supresión del lado de n8n (por ejemplo, con un nodo que descarte repeticiones del mismo
-> `identificador` dentro de X minutos).
+> **`empresaReportada` es solo lo que la persona escribió, nunca verificado** — el
+> representante que vea el aviso decide manualmente a qué `Cliente` real de NexIT
+> corresponde (el mismo criterio que ya se usa en "Crear ticket interno", ver §3.f):
+> jamás se auto-matchea contra un cliente real, porque un error ahí mezclaría datos
+> entre dos empresas distintas.
+>
+> **`staffWhatsapp`** ya viene resuelto por NexIT (teléfonos de WhatsApp de todo
+> ADMIN/COORDINADOR activo que vinculó el canal en su Perfil) — n8n no puede consultar
+> la base de datos, así que no hay forma de armar esa lista del lado del workflow. Puede
+> venir vacío si nadie del staff vinculó WhatsApp; en ese caso, el aviso de Telegram al
+> chat interno sigue siendo el único canal.
+>
+> No hay reintento ni deduplicación más allá de "recién se avisa cuando los 5 campos ya
+> están completos": si la misma persona completa el formulario, se convierte en ticket,
+> y vuelve a escribir después, arranca un `ContactoPendiente` nuevo desde cero — el único
+> control contra avisos repetidos es el estado `CONVERTIDO`/`PENDIENTE` de la fila ya
+> existente, que `procesarMensajeContactoPendiente()` consulta antes de volver a preguntar.
 
 ## 2. Verificar la identidad del request en n8n
 
@@ -491,19 +510,35 @@ desde `/perfil`.
 ### g) `CONTACTO_NO_IDENTIFICADO` → alerta interna, no al contacto
 
 ```
-Switch[CONTACTO_NO_IDENTIFICADO] → Telegram sendMessage a un GRUPO interno (no al remitente)
-                                      chatId: {{$env.NEXIT_TELEGRAM_CHAT_ID}}
-                                      Texto: "📵 Contacto no identificado por
-                                              {{$json.data.canal}} ({{$json.data.identificador}}):
-                                              '{{$json.data.texto}}'
-                                              Un representante debe contactarlo y levantar
-                                              el ticket manualmente."
+Switch[CONTACTO_NO_IDENTIFICADO] ─┬─ Telegram sendMessage a un GRUPO interno (no al remitente)
+                                   │    chatId: {{$env.NEXIT_TELEGRAM_CHAT_ID}}
+                                   │    Texto: "📵 Contacto no identificado por {{$json.data.canal}}
+                                   │            ({{$json.data.identificador}}):
+                                   │            Nombre: {{$json.data.nombre}}
+                                   │            Empresa (reportada, sin confirmar): {{$json.data.empresaReportada}}
+                                   │            Teléfono: {{$json.data.telefonoReportado}}
+                                   │            Correo: {{$json.data.correoReportado}}
+                                   │            Motivo: {{$json.data.motivo}}
+                                   │            Un representante debe confirmar el cliente y crear el ticket."
+                                   └─ Split Out ($json.data.staffWhatsapp → "telefono")
+                                        └─ Twilio sendMessage a CADA Admin/Coordinador
+                                             to: =whatsapp:{{$json.telefono}}
+                                             message: (mismo contenido, leído de
+                                                       $('Switch por evento').item.json.data.*
+                                                       porque Split Out ya pisó esos campos)
 ```
 
 Mismo `$env.NEXIT_TELEGRAM_CHAT_ID` que usa la alerta de SLA en riesgo (§3.c) — un chat
-interno de soporte, no el contacto que escribió. El representante que lo vea entra a
-"Crear ticket" (`/tickets/nuevo`) en NexIT, donde el mismo formulario le permite buscar
-al contacto por nombre/correo o crearlo si es la primera vez.
+interno de soporte, no el contacto que escribió. En paralelo, el nodo **Split Out**
+convierte el arreglo `staffWhatsapp` (ya resuelto por NexIT, ver §1) en un ítem por
+teléfono, y Twilio le manda el mismo aviso a cada uno — si el arreglo viene vacío
+(nadie del staff vinculó WhatsApp), esa rama simplemente no genera ningún envío.
+
+El representante que lo vea entra a **`/admin/contactos-pendientes`** en NexIT, revisa
+el motivo/empresa reportada, confirma manualmente a qué cliente real pertenece, y clic
+en "Crear ticket con estos datos" — eso abre `/tickets/nuevo` con el contacto ya
+prellenado (ver §3.f) y, al crear el ticket, marca ese `ContactoPendiente` como
+`CONVERTIDO`.
 
 ## 4. Cron del chequeo de SLA (`Schedule Trigger`)
 
@@ -1414,7 +1449,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "chatId": "={{$env.NEXIT_TELEGRAM_CHAT_ID}}",
-        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\"{{$json.data.texto}}\"\n\nNo hay ningún usuario de NexIT con ese chat/teléfono vinculado. Un representante debe contactarlo y, si corresponde, levantar el ticket manualmente desde \"Crear ticket\"."
+        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\nNombre: {{$json.data.nombre}}\nEmpresa (reportada por él, sin confirmar): {{$json.data.empresaReportada}}\nTeléfono: {{$json.data.telefonoReportado}}\nCorreo: {{$json.data.correoReportado}}\nMotivo: {{$json.data.motivo}}\n\nNo hay ningún usuario de NexIT con ese chat/teléfono vinculado. Un representante debe confirmar a qué cliente pertenece y crear su ticket desde \"Crear ticket\" en NexIT (o desde /admin/contactos-pendientes)."
       },
       "id": "telegram-contacto-no-identificado",
       "name": "Telegram contacto no identificado",
@@ -1428,6 +1463,43 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         "telegramApi": {
           "id": "REEMPLAZAR",
           "name": "NexIT Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data.staffWhatsapp",
+        "options": {
+          "destinationFieldName": "telefono"
+        }
+      },
+      "id": "split-staff-whatsapp-contacto",
+      "name": "Split staff WhatsApp",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        1080
+      ]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{$json.telefono}}",
+        "message": "=📵 Contacto no identificado por {{$('Switch por evento').item.json.data.canal}}: {{$('Switch por evento').item.json.data.nombre}}, de \"{{$('Switch por evento').item.json.data.empresaReportada}}\" — Tel: {{$('Switch por evento').item.json.data.telefonoReportado}}, correo: {{$('Switch por evento').item.json.data.correoReportado}}. Motivo: {{$('Switch por evento').item.json.data.motivo}}. Contactalo y levantá el ticket en NexIT."
+      },
+      "id": "twilio-staff-contacto-no-identificado",
+      "name": "Twilio aviso staff (contacto no identificado)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        1080
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
         }
       }
     }
@@ -1515,6 +1587,11 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         [
           {
             "node": "Telegram contacto no identificado",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split staff WhatsApp",
             "type": "main",
             "index": 0
           }
@@ -1758,6 +1835,17 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         ],
         []
       ]
+    },
+    "Split staff WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Twilio aviso staff (contacto no identificado)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   }
 }
@@ -1880,16 +1968,44 @@ cliente (sucursales y sus activos) para que la IA decida con memoria real.
 }
 
 // 200 — no vinculado
-{ "encontrado": false, "mensaje": "No encontramos tu número vinculado a NexIT. En breve un representante te contactará para ayudarte.", "canal": "TELEGRAM", "identificador": "000000000" }
+{ "encontrado": false, "texto": "Hola", "canal": "TELEGRAM", "identificador": "000000000" }
 ```
 
 > **Cuando no se encuentra**, no hay forma segura de saber a qué cliente/sede pertenece
 > quien escribe — listarle todos los clientes de NexIT para que elija sería un problema
-> de confusión (y de privacidad entre clientes distintos). En vez de eso, este endpoint
-> dispara `CONTACTO_NO_IDENTIFICADO` (ver §1 y §3) para avisarle a un chat interno de
-> soporte, y responde con un mensaje que le pone la pelota a un representante humano, no
-> a la IA — el representante usa "Crear ticket" (`/tickets/nuevo`) para levantarlo,
-> pantalla que ya busca o crea el contacto correspondiente.
+> de confusión (y de privacidad entre clientes distintos). Este endpoint ya NO le
+> responde nada al contacto directamente ni dispara ningún evento por su cuenta — el
+> workflow de n8n debe, en la rama `encontrado == false`, llamar a
+> **`POST /api/n8n/contacto-pendiente/mensaje`** (mismo body `{ canal, identificador,
+> texto }`, mismo `WEBHOOK_SECRET`) para seguir el flujo de recolección de datos.
+> `texto` viaja de vuelta en la respuesta (mismo motivo que en `contextoTecnicoSchema`):
+> esa siguiente llamada ya no tiene el mensaje original disponible porque esta misma
+> llamada pisó `$json`.
+
+**`POST /api/n8n/contacto-pendiente/mensaje`** — body `{ canal, identificador, texto }`
+
+Arranca (o continúa) una recolección de 5 datos básicos, un campo a la vez, sin
+intervención de IA — el orden es fijo (`nombre` → `empresaReportada` →
+`telefonoReportado` → `correoReportado` → `motivo`), así que "el primer campo vacío" es
+siempre inequívocamente "lo que se acaba de preguntar".
+
+```json
+// 200 — primera vez que escribe esta persona (crea el ContactoPendiente)
+{ "mensaje": "No encontramos tu número vinculado a NexIT. Para que un representante te pueda contactar, necesitamos algunos datos.\n\n¿Cuál es tu nombre?", "canal": "WHATSAPP", "identificador": "+18095551234" }
+
+// 200 — respondiendo un campo intermedio
+{ "mensaje": "¿A qué número de teléfono te podemos contactar?", "canal": "WHATSAPP", "identificador": "+18095551234" }
+
+// 200 — los 5 campos ya están completos (dispara CONTACTO_NO_IDENTIFICADO)
+{ "mensaje": "¡Gracias! Ya registramos tus datos. En breve un representante de nuestro equipo te va a contactar.", "canal": "WHATSAPP", "identificador": "+18095551234" }
+```
+
+`telefonoReportado` y `correoReportado` tienen una validación mínima (teléfono con 7+
+dígitos, correo con forma `algo@algo.algo`) — si no pasa, responde pidiendo lo mismo de
+nuevo en vez de avanzar, sin guardar el valor inválido. Si la persona ya completó sus 5
+datos (`estado: "PENDIENTE"`) o ya se le creó un ticket (`estado: "CONVERTIDO"`),
+este endpoint no vuelve a preguntar nada — responde con un mensaje de "ya te vamos a
+contactar" (o el número de ticket, si ya existe).
 
 **`POST /api/n8n/conversacion/turno`** — body `{ conversacionId, accion, mensajeAsistente, ticket? }`
 
@@ -1945,7 +2061,8 @@ está pensado como punto de partida, no como texto final.
 ```
 Telegram Trigger ──→ Normalizar Telegram ──┐
                                              ├─→ POST conversacion/mensaje → IF encontrado
-Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘                     ├─ false → Switch por canal → responder
+Webhook WhatsApp (Twilio) ──→ Normalizar WhatsApp ─┘                         ├─ false → POST contacto-pendiente/mensaje
+                                                                             │            → Switch por canal → responder
                                                                              └─ true  → IA: decidir siguiente paso
                                                                                           → POST conversacion/turno
                                                                                           → Switch por canal → responder
@@ -2242,6 +2359,32 @@ URL/body del nodo Code si usás otro).
           "name": "NexIT Twilio"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/contacto-pendiente/mensaje",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
+      },
+      "id": "post-contacto-pendiente-cliente",
+      "name": "POST contacto-pendiente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        100
+      ]
     }
   ],
   "connections": {
@@ -2311,7 +2454,7 @@ URL/body del nodo Code si usás otro).
         ],
         [
           {
-            "node": "Switch por canal",
+            "node": "POST contacto-pendiente",
             "type": "main",
             "index": 0
           }
@@ -2352,6 +2495,17 @@ URL/body del nodo Code si usás otro).
         [
           {
             "node": "Twilio - Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST contacto-pendiente": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
             "type": "main",
             "index": 0
           }

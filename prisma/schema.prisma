@@ -52,6 +52,12 @@ enum EstadoConversacionChat {
   CONVERTIDA_A_TICKET
 }
 
+enum EstadoContactoPendiente {
+  RECOLECTANDO
+  PENDIENTE
+  CONVERTIDO
+}
+
 enum RolMensajeChat {
   USUARIO
   ASISTENTE
@@ -245,16 +251,17 @@ model Usuario {
   telegramChatId   String? @unique
   whatsappTelefono String? @unique
 
-  ticketsCreados        Ticket[]                      @relation("TicketCreador")
-  ticketsAsignados      Ticket[]                      @relation("TicketTecnico")
-  historial             TicketHistorial[]
-  evidencias            Evidencia[]
-  repuestosAprobados    TicketRepuesto[]              @relation("RepuestoAprobador")
-  cotizacionesAprobadas Cotizacion[]                  @relation("CotizacionAprobador")
-  planesPreventivos     PlanMantenimientoPreventivo[]
-  movimientosInventario MovimientoInventario[]
-  registrosAuditoria    RegistroAuditoria[]
-  conversacionesChat    ConversacionChat[]
+  ticketsCreados             Ticket[]                      @relation("TicketCreador")
+  ticketsAsignados           Ticket[]                      @relation("TicketTecnico")
+  historial                  TicketHistorial[]
+  evidencias                 Evidencia[]
+  repuestosAprobados         TicketRepuesto[]              @relation("RepuestoAprobador")
+  cotizacionesAprobadas      Cotizacion[]                  @relation("CotizacionAprobador")
+  planesPreventivos          PlanMantenimientoPreventivo[]
+  movimientosInventario      MovimientoInventario[]
+  registrosAuditoria         RegistroAuditoria[]
+  conversacionesChat         ConversacionChat[]
+  contactosPendientesCreados ContactoPendiente[]
 
   @@index([clienteId])
   @@map("usuarios")
@@ -436,6 +443,7 @@ model Ticket {
   repuestos           TicketRepuesto[]
   cotizaciones        Cotizacion[]
   conversacionChat    ConversacionChat?
+  contactoPendiente   ContactoPendiente?
 
   @@index([clienteId, estado])
   @@index([tecnicoAsignadoId, estado])
@@ -662,4 +670,35 @@ model MensajeConversacion {
 
   @@index([conversacionId])
   @@map("mensajes_conversacion")
+}
+
+// Captura de datos cuando escribe por Telegram/WhatsApp un chat_id/teléfono que no
+// está vinculado a ningún Usuario — no hay con qué cliente/sede asociarlo de forma
+// segura (ver webhook.service.ts, CONTACTO_NO_IDENTIFICADO), así que en vez de crear
+// algo automáticamente se le piden 5 datos básicos por chat (sin IA, un campo a la
+// vez, el primero vacío en orden) y un Coordinador/Admin decide manualmente a qué
+// cliente real pertenece desde /admin/contactos-pendientes. `empresaReportada` es
+// SOLO una referencia en pantalla — nunca se usa para matchear automáticamente contra
+// un Cliente real, por el mismo riesgo de mezclar datos entre clientes que ya se
+// descartó para el flujo de "Crear ticket interno".
+model ContactoPendiente {
+  id                 String                  @id @default(cuid())
+  canal              String
+  identificador      String
+  nombre             String?
+  empresaReportada   String?
+  telefonoReportado  String?
+  correoReportado    String?
+  motivo             String?
+  estado             EstadoContactoPendiente @default(RECOLECTANDO)
+  ticketId           String?                 @unique
+  ticket             Ticket?                 @relation(fields: [ticketId], references: [id])
+  contactoCreadoId   String?
+  contactoCreado     Usuario?                @relation(fields: [contactoCreadoId], references: [id])
+  fechaCreacion      DateTime                @default(now())
+  fechaActualizacion DateTime                @updatedAt
+
+  @@index([canal, identificador])
+  @@index([estado])
+  @@map("contactos_pendientes")
 }
