@@ -1948,7 +1948,8 @@ Ambos protegidos con `WEBHOOK_SECRET`, igual que el resto de `/api/n8n/*`.
 Primer paso de cada mensaje entrante: resuelve el cliente, guarda `texto` como un
 mensaje `USUARIO` (busca la conversación `ACTIVA` existente o crea una si no hay, o si
 la que había quedó abandonada), y devuelve **todo el historial** + el contexto del
-cliente (sucursales y sus activos) para que la IA decida con memoria real.
+cliente (sucursales y sus activos, y sus sistemas de software — ver
+`/admin/sistemas-software`) para que la IA decida con memoria real.
 
 ```json
 // 200 — encontrado
@@ -1958,6 +1959,7 @@ cliente (sucursales y sus activos) para que la IA decida con memoria real.
   "usuarioNombre": "Juan Pérez",
   "clienteNombre": "Constructora ABC S.A.",
   "sucursales": [{ "id": "...", "nombre": "Bodega Norte", "direccion": "...", "ciudad": "...", "activos": [{ "id": "...", "categoria": "UPS", "marca": "APC", "modelo": "Smart-UPS 3000VA" }] }],
+  "sistemasSoftware": [{ "id": "...", "nombre": "ERP SAP Business One" }],
   "historial": [
     { "rol": "USUARIO", "contenido": "Hola" },
     { "rol": "ASISTENTE", "contenido": "Hola Juan! Contame, ¿qué problema tenés con algún equipo?" },
@@ -2014,7 +2016,7 @@ Persiste la respuesta de la IA (`mensajeAsistente`) como un mensaje `ASISTENTE`,
 
 - `PREGUNTAR` — no hace nada más; la conversación sigue `ACTIVA`.
 - `CERRAR_SIN_TICKET` — marca la conversación `RESUELTA_SIN_TICKET`.
-- `CREAR_TICKET` — requiere `ticket: { titulo, descripcion, prioridad, sucursalId?, activoId?, tipo?, categoriaSoporte?, sugerenciaIA? }` (el schema lo exige con `.refine()` solo para esta acción). Crea el ticket (`origen: "CHATBOT"`), guarda `sugerenciaIA` tal cual la mandó el modelo (o `null` si no aplicó ninguna), vincula la conversación (`CONVERTIDA_A_TICKET`), y dispara `TICKET_CREADO`. Mismo manejo de `SUCURSAL_AMBIGUA` que el flujo anterior si el cliente tiene más de una sede y la IA no mandó `sucursalId`.
+- `CREAR_TICKET` — requiere `ticket: { titulo, descripcion, prioridad, sucursalId?, activoId?, sistemaSoftwareId?, sistemaNoCatalogado?, tipo?, categoriaSoporte?, sugerenciaIA? }` (el schema lo exige con `.refine()` solo para esta acción). `sistemaSoftwareId` se valida contra el cliente de la conversación igual que `activoId` contra la sucursal (error `SISTEMA_INVALIDO` si no corresponde). Crea el ticket (`origen: "CHATBOT"`), antepone `[Sistema: ...]` a la descripción cuando viene `sistemaNoCatalogado` (mismo patrón que el wizard web para equipos no catalogados), guarda `sugerenciaIA` tal cual la mandó el modelo (o `null` si no aplicó ninguna), vincula la conversación (`CONVERTIDA_A_TICKET`), y dispara `TICKET_CREADO`. Mismo manejo de `SUCURSAL_AMBIGUA` que el flujo anterior si el cliente tiene más de una sede y la IA no mandó `sucursalId`.
 
 ```json
 // 200 — CREAR_TICKET exitoso
@@ -2040,18 +2042,32 @@ siempre el real, nunca algo que el modelo podría llegar a inventar.
 ### d) El prompt: preguntar, y crear el ticket sin retrasarlo
 
 El nodo "IA: decidir siguiente paso" le manda al modelo el historial completo + las
-sucursales/activos del cliente, y le exige devolver un JSON con `accion` + `mensaje` +
-`ticket` (null salvo que `accion = CREAR_TICKET`). Las reglas clave del prompt:
+sucursales/activos del cliente + sus sistemas de software, y le exige devolver un JSON
+con `accion` + `mensaje` + `ticket` (null salvo que `accion = CREAR_TICKET`). Las reglas
+clave del prompt:
 
 1. Un saludo o mensaje sin detalle técnico → `PREGUNTAR`, nunca crear ticket todavía.
-2. En cuanto hay un problema concreto (equipo + síntoma) → `CREAR_TICKET` de inmediato.
-   Si existe una sugerencia breve y segura (reiniciar, revisar corriente/cables), va en
-   `ticket.sugerenciaIA` como dato informativo para el técnico — nunca como excusa para
-   retrasar la creación ni como paso que el cliente tiene que confirmar antes.
+2. En cuanto hay un problema concreto (equipo o sistema + síntoma) → `CREAR_TICKET` de
+   inmediato. Si existe una sugerencia breve y segura (reiniciar, revisar
+   corriente/cables), va en `ticket.sugerenciaIA` como dato informativo para el técnico
+   — nunca como excusa para retrasar la creación ni como paso que el cliente tiene que
+   confirmar antes.
 3. Cliente dice que ya se resolvió solo (antes de llegar al punto 2) → `CERRAR_SIN_TICKET`.
 
-Ajustá este prompt libremente según el tipo de fallas más comunes de tus clientes —
-está pensado como punto de partida, no como texto final.
+**Equipo vs Sistema** (mismo criterio que el wizard web en `/tickets/nuevo` y
+`/portal/tickets/nuevo`): el prompt le pide al modelo clasificar el problema sin
+preguntárselo explícitamente al cliente —
+
+- Equipo físico de la lista de activos → `categoriaSoporte: "HARDWARE"` (el equipo
+  falló) o `"INFRAESTRUCTURA"` (red/cableado), con `activoId` si lo identifica.
+- Un sistema de la lista `sistemasSoftware` del cliente → `categoriaSoporte:
+  "SOFTWARE_TERCEROS"` + `sistemaSoftwareId`.
+- "El sistema operativo", "Windows", "Office", etc. (genérico, no es un activo ni un
+  sistema del catálogo) → `categoriaSoporte: "SOFTWARE_SISTEMA"` + una nota breve en
+  `sistemaNoCatalogado`.
+- Ambiguo o no reconocido → `categoriaSoporte: "SOFTWARE"` (catch-all), igual que el
+  wizard web para el caso "no sé cuál es". `activoId` y `sistemaSoftwareId` nunca van
+  los dos a la vez.
 
 Ajustá este prompt libremente según el tipo de fallas más comunes de tus clientes —
 está pensado como punto de partida, no como texto final.
@@ -2238,7 +2254,7 @@ URL/body del nodo Code si usás otro).
     },
     {
       "parameters": {
-        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nconst historialTexto = contexto.historial.map((m) => `${m.rol === 'USUARIO' ? 'Cliente' : 'Asistente'}: ${m.contenido}`).join('\n');\n\nconst prompt = `Sos el asistente de soporte tecnico de NexIT, atendiendo por chat a ${contexto.usuarioNombre} de ${contexto.clienteNombre}.\n\nSucursales y equipos (activos) de este cliente:\n${JSON.stringify(contexto.sucursales)}\n\nHistorial completo de la conversacion (el ultimo mensaje es el mas reciente):\n${historialTexto}\n\nTu trabajo, en este orden:\n1. Si el ultimo mensaje del cliente es un saludo o no tiene detalle tecnico (\"hola\", \"tengo un problema\"), NO crees un ticket todavia - respondé con una pregunta concreta para entender que pasa (que equipo, que sintoma exacto, desde cuando).\n2. En cuanto tengas un problema concreto (equipo + sintoma), crea el ticket DE INMEDIATO - no le pidas al cliente que pruebe nada primero ni esperes que confirme si funciono. Muchos contactos no tienen el conocimiento ni las facilidades para seguir un procedimiento tecnico por chat, y hacerlo esperar solo demora que un tecnico real se entere. Si conoces una sugerencia breve y segura para que intente mientras el tecnico llega (reiniciar el equipo, revisar corriente/cables), incluila en ticket.sugerenciaIA como dato informativo para el tecnico - nunca la uses como excusa para retrasar el ticket, y en tu mensaje al cliente aclara que igual ya se genero el ticket. Prioriza ALTA o CRITICA para fallas totales/de seguridad, MEDIA para el resto.\n3. Si el cliente dice que ya se soluciono solo (antes de llegar al punto 2), cerra la conversacion sin ticket.\n\nNunca inventes datos que el cliente no dio - si falta el nombre de la sede y el cliente tiene mas de una, deja sucursalId en null (el sistema le va a preguntar directamente cual es).\n\nDevolve SOLO un JSON con esta forma exacta:\n{\n  \"accion\": \"PREGUNTAR\" o \"CREAR_TICKET\" o \"CERRAR_SIN_TICKET\",\n  \"mensaje\": \"el texto que le vas a responder al cliente, en español, tono cordial y breve - si accion=CREAR_TICKET, mencionale que ya se genero el ticket, nunca le pidas que pruebe algo antes\",\n  \"ticket\": null o { \"titulo\": \"...\", \"descripcion\": \"...\", \"prioridad\": \"CRITICA\" o \"ALTA\" o \"MEDIA\" o \"BAJA\", \"sucursalId\": \"...\" o null, \"activoId\": \"...\" o null, \"sugerenciaIA\": \"...\" o null }\n}`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  conversacionId: contexto.conversacionId,\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  accion: ai.accion,\n  mensajeAsistente: ai.mensaje,\n  ticket: ai.ticket && ai.ticket.titulo ? ai.ticket : undefined,\n} }];"
+        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nconst historialTexto = contexto.historial.map((m) => `${m.rol === 'USUARIO' ? 'Cliente' : 'Asistente'}: ${m.contenido}`).join('\\n');\n\nconst prompt = `Sos el asistente de soporte tecnico de NexIT, atendiendo por chat a ${contexto.usuarioNombre} de ${contexto.clienteNombre}.\n\nSucursales y equipos (activos) de este cliente:\n${JSON.stringify(contexto.sucursales)}\n\nSistemas de software/terceros que este cliente tiene registrado (ademas de \"sistema operativo\" y \"suite de oficina\", que son opciones genericas validas para cualquier cliente aunque no aparezcan en esta lista):\n${JSON.stringify(contexto.sistemasSoftware)}\n\nHistorial completo de la conversacion (el ultimo mensaje es el mas reciente):\n${historialTexto}\n\nTu trabajo, en este orden:\n1. Si el ultimo mensaje del cliente es un saludo o no tiene detalle tecnico (\"hola\", \"tengo un problema\"), NO crees un ticket todavia - respondé con una pregunta concreta para entender que pasa (que equipo o sistema, que sintoma exacto, desde cuando).\n2. En cuanto tengas un problema concreto, crea el ticket DE INMEDIATO - no le pidas al cliente que pruebe nada primero ni esperes que confirme si funciono. Muchos contactos no tienen el conocimiento ni las facilidades para seguir un procedimiento tecnico por chat, y hacerlo esperar solo demora que un tecnico real se entere. Si conoces una sugerencia breve y segura para que intente mientras el tecnico llega (reiniciar el equipo, revisar corriente/cables), incluila en ticket.sugerenciaIA como dato informativo para el tecnico - nunca la uses como excusa para retrasar el ticket, y en tu mensaje al cliente aclara que igual ya se genero el ticket. Prioriza ALTA o CRITICA para fallas totales/de seguridad, MEDIA para el resto.\n3. Si el cliente dice que ya se soluciono solo (antes de llegar al punto 2), cerra la conversacion sin ticket.\n\nDecidi si el problema es de un EQUIPO fisico o de un SISTEMA, y completa ticket.categoriaSoporte segun corresponda - nunca pidas esta clasificacion explicitamente al cliente, inferila de lo que describe:\n- Equipo fisico (UPS, switch, PC, impresora, etc.) -> categoriaSoporte \"HARDWARE\" (el equipo en si fallo) o \"INFRAESTRUCTURA\" (problema de red/cableado), y completa activoId si identificas cual de la lista de activos es (o null si no esta claro).\n- El cliente menciona un sistema de la lista de sistemas de software -> categoriaSoporte \"SOFTWARE_TERCEROS\" y completa sistemaSoftwareId con el id de ese sistema.\n- El cliente dice \"el sistema operativo\", \"Windows\", \"el servidor no actualiza\", \"Office\", \"Excel\", etc. (no es un sistema de la lista ni un equipo fisico) -> categoriaSoporte \"SOFTWARE_SISTEMA\" y describi brevemente cual en sistemaNoCatalogado (ej. \"Sistema operativo\", \"Suite de oficina\").\n- No queda claro si es equipo o sistema, o es un sistema que no reconoces y no es ninguno de los anteriores -> categoriaSoporte \"SOFTWARE\" y, si aplica, describi lo que el cliente dijo en sistemaNoCatalogado.\nactivoId y sistemaSoftwareId nunca van los dos a la vez en el mismo ticket.\n\nNunca inventes datos que el cliente no dio - si falta el nombre de la sede y el cliente tiene mas de una, deja sucursalId en null (el sistema le va a preguntar directamente cual es).\n\nDevolve SOLO un JSON con esta forma exacta:\n{\n  \"accion\": \"PREGUNTAR\" o \"CREAR_TICKET\" o \"CERRAR_SIN_TICKET\",\n  \"mensaje\": \"el texto que le vas a responder al cliente, en español, tono cordial y breve - si accion=CREAR_TICKET, mencionale que ya se genero el ticket, nunca le pidas que pruebe algo antes\",\n  \"ticket\": null o { \"titulo\": \"...\", \"descripcion\": \"...\", \"prioridad\": \"CRITICA\" o \"ALTA\" o \"MEDIA\" o \"BAJA\", \"sucursalId\": \"...\" o null, \"categoriaSoporte\": \"HARDWARE\" o \"INFRAESTRUCTURA\" o \"SOFTWARE_TERCEROS\" o \"SOFTWARE_SISTEMA\" o \"SOFTWARE\", \"activoId\": \"...\" o null, \"sistemaSoftwareId\": \"...\" o null, \"sistemaNoCatalogado\": \"...\" o null, \"sugerenciaIA\": \"...\" o null }\n}`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  conversacionId: contexto.conversacionId,\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  accion: ai.accion,\n  mensajeAsistente: ai.mensaje,\n  ticket: ai.ticket && ai.ticket.titulo ? ai.ticket : undefined,\n} }];"
       },
       "id": "ia-decidir-paso",
       "name": "IA: decidir siguiente paso",

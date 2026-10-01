@@ -9,6 +9,11 @@ export const crearTicketPortalSchema = z.object({
   sucursalId: z.string().cuid(),
   activoId: optionalCuid(),
   ubicacionNoCatalogada: z.string().trim().max(200).optional(),
+  sistemaSoftwareId: optionalCuid(),
+  // Texto libre cuando el problema es de "Sistema" pero no hay un SistemaSoftware
+  // concreto del catálogo del cliente — también lo usa el wizard para anotar cuál de
+  // las dos opciones genéricas (Sistema operativo / Suite de oficina) se eligió.
+  sistemaNoCatalogado: z.string().trim().max(200).optional(),
   categoriaSoporte: categoriaSoporteSchema,
   titulo: z.string().trim().min(5, "Mínimo 5 caracteres").max(120),
   descripcion: z.string().trim().min(20, "Describe el problema con al menos 20 caracteres").max(4000),

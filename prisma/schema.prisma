@@ -78,8 +78,20 @@ enum TipoTicket {
 
 enum CategoriaSoporte {
   SOFTWARE
+  // Las dos siguientes se derivan automáticamente en el wizard de creación (portal y
+  // staff) a partir de qué eligió el usuario en el paso "Equipo o Sistema" — nunca se
+  // le pide elegir entre estas dos y SOFTWARE a mano. SOFTWARE sigue existiendo como
+  // categoría genérica/heredada para tickets de antes de este cambio y para el caso
+  // "no sé cuál sistema es".
+  SOFTWARE_TERCEROS
+  SOFTWARE_SISTEMA
   HARDWARE
   INFRAESTRUCTURA
+}
+
+enum EstadoSistemaSoftware {
+  ACTIVO
+  INACTIVO
 }
 
 enum EstadoTicket {
@@ -211,12 +223,33 @@ model Cliente {
   estado               EstadoCliente @default(ACTIVO)
   fechaRegistro        DateTime      @default(now())
 
-  sucursales Sucursal[]
-  usuarios   Usuario[]
-  contratos  Contrato[]
-  tickets    Ticket[]
+  sucursales       Sucursal[]
+  usuarios         Usuario[]
+  contratos        Contrato[]
+  tickets          Ticket[]
+  sistemasSoftware SistemaSoftware[]
 
   @@map("clientes")
+}
+
+// Catálogo de sistemas/software que un cliente reporta tener instalado (ERP, sistema de
+// facturación propio, etc.) — a propósito NO es un Activo: no tiene marca/modelo/número
+// de serie reales que registrar, no necesita checklist de mantenimiento físico, y suele
+// ser transversal a toda la empresa, no de una sola sucursal (por eso cuelga de Cliente,
+// no de Sucursal, a diferencia de Activo).
+model SistemaSoftware {
+  id            String                @id @default(cuid())
+  clienteId     String
+  cliente       Cliente               @relation(fields: [clienteId], references: [id])
+  nombre        String
+  proveedor     String?
+  estado        EstadoSistemaSoftware @default(ACTIVO)
+  fechaCreacion DateTime              @default(now())
+
+  tickets Ticket[]
+
+  @@index([clienteId])
+  @@map("sistemas_software")
 }
 
 model Sucursal {
@@ -411,6 +444,8 @@ model Ticket {
   sucursal                Sucursal                     @relation(fields: [sucursalId], references: [id])
   activoId                String?
   activo                  Activo?                      @relation(fields: [activoId], references: [id])
+  sistemaSoftwareId       String?
+  sistemaSoftware         SistemaSoftware?             @relation(fields: [sistemaSoftwareId], references: [id])
   planPreventivoId        String?
   planPreventivo          PlanMantenimientoPreventivo? @relation(fields: [planPreventivoId], references: [id])
   tipo                    TipoTicket

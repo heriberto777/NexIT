@@ -2,7 +2,13 @@ import { z } from "zod";
 import { optionalCuid } from "@/lib/zod/shared";
 
 export const tipoTicketSchema = z.enum(["CORRECTIVO", "PREVENTIVO", "INSTALACION"]);
-export const categoriaSoporteSchema = z.enum(["SOFTWARE", "HARDWARE", "INFRAESTRUCTURA"]);
+export const categoriaSoporteSchema = z.enum([
+  "SOFTWARE",
+  "SOFTWARE_TERCEROS",
+  "SOFTWARE_SISTEMA",
+  "HARDWARE",
+  "INFRAESTRUCTURA",
+]);
 export const prioridadSchema = z.enum(["CRITICA", "ALTA", "MEDIA", "BAJA"]);
 export const estadoTicketSchema = z.enum([
   "ABIERTO",
@@ -48,6 +54,11 @@ export const crearTicketSchema = z
     sucursalId: z.string().cuid(),
     activoId: optionalCuid(),
     ubicacionNoCatalogada: z.string().trim().max(200).optional(),
+    sistemaSoftwareId: optionalCuid(),
+    // Texto libre cuando el problema es de "Sistema" pero no hay un SistemaSoftware
+    // concreto del catálogo del cliente — también lo usa el wizard para anotar cuál de
+    // las dos opciones genéricas (Sistema operativo / Suite de oficina) se eligió.
+    sistemaNoCatalogado: z.string().trim().max(200).optional(),
     tipo: tipoTicketSchema,
     categoriaSoporte: categoriaSoporteSchema,
     titulo: z.string().trim().min(5, "El título debe tener al menos 5 caracteres").max(120),

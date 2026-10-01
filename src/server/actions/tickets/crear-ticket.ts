@@ -34,6 +34,8 @@ export async function crearTicket(input: CrearTicketInput) {
     sucursalId,
     activoId,
     ubicacionNoCatalogada,
+    sistemaSoftwareId,
+    sistemaNoCatalogado,
     tipo,
     categoriaSoporte,
     titulo,
@@ -53,6 +55,13 @@ export async function crearTicket(input: CrearTicketInput) {
     const activo = await prisma.activo.findUniqueOrThrow({ where: { id: activoId } });
     if (activo.sucursalId !== sucursalId) {
       throw new Error("Ese activo no pertenece a la sucursal seleccionada");
+    }
+  }
+
+  if (sistemaSoftwareId) {
+    const sistema = await prisma.sistemaSoftware.findUniqueOrThrow({ where: { id: sistemaSoftwareId } });
+    if (sistema.clienteId !== clienteId) {
+      throw new Error("Ese sistema no pertenece al cliente seleccionado");
     }
   }
 
@@ -97,9 +106,11 @@ export async function crearTicket(input: CrearTicketInput) {
     ? await prisma.contratoSla.findFirst({ where: { contratoId: contrato.id, prioridad } })
     : null;
 
-  const descripcionFinal = ubicacionNoCatalogada
-    ? `[Equipo/ubicación no catalogada: ${ubicacionNoCatalogada}]\n\n${descripcion}`
-    : descripcion;
+  const notas = [
+    ubicacionNoCatalogada && `[Equipo/ubicación no catalogada: ${ubicacionNoCatalogada}]`,
+    sistemaNoCatalogado && `[Sistema: ${sistemaNoCatalogado}]`,
+  ].filter(Boolean);
+  const descripcionFinal = notas.length ? `${notas.join("\n")}\n\n${descripcion}` : descripcion;
 
   const numeroTicket = await siguienteNumeroTicket();
 
@@ -110,6 +121,7 @@ export async function crearTicket(input: CrearTicketInput) {
         clienteId,
         sucursalId,
         activoId,
+        sistemaSoftwareId,
         tipo,
         categoriaSoporte,
         prioridad,

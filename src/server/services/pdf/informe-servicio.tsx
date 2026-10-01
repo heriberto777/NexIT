@@ -60,6 +60,7 @@ export interface InformeServicioProps {
   cliente: { nombre: string };
   sucursal: { nombre: string; direccion: string; ciudad: string };
   activo: { categoria: string; marca: string; modelo: string; numeroSerie: string } | null;
+  sistemaSoftware: { nombre: string; proveedor: string | null } | null;
   tecnico: { nombre: string } | null;
   checklist: { descripcion: string; respuesta: string; observacion: string | null; fotoDataUri: string | null }[];
   fotosAntes: string[];
@@ -77,6 +78,7 @@ export function InformeServicioDocument({
   cliente,
   sucursal,
   activo,
+  sistemaSoftware,
   tecnico,
   checklist,
   fotosAntes,
@@ -169,6 +171,16 @@ export function InformeServicioDocument({
             <Text style={styles.sectionTitle}>Activo intervenido</Text>
             <Text>
               {activo.categoria} — {activo.marca} {activo.modelo} (Serie #{activo.numeroSerie})
+            </Text>
+          </View>
+        )}
+
+        {sistemaSoftware && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Sistema</Text>
+            <Text>
+              {sistemaSoftware.nombre}
+              {sistemaSoftware.proveedor ? ` (${sistemaSoftware.proveedor})` : ""}
             </Text>
           </View>
         )}

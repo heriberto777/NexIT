@@ -25,10 +25,15 @@ interface Sucursal {
   nombre: string;
   activos: Activo[];
 }
+interface SistemaSoftware {
+  id: string;
+  nombre: string;
+}
 interface Cliente {
   id: string;
   nombre: string;
   sucursales: Sucursal[];
+  sistemasSoftware: SistemaSoftware[];
 }
 
 interface ContactoInicial {
@@ -46,10 +51,15 @@ const TIPOS = [
   { value: "PREVENTIVO", label: "Preventivo — mantenimiento manual" },
 ] as const;
 
-const CATEGORIAS = [
-  { value: "SOFTWARE", label: "Software / Sistemas" },
+// Solo para la rama "Equipo" — ver mismo comentario en nuevo-ticket-wizard.tsx (portal).
+const TIPOS_EQUIPO = [
   { value: "HARDWARE", label: "Hardware / Equipos" },
   { value: "INFRAESTRUCTURA", label: "Infraestructura / Redes" },
+] as const;
+
+const SISTEMAS_GENERICOS = [
+  { value: "SISTEMA_OPERATIVO", label: "Sistema operativo" },
+  { value: "OFICINA", label: "Suite de oficina (Office, etc.)" },
 ] as const;
 
 const PRIORIDADES = [
@@ -62,7 +72,10 @@ const PRIORIDADES = [
 export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Cliente[]; contactoInicial?: ContactoInicial | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [tipoProblema, setTipoProblema] = useState<"EQUIPO" | "SISTEMA">("EQUIPO");
   const [sinActivo, setSinActivo] = useState(false);
+  const [sistemaSeleccion, setSistemaSeleccion] = useState("");
+  const [sinSistema, setSinSistema] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<ContactoEncontrado[]>([]);
@@ -96,6 +109,53 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
   const sucursalId = watch("sucursalId");
   const sucursalesDelCliente = clientes.find((c) => c.id === clienteId)?.sucursales ?? [];
   const activosDeSucursal = sucursalesDelCliente.find((s) => s.id === sucursalId)?.activos ?? [];
+  const sistemasDelCliente = clientes.find((c) => c.id === clienteId)?.sistemasSoftware ?? [];
+
+  function cambiarTipoProblema(tipo: "EQUIPO" | "SISTEMA") {
+    setTipoProblema(tipo);
+    if (tipo === "EQUIPO") {
+      setValue("sistemaSoftwareId", undefined);
+      setValue("sistemaNoCatalogado", undefined);
+      setSistemaSeleccion("");
+      setSinSistema(false);
+      setValue("categoriaSoporte", "HARDWARE");
+    } else {
+      setValue("activoId", undefined);
+      setValue("ubicacionNoCatalogada", undefined);
+      setSinActivo(false);
+      setValue("categoriaSoporte", "SOFTWARE");
+    }
+  }
+
+  function onSistemaChange(value: string) {
+    setSistemaSeleccion(value);
+    const generico = SISTEMAS_GENERICOS.find((g) => g.value === value);
+    if (generico) {
+      setValue("sistemaSoftwareId", undefined);
+      setValue("sistemaNoCatalogado", generico.label);
+      setValue("categoriaSoporte", "SOFTWARE_SISTEMA");
+    } else if (value) {
+      setValue("sistemaSoftwareId", value);
+      setValue("sistemaNoCatalogado", undefined);
+      setValue("categoriaSoporte", "SOFTWARE_TERCEROS");
+    } else {
+      setValue("sistemaSoftwareId", undefined);
+      setValue("sistemaNoCatalogado", undefined);
+    }
+  }
+
+  function activarSinSistema() {
+    setSinSistema(true);
+    setSistemaSeleccion("");
+    setValue("sistemaSoftwareId", undefined);
+    setValue("sistemaNoCatalogado", "");
+    setValue("categoriaSoporte", "SOFTWARE");
+  }
+
+  function desactivarSinSistema() {
+    setSinSistema(false);
+    setValue("sistemaNoCatalogado", undefined);
+  }
 
   // Cambiar de cliente invalida cualquier contacto ya elegido — buscarlo de nuevo evita
   // enviar un contactoUsuarioId que pertenece a otro cliente.
@@ -267,36 +327,105 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
         {errors.sucursalId && <p className="mt-1 text-xs text-red-600">{errors.sucursalId.message}</p>}
       </div>
 
-      {!sinActivo ? (
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">¿Qué presenta el problema?</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => cambiarTipoProblema("EQUIPO")}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+              tipoProblema === "EQUIPO" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"
+            }`}
+          >
+            Equipo
+          </button>
+          <button
+            type="button"
+            onClick={() => cambiarTipoProblema("SISTEMA")}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+              tipoProblema === "SISTEMA" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"
+            }`}
+          >
+            Sistema
+          </button>
+        </div>
+      </div>
+
+      {tipoProblema === "EQUIPO" ? (
+        !sinActivo ? (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Equipo (opcional)</label>
+            <select {...register("activoId")} disabled={!sucursalId} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50">
+              <option value="">Selecciona un equipo...</option>
+              {activosDeSucursal.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => setSinActivo(true)} className="mt-1 text-xs text-blue-600 underline">
+              No sé cuál es / no está en la lista
+            </button>
+          </div>
+        ) : (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Describe el equipo o la ubicación</label>
+            <input
+              {...register("ubicacionNoCatalogada")}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Ej. Impresora de recepción, 2do piso"
+            />
+            <button type="button" onClick={() => setSinActivo(false)} className="mt-1 text-xs text-blue-600 underline">
+              Mejor elegir de la lista
+            </button>
+          </div>
+        )
+      ) : !sinSistema ? (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Equipo (opcional)</label>
-          <select {...register("activoId")} disabled={!sucursalId} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50">
-            <option value="">Selecciona un equipo...</option>
-            {activosDeSucursal.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label}
-              </option>
-            ))}
+          <label className="mb-1 block text-sm font-medium text-gray-700">Sistema (opcional)</label>
+          <select
+            value={sistemaSeleccion}
+            onChange={(e) => onSistemaChange(e.target.value)}
+            disabled={!clienteId}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+          >
+            <option value="">Selecciona un sistema...</option>
+            {sistemasDelCliente.length > 0 && (
+              <optgroup label="Sistemas del cliente">
+                {sistemasDelCliente.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="General">
+              {SISTEMAS_GENERICOS.map((g) => (
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
+              ))}
+            </optgroup>
           </select>
-          <button type="button" onClick={() => setSinActivo(true)} className="mt-1 text-xs text-blue-600 underline">
+          <button type="button" onClick={activarSinSistema} className="mt-1 text-xs text-blue-600 underline">
             No sé cuál es / no está en la lista
           </button>
         </div>
       ) : (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Describe el equipo o la ubicación</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Describe el sistema</label>
           <input
-            {...register("ubicacionNoCatalogada")}
+            {...register("sistemaNoCatalogado")}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Ej. Impresora de recepción, 2do piso"
+            placeholder="Ej. Sistema de facturación del proveedor X"
           />
-          <button type="button" onClick={() => setSinActivo(false)} className="mt-1 text-xs text-blue-600 underline">
+          <button type="button" onClick={desactivarSinSistema} className="mt-1 text-xs text-blue-600 underline">
             Mejor elegir de la lista
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-3 ${tipoProblema === "EQUIPO" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Tipo</label>
           <select {...register("tipo")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -307,16 +436,18 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
             ))}
           </select>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
-          <select {...register("categoriaSoporte")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-            {CATEGORIAS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {tipoProblema === "EQUIPO" && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
+            <select {...register("categoriaSoporte")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              {TIPOS_EQUIPO.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Prioridad</label>
           <select {...register("prioridad")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">

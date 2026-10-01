@@ -33,6 +33,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       cliente: true,
       sucursal: true,
       activo: { include: { categoria: true } },
+      sistemaSoftware: true,
       tecnicoAsignado: true,
       checklistRespuestas: { include: { checklistItem: true } },
       evidencias: { orderBy: { fechaCarga: "asc" } },
@@ -96,6 +97,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
               numeroSerie: ticket.activo.numeroSerie,
             }
           : null
+      }
+      sistemaSoftware={
+        ticket.sistemaSoftware ? { nombre: ticket.sistemaSoftware.nombre, proveedor: ticket.sistemaSoftware.proveedor } : null
       }
       tecnico={ticket.tecnicoAsignado ? { nombre: ticket.tecnicoAsignado.nombre } : null}
       checklist={checklistOrdenado.map((r) => ({

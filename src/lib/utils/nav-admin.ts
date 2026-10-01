@@ -42,6 +42,7 @@ const NAV_BASE: NavEntryConfig[] = [
     items: [
       { href: "/admin/clientes", label: "Clientes" },
       { href: "/admin/contactos-pendientes", label: "Contactos pendientes" },
+      { href: "/admin/sistemas-software", label: "Sistemas de software" },
     ],
   },
   {

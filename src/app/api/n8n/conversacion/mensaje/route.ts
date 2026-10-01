@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       cliente: {
         include: {
           sucursales: { include: { activos: { include: { categoria: true } } }, orderBy: { nombre: "asc" } },
+          sistemasSoftware: { where: { estado: "ACTIVO" }, orderBy: { nombre: "asc" } },
         },
       },
     },
@@ -89,6 +90,10 @@ export async function POST(request: Request) {
       ciudad: s.ciudad,
       activos: s.activos.map((a) => ({ id: a.id, categoria: a.categoria.nombre, marca: a.marca, modelo: a.modelo })),
     })),
+    // Sistemas/software que el cliente tiene registrado (ver /admin/sistemas-software)
+    // — le da a la IA la misma distinción Equipo/Sistema que ya existe en el wizard web:
+    // un activoId es un equipo físico, un sistemaSoftwareId es un sistema de terceros.
+    sistemasSoftware: usuario.cliente.sistemasSoftware.map((s) => ({ id: s.id, nombre: s.nombre })),
     historial,
   });
 }

@@ -42,6 +42,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
       cliente: true,
       sucursal: true,
       activo: { include: { categoria: true } },
+      sistemaSoftware: true,
       tecnicoAsignado: true,
       creadoPor: true,
       checklistRespuestas: { include: { checklistItem: true } },
@@ -180,6 +181,14 @@ export default async function TicketDetailPage({ params }: PageProps) {
           <p className="text-xs text-gray-500">
             Serie #{ticket.activo.numeroSerie} · {ticket.activo.ubicacionEspecifica ?? "sin ubicación específica"}
           </p>
+        </section>
+      )}
+
+      {ticket.sistemaSoftware && (
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-2 text-sm font-semibold text-gray-900">Sistema</h2>
+          <p className="text-sm text-gray-700">{ticket.sistemaSoftware.nombre}</p>
+          {ticket.sistemaSoftware.proveedor && <p className="text-xs text-gray-500">Proveedor: {ticket.sistemaSoftware.proveedor}</p>}
         </section>
       )}
 

@@ -78,3 +78,18 @@ export const editarActivoSchema = z.object({
   estado: z.enum(["ACTIVO", "EN_MANTENIMIENTO", "FUERA_DE_SERVICIO", "DADO_DE_BAJA"]),
 });
 export type EditarActivoInput = z.infer<typeof editarActivoSchema>;
+
+export const crearSistemaSoftwareSchema = z.object({
+  clienteId: z.string().cuid(),
+  nombre: z.string().trim().min(2, "Mínimo 2 caracteres").max(120),
+  proveedor: z.string().trim().max(120).optional(),
+});
+export type CrearSistemaSoftwareInput = z.infer<typeof crearSistemaSoftwareSchema>;
+
+export const editarSistemaSoftwareSchema = z.object({
+  id: z.string().cuid(),
+  nombre: z.string().trim().min(2, "Mínimo 2 caracteres").max(120),
+  proveedor: z.string().trim().max(120).optional(),
+  estado: z.enum(["ACTIVO", "INACTIVO"]),
+});
+export type EditarSistemaSoftwareInput = z.infer<typeof editarSistemaSoftwareSchema>;

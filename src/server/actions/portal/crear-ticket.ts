@@ -17,8 +17,17 @@ export async function crearTicketPortal(input: CrearTicketPortalInput) {
     throw new Error("Tu usuario no está asociado a ninguna empresa");
   }
 
-  const { sucursalId, activoId, ubicacionNoCatalogada, categoriaSoporte, titulo, descripcion, prioridadPercibida } =
-    crearTicketPortalSchema.parse(input);
+  const {
+    sucursalId,
+    activoId,
+    ubicacionNoCatalogada,
+    sistemaSoftwareId,
+    sistemaNoCatalogado,
+    categoriaSoporte,
+    titulo,
+    descripcion,
+    prioridadPercibida,
+  } = crearTicketPortalSchema.parse(input);
 
   const sucursal = await prisma.sucursal.findUniqueOrThrow({ where: { id: sucursalId } });
   if (sucursal.clienteId !== usuario.clienteId) {
@@ -32,6 +41,13 @@ export async function crearTicketPortal(input: CrearTicketPortalInput) {
     }
   }
 
+  if (sistemaSoftwareId) {
+    const sistema = await prisma.sistemaSoftware.findUniqueOrThrow({ where: { id: sistemaSoftwareId } });
+    if (sistema.clienteId !== usuario.clienteId) {
+      throw new Error("Ese sistema no pertenece a tu empresa");
+    }
+  }
+
   const contrato = await prisma.contrato.findFirst({
     where: { clienteId: usuario.clienteId, estado: "ACTIVO" },
     orderBy: { fechaInicio: "desc" },
@@ -40,9 +56,11 @@ export async function crearTicketPortal(input: CrearTicketPortalInput) {
     ? await prisma.contratoSla.findFirst({ where: { contratoId: contrato.id, prioridad: prioridadPercibida } })
     : null;
 
-  const descripcionFinal = ubicacionNoCatalogada
-    ? `[Equipo/ubicación no catalogada: ${ubicacionNoCatalogada}]\n\n${descripcion}`
-    : descripcion;
+  const notas = [
+    ubicacionNoCatalogada && `[Equipo/ubicación no catalogada: ${ubicacionNoCatalogada}]`,
+    sistemaNoCatalogado && `[Sistema: ${sistemaNoCatalogado}]`,
+  ].filter(Boolean);
+  const descripcionFinal = notas.length ? `${notas.join("\n")}\n\n${descripcion}` : descripcion;
 
   const numeroTicket = await siguienteNumeroTicket();
 
@@ -53,6 +71,7 @@ export async function crearTicketPortal(input: CrearTicketPortalInput) {
         clienteId: usuario.clienteId!,
         sucursalId,
         activoId,
+        sistemaSoftwareId,
         tipo: "CORRECTIVO",
         categoriaSoporte,
         prioridad: prioridadPercibida,

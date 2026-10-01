@@ -45,6 +45,7 @@ export default async function PortalTicketDetailPage({ params }: PageProps) {
     include: {
       sucursal: true,
       activo: { include: { categoria: true } },
+      sistemaSoftware: true,
       evidencias: { orderBy: { fechaCarga: "asc" } },
       firmas: { orderBy: { fecha: "asc" } },
       cotizaciones: { orderBy: { fecha: "desc" } },
@@ -89,6 +90,7 @@ export default async function PortalTicketDetailPage({ params }: PageProps) {
             Equipo: {ticket.activo.categoria.nombre} — {ticket.activo.marca} {ticket.activo.modelo}
           </p>
         )}
+        {ticket.sistemaSoftware && <p className="text-sm text-gray-600">Sistema: {ticket.sistemaSoftware.nombre}</p>}
 
         {ESTADOS_DESCARGABLES.has(ticket.estado) && (
           <a href={`/api/tickets/${ticket.id}/pdf`} className="inline-block text-sm text-blue-600 underline">

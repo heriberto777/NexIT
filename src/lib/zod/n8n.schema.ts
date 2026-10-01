@@ -68,6 +68,13 @@ export const turnoConversacionSchema = z
         prioridad: prioridadSchema.default("MEDIA"),
         sucursalId: optionalCuid(),
         activoId: optionalCuid(),
+        // Mismo par que en el wizard web (ver crearTicketSchema): sistemaSoftwareId
+        // cuando la IA identificó un sistema real del catálogo del cliente (lista que
+        // le llegó en /conversacion/mensaje), sistemaNoCatalogado como nota de texto
+        // libre para "sistema operativo", "Office" o cualquier sistema que el cliente
+        // mencionó pero no está en su catálogo.
+        sistemaSoftwareId: optionalCuid(),
+        sistemaNoCatalogado: z.string().trim().max(200).optional(),
         // Sugerencia breve y segura para el contacto mientras el técnico llega (o null
         // si no hay ninguna sugerencia razonable) — queda guardada en el ticket como
         // contexto para el técnico, nunca visible en el Portal del cliente.

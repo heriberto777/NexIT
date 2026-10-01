@@ -58,7 +58,18 @@ export async function POST(request: Request) {
   if (!usuario.clienteId || !usuario.cliente) {
     return responder({ ok: false, error: "USUARIO_SIN_CLIENTE", mensaje: "Tu usuario no está asociado a ninguna empresa." }, 409);
   }
-  const { titulo, descripcion, tipo, categoriaSoporte, prioridad, sucursalId, activoId, sugerenciaIA } = datosTicket!;
+  const {
+    titulo,
+    descripcion,
+    tipo,
+    categoriaSoporte,
+    prioridad,
+    sucursalId,
+    activoId,
+    sistemaSoftwareId,
+    sistemaNoCatalogado,
+    sugerenciaIA,
+  } = datosTicket!;
 
   const sucursales = await prisma.sucursal.findMany({ where: { clienteId: usuario.clienteId }, orderBy: { nombre: "asc" } });
   let sucursalResuelta = sucursalId ? sucursales.find((s) => s.id === sucursalId) : undefined;
@@ -88,6 +99,13 @@ export async function POST(request: Request) {
     }
   }
 
+  if (sistemaSoftwareId) {
+    const sistema = await prisma.sistemaSoftware.findUnique({ where: { id: sistemaSoftwareId } });
+    if (!sistema || sistema.clienteId !== usuario.clienteId) {
+      return responder({ ok: false, error: "SISTEMA_INVALIDO", mensaje: "Ese sistema no pertenece a tu empresa." }, 422);
+    }
+  }
+
   const contrato = await prisma.contrato.findFirst({
     where: { clienteId: usuario.clienteId, estado: "ACTIVO" },
     orderBy: { fechaInicio: "desc" },
@@ -96,6 +114,8 @@ export async function POST(request: Request) {
 
   const numeroTicket = await siguienteNumeroTicket();
 
+  const notaSistema = sistemaNoCatalogado ? `[Sistema: ${sistemaNoCatalogado}]\n\n` : "";
+
   const ticket = await prisma.$transaction(async (tx) => {
     const nuevo = await tx.ticket.create({
       data: {
@@ -103,12 +123,13 @@ export async function POST(request: Request) {
         clienteId: usuario.clienteId!,
         sucursalId: sucursalResuelta!.id,
         activoId,
+        sistemaSoftwareId,
         tipo,
         categoriaSoporte,
         prioridad,
         estado: "ABIERTO",
         titulo,
-        descripcion: `[Reportado por ${canal === "TELEGRAM" ? "Telegram" : "WhatsApp"} — vía asistente IA conversacional]\n\n${descripcion}`,
+        descripcion: `[Reportado por ${canal === "TELEGRAM" ? "Telegram" : "WhatsApp"} — vía asistente IA conversacional]\n\n${notaSistema}${descripcion}`,
         sugerenciaIA: sugerenciaIA ?? null,
         creadoPorId: usuario.id,
         slaId: sla?.id,

@@ -32,7 +32,10 @@ export default async function NuevoTicketPage({ searchParams }: PageProps) {
       where: { estado: "ACTIVO" },
       // Un activo dado de baja no debería recibir tickets nuevos — pero uno "fuera de
       // servicio" sí (justamente es el estado de algo roto que hay que reportar/arreglar).
-      include: { sucursales: { include: { activos: { where: { estado: { not: "DADO_DE_BAJA" } }, include: { categoria: true } } } } },
+      include: {
+        sucursales: { include: { activos: { where: { estado: { not: "DADO_DE_BAJA" } }, include: { categoria: true } } } },
+        sistemasSoftware: { where: { estado: "ACTIVO" }, orderBy: { nombre: "asc" } },
+      },
       orderBy: { nombre: "asc" },
     }),
     // Solo prellena si sigue PENDIENTE — si ya se convirtió (por otra pestaña, o porque
@@ -63,6 +66,7 @@ export default async function NuevoTicketPage({ searchParams }: PageProps) {
               label: `${a.categoria.nombre} — ${a.marca} ${a.modelo} (${a.numeroSerie})`,
             })),
           })),
+          sistemasSoftware: c.sistemasSoftware.map((s) => ({ id: s.id, nombre: s.nombre })),
         }))}
         contactoInicial={
           contactoPendiente
