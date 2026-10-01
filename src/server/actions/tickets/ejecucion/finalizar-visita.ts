@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { emitirEvento } from "@/server/services/webhook.service";
+import { notificarCambioEstadoCliente } from "@/server/services/notificacion.service";
 import { finalizarVisitaSchema } from "@/lib/zod/evidencia.schema";
 import type { FinalizarVisitaInput } from "@/lib/zod/evidencia.schema";
 
@@ -65,6 +66,15 @@ export async function finalizarVisita(input: FinalizarVisitaInput) {
     reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
     reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
   });
+
+  if (ticket.creadoPor.rol === "CLIENTE") {
+    await notificarCambioEstadoCliente(
+      ticket.creadoPor.id,
+      actualizado,
+      "Visita lista para revisar",
+      "El técnico finalizó la visita — ingresa a revisar el informe y aprobar o rechazar.",
+    );
+  }
 
   return actualizado;
 }

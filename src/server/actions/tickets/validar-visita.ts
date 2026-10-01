@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { emitirEvento } from "@/server/services/webhook.service";
+import { notificarTicketSinAsignar } from "@/server/services/notificacion.service";
 import { validarVisitaSchema } from "@/lib/zod/ticket.schema";
 import type { ValidarVisitaInput } from "@/lib/zod/ticket.schema";
 
@@ -71,6 +72,11 @@ export async function validarVisita(input: ValidarVisitaInput) {
       reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
       reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
     });
+  } else {
+    // REABIERTO: el cliente rechazó el trabajo — necesita reasignación aunque
+    // tecnicoAsignadoId no se haya limpiado, así que entra al mismo tipo de
+    // notificación que un ticket recién creado sin técnico.
+    await notificarTicketSinAsignar(actualizado, comentario ?? "El cliente rechazó la visita — necesita reasignación.");
   }
 
   return { id: actualizado.id, estado: actualizado.estado };

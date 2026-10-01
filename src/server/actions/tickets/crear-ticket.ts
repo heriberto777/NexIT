@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { siguienteNumeroTicket } from "@/server/services/numero-ticket.service";
 import { emitirEvento } from "@/server/services/webhook.service";
+import { notificarTicketSinAsignar } from "@/server/services/notificacion.service";
 import { crearTicketSchema } from "@/lib/zod/ticket.schema";
 import type { CrearTicketInput } from "@/lib/zod/ticket.schema";
 
@@ -169,6 +170,10 @@ export async function crearTicket(input: CrearTicketInput) {
     reportadoPorTelegramChatId: contacto.telegramChatId,
     reportadoPorWhatsapp: contacto.whatsappTelefono,
   });
+
+  // Un ticket creado por teléfono nunca nace asignado — Admin/Coordinador son quienes
+  // le ponen técnico, así que son los destinatarios de esta notificación.
+  await notificarTicketSinAsignar(ticket, titulo);
 
   return { id: ticket.id, numeroTicket: ticket.numeroTicket };
 }

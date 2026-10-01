@@ -65,6 +65,7 @@ export default async function ConfiguracionPage() {
           monedaCodigo: config.monedaCodigo,
           monedaSimbolo: config.monedaSimbolo,
           localeFecha: config.localeFecha,
+          notificacionesIntervaloSegundos: config.notificacionesIntervaloSegundos,
         }}
         categorias={categoriasRaw.map((c) => ({
           id: c.id,

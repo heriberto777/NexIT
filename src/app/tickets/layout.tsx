@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { getSesionActual } from "@/server/auth/session";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { navParaRol } from "@/lib/utils/nav-admin";
 
 const NAV_TECNICO = [
@@ -21,6 +22,7 @@ export default async function TicketsLayout({ children }: { children: ReactNode 
   return (
     <div className="min-h-screen bg-gray-50">
       <MainNav brand="NexIT" brandHref={esTecnico ? "/tickets" : "/admin"} links={nav}>
+        <NotificationBell />
         <LogoutButton />
       </MainNav>
       {children}

@@ -39,5 +39,6 @@ export const guardarParametrosSchema = z.object({
   fotosMinimasEvidencia: z.coerce.number().int().min(0).max(20),
   evidenciaMaxMB: z.coerce.number().int().min(1).max(50),
   diasVentanaProximoPreventivo: z.coerce.number().int().min(0).max(90),
+  notificacionesIntervaloSegundos: z.coerce.number().int().min(10).max(600),
 });
 export type GuardarParametrosInput = z.infer<typeof guardarParametrosSchema>;

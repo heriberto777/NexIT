@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { siguienteNumeroTicket } from "@/server/services/numero-ticket.service";
 import { emitirEvento } from "@/server/services/webhook.service";
+import { notificarTicketSinAsignar } from "@/server/services/notificacion.service";
 import { crearTicketPortalSchema } from "@/lib/zod/portal.schema";
 import type { CrearTicketPortalInput } from "@/lib/zod/portal.schema";
 
@@ -91,6 +92,8 @@ export async function crearTicketPortal(input: CrearTicketPortalInput) {
     reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
     reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
   });
+
+  await notificarTicketSinAsignar(ticket, titulo);
 
   return { id: ticket.id, numeroTicket: ticket.numeroTicket };
 }

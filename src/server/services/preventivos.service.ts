@@ -3,6 +3,7 @@ import type { FrecuenciaMantenimiento } from "@prisma/client";
 import { siguienteNumeroTicket } from "@/server/services/numero-ticket.service";
 import { emitirEvento } from "@/server/services/webhook.service";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { notificarTicketSinAsignar, notificarTecnicoAsignado } from "@/server/services/notificacion.service";
 
 function sumarFrecuencia(fecha: Date, frecuencia: FrecuenciaMantenimiento): Date {
   const resultado = new Date(fecha);
@@ -165,6 +166,9 @@ export async function generarTicketsPreventivos({ diasVentana, usuarioId }: Gene
         reportadoPorTelegramChatId: coordinador.telegramChatId,
         reportadoPorWhatsapp: coordinador.whatsappTelefono,
       });
+      await notificarTecnicoAsignado(ticket, plan.tecnicoAsignado.id, false);
+    } else {
+      await notificarTicketSinAsignar(ticket, ticket.titulo);
     }
 
     generados.push({ id: ticket.id, numeroTicket: ticket.numeroTicket, planTitulo: plan.titulo });

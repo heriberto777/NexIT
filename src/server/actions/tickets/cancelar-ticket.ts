@@ -7,6 +7,7 @@ import type { CancelarTicketInput } from "@/lib/zod/ticket.schema";
 import { ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
 import { emitirEvento } from "@/server/services/webhook.service";
 import { registrarAuditoria } from "@/server/services/auditoria.service";
+import { notificarCambioEstadoCliente } from "@/server/services/notificacion.service";
 
 const ROLES_PERMITIDOS = ["COORDINADOR", "ADMIN"] as const;
 
@@ -66,6 +67,10 @@ export async function cancelarTicket(input: CancelarTicketInput) {
     entidadId: ticketId,
     detalle: `Canceló el ticket ${actualizado.numeroTicket} (estaba en ${ticket.estado}). Motivo: ${motivo}`,
   });
+
+  if (ticket.creadoPor.rol === "CLIENTE") {
+    await notificarCambioEstadoCliente(ticket.creadoPor.id, actualizado, "Ticket cancelado", motivo);
+  }
 
   return { id: actualizado.id, estado: actualizado.estado };
 }

@@ -191,6 +191,12 @@ model ConfiguracionSistema {
   monedaSimbolo String @default("RD$")
   localeFecha   String @default("es-DO")
 
+  // Cada cuántos segundos la campanita de notificaciones (NotificationBell) vuelve a
+  // consultar el servidor mientras la pantalla está abierta — no hay WebSockets en la
+  // app, así que esto es sondeo (polling) puro. Configurable en vez de fijo para poder
+  // ajustar el balance "se siente en vivo" vs "no sobrecargar el servidor" sin tocar código.
+  notificacionesIntervaloSegundos Int @default(30)
+
   actualizadoEn DateTime @updatedAt
 
   @@map("configuracion_sistema")
@@ -262,6 +268,7 @@ model Usuario {
   registrosAuditoria         RegistroAuditoria[]
   conversacionesChat         ConversacionChat[]
   contactosPendientesCreados ContactoPendiente[]
+  notificaciones             Notificacion[]
 
   @@index([clienteId])
   @@map("usuarios")
@@ -444,6 +451,7 @@ model Ticket {
   cotizaciones        Cotizacion[]
   conversacionChat    ConversacionChat?
   contactoPendiente   ContactoPendiente?
+  notificaciones      Notificacion[]
 
   @@index([clienteId, estado])
   @@index([tecnicoAsignadoId, estado])
@@ -698,7 +706,38 @@ model ContactoPendiente {
   fechaCreacion      DateTime                @default(now())
   fechaActualizacion DateTime                @updatedAt
 
+  notificaciones Notificacion[]
+
   @@index([canal, identificador])
   @@index([estado])
   @@map("contactos_pendientes")
+}
+
+enum TipoNotificacion {
+  TICKET_SIN_ASIGNAR
+  TICKET_ASIGNADO
+  CONTACTO_PENDIENTE_NUEVO
+  TICKET_CAMBIO_ESTADO
+}
+
+// Feed de la campanita de notificaciones (NotificationBell) — una fila por
+// destinatario, nunca compartida entre usuarios, para que "leída" sea individual. No
+// reemplaza los webhooks de n8n (correo/Telegram/WhatsApp) ni los sustituye: es el
+// mismo tipo de evento, mostrado también dentro de la propia app.
+model Notificacion {
+  id                  String             @id @default(cuid())
+  usuarioId           String
+  usuario             Usuario            @relation(fields: [usuarioId], references: [id])
+  tipo                TipoNotificacion
+  titulo              String
+  mensaje             String
+  ticketId            String?
+  ticket              Ticket?            @relation(fields: [ticketId], references: [id])
+  contactoPendienteId String?
+  contactoPendiente   ContactoPendiente? @relation(fields: [contactoPendienteId], references: [id])
+  leida               Boolean            @default(false)
+  fechaCreacion       DateTime           @default(now())
+
+  @@index([usuarioId, leida])
+  @@map("notificaciones")
 }

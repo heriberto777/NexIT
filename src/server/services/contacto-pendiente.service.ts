@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { emitirEvento } from "@/server/services/webhook.service";
+import { notificarContactoPendienteNuevo } from "@/server/services/notificacion.service";
 import type { Prisma, ContactoPendiente } from "@prisma/client";
 
 const CAMPOS_ORDEN = ["nombre", "empresaReportada", "telefonoReportado", "correoReportado", "motivo"] as const;
@@ -118,6 +119,8 @@ export async function procesarMensajeContactoPendiente(input: { canal: string; i
     motivo: actualizado.motivo!,
     staffWhatsapp: staff.map((s) => s.whatsappTelefono!).filter(Boolean),
   });
+
+  await notificarContactoPendienteNuevo(actualizado);
 
   return { mensaje: "¡Gracias! Ya registramos tus datos. En breve un representante de nuestro equipo te va a contactar." };
 }

@@ -6,6 +6,7 @@ import { asignarTicketSchema } from "@/lib/zod/ticket.schema";
 import type { AsignarTicketInput } from "@/lib/zod/ticket.schema";
 import { ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
 import { emitirEvento } from "@/server/services/webhook.service";
+import { notificarTecnicoAsignado, notificarCambioEstadoCliente } from "@/server/services/notificacion.service";
 
 const ROLES_PERMITIDOS = ["COORDINADOR", "ADMIN"] as const;
 
@@ -78,6 +79,16 @@ export async function asignarTecnico(input: AsignarTicketInput) {
     reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
     reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
   });
+
+  await notificarTecnicoAsignado(actualizado, tecnicoId, Boolean(ticket.tecnicoAsignadoId));
+  if (ticket.creadoPor.rol === "CLIENTE") {
+    await notificarCambioEstadoCliente(
+      ticket.creadoPor.id,
+      actualizado,
+      "Técnico asignado",
+      `${tecnico.nombre} fue asignado a tu ticket y ya está trabajando en tu solicitud.`,
+    );
+  }
 
   return { id: actualizado.id, estado: actualizado.estado };
 }

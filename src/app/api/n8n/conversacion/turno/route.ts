@@ -4,6 +4,7 @@ import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { turnoConversacionSchema } from "@/lib/zod/n8n.schema";
 import { siguienteNumeroTicket } from "@/server/services/numero-ticket.service";
 import { emitirEvento } from "@/server/services/webhook.service";
+import { notificarTicketSinAsignar } from "@/server/services/notificacion.service";
 
 export const dynamic = "force-dynamic";
 
@@ -144,6 +145,8 @@ export async function POST(request: Request) {
     reportadoPorTelegramChatId: usuario.telegramChatId,
     reportadoPorWhatsapp: usuario.whatsappTelefono,
   });
+
+  await notificarTicketSinAsignar(ticket, titulo);
 
   return responder(
     {

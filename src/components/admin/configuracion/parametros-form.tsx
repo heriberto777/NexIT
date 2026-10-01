@@ -126,6 +126,25 @@ export function ParametrosForm({ valores }: { valores: ParametrosValues }) {
         </div>
       </div>
 
+      <div className="border-t border-gray-100 pt-4">
+        <p className="mb-2 text-sm font-medium text-gray-700">Notificaciones</p>
+        <div className="max-w-xs">
+          <label className="mb-1 block text-xs font-medium text-gray-500">Intervalo de refresco de la campanita (segundos)</label>
+          <input
+            type="number"
+            min={10}
+            max={600}
+            {...register("notificacionesIntervaloSegundos")}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+          {errors.notificacionesIntervaloSegundos && <p className="mt-1 text-xs text-red-600">{errors.notificacionesIntervaloSegundos.message}</p>}
+        </div>
+        <p className="mt-2 text-xs text-gray-400">
+          Cada cuánto vuelve a consultar el servidor mientras la pantalla está abierta, buscando notificaciones nuevas (no hay
+          WebSockets — es sondeo). Un valor más bajo se siente más &quot;en vivo&quot; pero genera más consultas.
+        </p>
+      </div>
+
       <Button type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Guardando..." : "Guardar cambios"}
       </Button>

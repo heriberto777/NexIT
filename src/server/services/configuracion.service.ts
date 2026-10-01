@@ -35,6 +35,7 @@ function defaultsDesdeEnv(): Omit<ConfiguracionSistema, "id" | "actualizadoEn"> 
     fotosMinimasEvidencia: process.env.FOTOS_MINIMAS_EVIDENCIA ? Number(process.env.FOTOS_MINIMAS_EVIDENCIA) : 1,
     evidenciaMaxMB: process.env.EVIDENCIA_MAX_MB ? Number(process.env.EVIDENCIA_MAX_MB) : 8,
     diasVentanaProximoPreventivo: process.env.DIAS_VENTANA_PROXIMO_PREVENTIVO ? Number(process.env.DIAS_VENTANA_PROXIMO_PREVENTIVO) : 7,
+    notificacionesIntervaloSegundos: process.env.NOTIFICACIONES_INTERVALO_SEGUNDOS ? Number(process.env.NOTIFICACIONES_INTERVALO_SEGUNDOS) : 30,
   };
 }
 

@@ -5,6 +5,7 @@ import { getSesionActual } from "@/server/auth/session";
 import { DevUserSwitcher } from "@/components/portal/dev-user-switcher";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 export default async function PortalLayout({ children }: { children: ReactNode }) {
   const sesion = await getSesionActual();
@@ -62,6 +63,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
             emailActual={sesion.email}
           />
         )}
+        <NotificationBell />
         <LogoutButton />
       </MainNav>
       {children}
