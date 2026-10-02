@@ -20,12 +20,12 @@ export default function NuevoClientePage() {
 
   async function onSubmit(values: CrearClienteInput) {
     setError(null);
-    try {
-      const { id } = await crearCliente(values);
-      router.push(`/admin/clientes/${id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await crearCliente(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    router.push(`/admin/clientes/${resultado.data.id}`);
   }
 
   return (

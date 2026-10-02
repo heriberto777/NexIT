@@ -21,14 +21,14 @@ export function NuevaSucursalForm({ clienteId }: { clienteId: string }) {
 
   async function onSubmit(values: CrearSucursalInput) {
     setError(null);
-    try {
-      await crearSucursal(values);
-      reset({ clienteId, nombre: "", direccion: "", ciudad: "", contactoNombre: "", contactoTelefono: "" });
-      setAbierto(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await crearSucursal(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    reset({ clienteId, nombre: "", direccion: "", ciudad: "", contactoNombre: "", contactoTelefono: "" });
+    setAbierto(false);
+    router.refresh();
   }
 
   if (!abierto) {

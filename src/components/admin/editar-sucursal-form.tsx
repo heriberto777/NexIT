@@ -40,13 +40,13 @@ export function EditarSucursalRow({ sucursal }: { sucursal: Sucursal }) {
 
   async function onSubmit(values: EditarSucursalInput) {
     setError(null);
-    try {
-      await editarSucursal(values);
-      setEditando(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await editarSucursal(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setEditando(false);
+    router.refresh();
   }
 
   if (!editando) {

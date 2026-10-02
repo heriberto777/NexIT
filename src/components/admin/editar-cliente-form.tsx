@@ -21,13 +21,13 @@ export function EditarClienteForm({ valores }: { valores: EditarClienteInput }) 
   async function onSubmit(values: EditarClienteInput) {
     setError(null);
     setGuardado(false);
-    try {
-      await editarCliente(values);
-      setGuardado(true);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await editarCliente(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setGuardado(true);
+    router.refresh();
   }
 
   return (

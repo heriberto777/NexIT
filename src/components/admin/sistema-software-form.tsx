@@ -60,16 +60,20 @@ export function SistemaSoftwareForm({ clientes, modoEdicion, valoresIniciales, c
 
   async function onSubmit(values: CrearSistemaSoftwareInput | EditarSistemaSoftwareInput) {
     setError(null);
-    try {
-      if (modoEdicion) {
-        const { id } = await editarSistemaSoftware(values as EditarSistemaSoftwareInput);
-        router.push(`/admin/sistemas-software/${id}`);
-      } else {
-        await crearSistemaSoftware(values as CrearSistemaSoftwareInput);
-        router.push("/admin/sistemas-software");
+    if (modoEdicion) {
+      const resultado = await editarSistemaSoftware(values as EditarSistemaSoftwareInput);
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      router.push(`/admin/sistemas-software/${resultado.data.id}`);
+    } else {
+      const resultado = await crearSistemaSoftware(values as CrearSistemaSoftwareInput);
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
+      }
+      router.push("/admin/sistemas-software");
     }
   }
 
