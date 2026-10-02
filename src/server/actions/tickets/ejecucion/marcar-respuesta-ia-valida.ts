@@ -8,7 +8,10 @@ import { ejecutarAccion, type ActionResult } from "@/server/actions/action-resul
 
 export async function marcarRespuestaIaValida(input: MarcarRespuestaIaValidaInput): Promise<ActionResult<{ ok: true }>> {
   return ejecutarAccion(async () => {
-    const usuario = await requireUsuario("TECNICO");
+    // Sin restricción de rol acá: un Admin/Coordinador puede estar asignado como
+    // "técnico" de este ticket (ver asignar-tecnico.ts) y ejecutar el wizard él mismo —
+    // la propiedad (el chequeo de abajo), no el rol, es lo que habilita cada paso.
+    const usuario = await requireUsuario();
     const { mensajeId } = marcarRespuestaIaValidaSchema.parse(input);
 
     const mensaje = await prisma.mensajeTicketIA.findUniqueOrThrow({

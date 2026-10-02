@@ -17,7 +17,10 @@ export async function iniciarAtencion(
   input: z.infer<typeof iniciarAtencionSchema>,
 ): Promise<ActionResult<Awaited<ReturnType<typeof prisma.ticket.update>>>> {
   return ejecutarAccion(async () => {
-    const usuario = await requireUsuario("TECNICO");
+    // Sin restricción de rol acá: un Admin/Coordinador puede estar asignado como
+    // "técnico" de este ticket (ver asignar-tecnico.ts) y ejecutar el wizard él mismo —
+    // la propiedad (el chequeo de abajo), no el rol, es lo que habilita cada paso.
+    const usuario = await requireUsuario();
     const { ticketId } = iniciarAtencionSchema.parse(input);
 
     const ticket = await prisma.ticket.findUniqueOrThrow({

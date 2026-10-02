@@ -12,7 +12,10 @@ import { ejecutarAccion, type ActionResult } from "@/server/actions/action-resul
 // finalizar-visita.ts salta el mínimo de fotos cuando este flag es true.
 export async function marcarEvidenciaNoAplica(input: MarcarEvidenciaNoAplicaInput): Promise<ActionResult<{ ok: true }>> {
   return ejecutarAccion(async () => {
-    const usuario = await requireUsuario("TECNICO");
+    // Sin restricción de rol acá: un Admin/Coordinador puede estar asignado como
+    // "técnico" de este ticket (ver asignar-tecnico.ts) y ejecutar el wizard él mismo —
+    // la propiedad (el chequeo de abajo), no el rol, es lo que habilita cada paso.
+    const usuario = await requireUsuario();
     const { ticketId, motivo } = marcarEvidenciaNoAplicaSchema.parse(input);
 
     const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });

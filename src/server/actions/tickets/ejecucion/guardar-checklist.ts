@@ -10,7 +10,10 @@ import { ejecutarAccion, type ActionResult } from "@/server/actions/action-resul
 // Se llama una vez por ítem respondido (autoguardado) o en batch al avanzar de paso.
 export async function guardarChecklist(input: GuardarChecklistInput): Promise<ActionResult<{ guardados: number }>> {
   return ejecutarAccion(async () => {
-    const usuario = await requireUsuario("TECNICO");
+    // Sin restricción de rol acá: un Admin/Coordinador puede estar asignado como
+    // "técnico" de este ticket (ver asignar-tecnico.ts) y ejecutar el wizard él mismo —
+    // la propiedad (el chequeo de abajo), no el rol, es lo que habilita cada paso.
+    const usuario = await requireUsuario();
     const { ticketId, respuestas } = guardarChecklistSchema.parse(input);
 
     const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });

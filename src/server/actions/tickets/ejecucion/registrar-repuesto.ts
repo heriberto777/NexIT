@@ -18,7 +18,10 @@ export async function registrarRepuesto(input: RegistrarRepuestoInput): Promise<
   }>
 > {
   return ejecutarAccion(async () => {
-    const usuario = await requireUsuario("TECNICO");
+    // Sin restricción de rol acá: un Admin/Coordinador puede estar asignado como
+    // "técnico" de este ticket (ver asignar-tecnico.ts) y ejecutar el wizard él mismo —
+    // la propiedad (el chequeo de abajo), no el rol, es lo que habilita cada paso.
+    const usuario = await requireUsuario();
     const { ticketId, repuestoId, cantidad } = registrarRepuestoSchema.parse(input);
 
     const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });

@@ -9,7 +9,10 @@ import { ejecutarAccion, type ActionResult } from "@/server/actions/action-resul
 // Paso 1 (continuación): guarda los hallazgos del diagnóstico antes de avanzar al checklist.
 export async function guardarDiagnostico(input: DiagnosticoInput): Promise<ActionResult<{ ok: true }>> {
   return ejecutarAccion(async () => {
-    const usuario = await requireUsuario("TECNICO");
+    // Sin restricción de rol acá: un Admin/Coordinador puede estar asignado como
+    // "técnico" de este ticket (ver asignar-tecnico.ts) y ejecutar el wizard él mismo —
+    // la propiedad (el chequeo de abajo), no el rol, es lo que habilita cada paso.
+    const usuario = await requireUsuario();
     const { ticketId, hallazgos, causaRaizIdentificada } = diagnosticoSchema.parse(input);
 
     const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
