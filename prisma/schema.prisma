@@ -280,7 +280,6 @@ model Usuario {
   rol            RolUsuario
   clienteId      String?
   cliente        Cliente?      @relation(fields: [clienteId], references: [id])
-  especialidad   String?
   estado         EstadoUsuario @default(ACTIVO)
   ultimoAccesoAt DateTime?
 
@@ -312,6 +311,7 @@ model Usuario {
   contactosPendientesCreados ContactoPendiente[]
   notificaciones             Notificacion[]
   verificacionesIdentidad    VerificacionIdentidadChat[]
+  especialidades             UsuarioEspecialidad[]
 
   @@index([clienteId])
   @@map("usuarios")
@@ -359,6 +359,31 @@ model CategoriaActivo {
   checklistTemplates ChecklistTemplate[]
 
   @@map("categorias_activo")
+}
+
+// Catálogo gestionable desde /admin/configuracion ("Especialidades") — reemplaza el
+// viejo Usuario.especialidad de texto libre para que un técnico pueda tener varias, de
+// una lista consistente (evita "Redes"/"redes"/"Red" como 3 cosas distintas).
+model Especialidad {
+  id     String @id @default(cuid())
+  nombre String @unique
+
+  usuarios UsuarioEspecialidad[]
+
+  @@map("especialidades")
+}
+
+// Tabla de unión explícita (no m2m implícito de Prisma) para no depender de que la
+// convención de nombres/columnas que Prisma genera para un m2m implícito coincida con
+// una migración escrita a mano — mismo criterio que TicketRepuesto/MovimientoInventario.
+model UsuarioEspecialidad {
+  usuarioId      String
+  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
+  especialidadId String
+  especialidad   Especialidad @relation(fields: [especialidadId], references: [id])
+
+  @@id([usuarioId, especialidadId])
+  @@map("usuarios_especialidades")
 }
 
 model Activo {

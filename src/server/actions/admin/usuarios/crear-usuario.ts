@@ -15,7 +15,7 @@ export async function crearUsuario(input: CrearUsuarioInput) {
     throw new Error(`Tu rol (${usuario.rol}) no puede crear usuarios`);
   }
 
-  const { nombre, email, rol, password, clienteId, especialidad } = crearUsuarioSchema.parse(input);
+  const { nombre, email, rol, password, clienteId, especialidadIds } = crearUsuarioSchema.parse(input);
 
   const existente = await prisma.usuario.findUnique({ where: { email } });
   if (existente) {
@@ -31,7 +31,10 @@ export async function crearUsuario(input: CrearUsuarioInput) {
       passwordHash,
       rol,
       clienteId: rol === "CLIENTE" ? clienteId : undefined,
-      especialidad: rol === "TECNICO" ? especialidad : undefined,
+      especialidades:
+        rol === "TECNICO" && especialidadIds.length > 0
+          ? { create: especialidadIds.map((especialidadId) => ({ especialidadId })) }
+          : undefined,
     },
   });
 

@@ -50,6 +50,25 @@ export const eliminarCategoriaActivoSchema = z.object({
 });
 export type EliminarCategoriaActivoInput = z.infer<typeof eliminarCategoriaActivoSchema>;
 
+export const crearEspecialidadSchema = z.object({
+  nombre: z.string().trim().min(2, "Mínimo 2 caracteres").max(80),
+});
+export type CrearEspecialidadInput = z.infer<typeof crearEspecialidadSchema>;
+
+// `id` usa .min(1), no .cuid(): las especialidades migradas desde el viejo
+// Usuario.especialidad (texto libre) se crearon con gen_random_uuid() en la migración de
+// datos, no con el cuid() que genera Prisma — un .cuid() estricto las rechazaría.
+export const editarEspecialidadSchema = z.object({
+  id: z.string().min(1),
+  nombre: z.string().trim().min(2, "Mínimo 2 caracteres").max(80),
+});
+export type EditarEspecialidadInput = z.infer<typeof editarEspecialidadSchema>;
+
+export const eliminarEspecialidadSchema = z.object({
+  id: z.string().min(1),
+});
+export type EliminarEspecialidadInput = z.infer<typeof eliminarEspecialidadSchema>;
+
 // fechaInstalacion/fechaFinGarantia viajan como string "YYYY-MM-DD" (input type=date) o
 // vacío/undefined; la conversión a Date ocurre en el Server Action, no aquí, para no
 // pelear con el coerce de Zod sobre strings vacíos.

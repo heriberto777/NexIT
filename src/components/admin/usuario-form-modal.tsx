@@ -10,8 +10,14 @@ import { editarUsuario } from "@/server/actions/admin/usuarios/editar-usuario";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
+import { SelectorEtiquetas } from "@/components/ui/selector-etiquetas";
 
 interface ClienteOpcion {
+  id: string;
+  nombre: string;
+}
+
+interface EspecialidadOpcion {
   id: string;
   nombre: string;
 }
@@ -22,12 +28,20 @@ interface UsuarioExistente {
   email: string;
   rol: "ADMIN" | "COORDINADOR" | "TECNICO" | "CLIENTE";
   clienteId: string | null;
-  especialidad: string | null;
+  especialidadIds: string[];
 }
 
 // Un solo modal para crear y editar: en modo edición no pide contraseña (eso lo
 // resuelve el botón aparte "Resetear contraseña", que genera una temporal).
-export function UsuarioFormModal({ clientes, usuarioExistente }: { clientes: ClienteOpcion[]; usuarioExistente?: UsuarioExistente }) {
+export function UsuarioFormModal({
+  clientes,
+  especialidades,
+  usuarioExistente,
+}: {
+  clientes: ClienteOpcion[];
+  especialidades: EspecialidadOpcion[];
+  usuarioExistente?: UsuarioExistente;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,9 +63,9 @@ export function UsuarioFormModal({ clientes, usuarioExistente }: { clientes: Cli
           email: usuarioExistente.email,
           rol: usuarioExistente.rol,
           clienteId: usuarioExistente.clienteId ?? "",
-          especialidad: usuarioExistente.especialidad ?? "",
+          especialidadIds: usuarioExistente.especialidadIds,
         }
-      : { rol: "TECNICO" },
+      : { rol: "TECNICO", especialidadIds: [] },
   });
 
   const rol = watch("rol");
@@ -125,8 +139,12 @@ export function UsuarioFormModal({ clientes, usuarioExistente }: { clientes: Cli
 
           {rol === "TECNICO" && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Especialidad (opcional)</label>
-              <input {...register("especialidad")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Redes, Electricidad, etc." />
+              <label className="mb-1 block text-sm font-medium text-gray-700">Especialidades (opcional)</label>
+              <SelectorEtiquetas
+                seleccionadas={watch("especialidadIds") ?? []}
+                onChange={(ids) => setValue("especialidadIds", ids, { shouldValidate: true })}
+                opciones={especialidades.map((e) => ({ id: e.id, nombre: e.nombre }))}
+              />
             </div>
           )}
 

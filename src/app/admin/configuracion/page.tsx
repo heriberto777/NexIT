@@ -19,10 +19,14 @@ export default async function ConfiguracionPage() {
 
   const allowDataReset = process.env.ALLOW_DATA_RESET === "true";
 
-  const [config, categoriasRaw, conteoDatosPrueba] = await Promise.all([
+  const [config, categoriasRaw, especialidadesRaw, conteoDatosPrueba] = await Promise.all([
     obtenerConfiguracion(),
     prisma.categoriaActivo.findMany({
       include: { _count: { select: { activos: true, checklistTemplates: true } } },
+      orderBy: { nombre: "asc" },
+    }),
+    prisma.especialidad.findMany({
+      include: { _count: { select: { usuarios: true } } },
       orderBy: { nombre: "asc" },
     }),
     allowDataReset
@@ -88,6 +92,7 @@ export default async function ConfiguracionPage() {
           activos: c._count.activos,
           checklistTemplates: c._count.checklistTemplates,
         }))}
+        especialidades={especialidadesRaw.map((e) => ({ id: e.id, nombre: e.nombre, usuarios: e._count.usuarios }))}
         conteoDatosPrueba={conteoDatosPrueba}
       />
     </div>

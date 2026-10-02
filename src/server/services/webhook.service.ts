@@ -154,7 +154,10 @@ async function enviarWebhook(evento: EventoWebhook): Promise<void> {
   if (!config.webhooksHabilitados || !config.webhookUrl) return;
 
   const { tipo, ...data } = evento;
-  const body = JSON.stringify({ evento: tipo, timestamp: new Date().toISOString(), data });
+  // empresaNombre al nivel raíz (no dentro de `data`) para que cualquier nodo de n8n lo
+  // lea con {{$json.empresaNombre}} sin importar el tipo de evento — así los mensajes de
+  // bienvenida/alertas dejan de tener "NexIT" fijo en el texto cuando se renombra la empresa.
+  const body = JSON.stringify({ evento: tipo, timestamp: new Date().toISOString(), empresaNombre: config.empresaNombre, data });
   const headers = construirHeaders(body, config.webhookSecret);
 
   const res = await postConTimeout(config.webhookUrl, body, headers);

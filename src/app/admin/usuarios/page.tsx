@@ -36,17 +36,18 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
   const estado = estadoUsuarioSchema.safeParse(params.estado).success ? params.estado : undefined;
   const q = params.q?.trim() || undefined;
 
-  const [usuarios, clientes, config] = await Promise.all([
+  const [usuarios, clientes, especialidades, config] = await Promise.all([
     prisma.usuario.findMany({
       where: {
         rol: rol as never,
         estado: estado as never,
         OR: q ? [{ nombre: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] : undefined,
       },
-      include: { cliente: true },
+      include: { cliente: true, especialidades: { include: { especialidad: true } } },
       orderBy: { nombre: "asc" },
     }),
     prisma.cliente.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.especialidad.findMany({ orderBy: { nombre: "asc" } }),
     obtenerConfiguracion(),
   ]);
 
@@ -57,7 +58,10 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
     <div className="mx-auto max-w-5xl space-y-4 px-4 py-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Usuarios</h1>
-        <UsuarioFormModal clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))} />
+        <UsuarioFormModal
+          clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
+          especialidades={especialidades.map((e) => ({ id: e.id, nombre: e.nombre }))}
+        />
       </div>
 
       <form className="flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 bg-white p-3" method="GET">
@@ -134,13 +138,14 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
                   <div className="flex items-center justify-end gap-3">
                     <UsuarioFormModal
                       clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
+                      especialidades={especialidades.map((e) => ({ id: e.id, nombre: e.nombre }))}
                       usuarioExistente={{
                         id: u.id,
                         nombre: u.nombre,
                         email: u.email,
                         rol: u.rol,
                         clienteId: u.clienteId,
-                        especialidad: u.especialidad,
+                        especialidadIds: u.especialidades.map((ue) => ue.especialidadId),
                       }}
                     />
                     <ResetearPasswordButton id={u.id} nombre={u.nombre} />

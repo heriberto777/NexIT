@@ -6,6 +6,7 @@ import { SmtpForm, type SmtpValues } from "@/components/admin/configuracion/smtp
 import { WebhooksForm, type WebhooksValues } from "@/components/admin/configuracion/webhooks-form";
 import { ParametrosForm, type ParametrosValues } from "@/components/admin/configuracion/parametros-form";
 import { CategoriasForm, type CategoriaActivoValue } from "@/components/admin/configuracion/categorias-form";
+import { EspecialidadesForm, type EspecialidadValue } from "@/components/admin/configuracion/especialidades-form";
 import { ZonaPeligroForm, type ConteoDatosPrueba } from "@/components/admin/configuracion/zona-peligro-form";
 
 const TABS_BASE = [
@@ -14,6 +15,7 @@ const TABS_BASE = [
   { id: "webhooks", label: "Integraciones" },
   { id: "parametros", label: "Parámetros y SLA" },
   { id: "categorias", label: "Categorías de activo" },
+  { id: "especialidades", label: "Especialidades" },
 ] as const;
 
 type TabId = (typeof TABS_BASE)[number]["id"] | "zona-peligro";
@@ -25,12 +27,13 @@ interface Props {
   webhooks: WebhooksValues;
   parametros: ParametrosValues;
   categorias: CategoriaActivoValue[];
+  especialidades: EspecialidadValue[];
   // Presente solo cuando ALLOW_DATA_RESET="true" (ver configuracion/page.tsx) — su
   // ausencia es lo que oculta el tab entero, no un simple `if` de estilos.
   conteoDatosPrueba: ConteoDatosPrueba | null;
 }
 
-export function ConfiguracionTabs({ branding, logoUrl, smtp, webhooks, parametros, categorias, conteoDatosPrueba }: Props) {
+export function ConfiguracionTabs({ branding, logoUrl, smtp, webhooks, parametros, categorias, especialidades, conteoDatosPrueba }: Props) {
   const [tab, setTab] = useState<TabId>("branding");
   const tabs = conteoDatosPrueba
     ? [...TABS_BASE, { id: "zona-peligro" as const, label: "Zona de peligro" }]
@@ -64,6 +67,7 @@ export function ConfiguracionTabs({ branding, logoUrl, smtp, webhooks, parametro
       {tab === "webhooks" && <WebhooksForm valores={webhooks} />}
       {tab === "parametros" && <ParametrosForm valores={parametros} />}
       {tab === "categorias" && <CategoriasForm categorias={categorias} />}
+      {tab === "especialidades" && <EspecialidadesForm especialidades={especialidades} />}
       {tab === "zona-peligro" && conteoDatosPrueba && <ZonaPeligroForm conteo={conteoDatosPrueba} />}
     </div>
   );

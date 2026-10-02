@@ -216,8 +216,18 @@ async function main() {
       email: "tecnico@nexit.dev",
       passwordHash: passwordHashDev,
       rol: "TECNICO",
-      especialidad: "Electricidad / UPS",
     },
+  });
+
+  const especialidadElectricidad = await prisma.especialidad.upsert({
+    where: { nombre: "Electricidad / UPS" },
+    update: {},
+    create: { nombre: "Electricidad / UPS" },
+  });
+  await prisma.usuarioEspecialidad.upsert({
+    where: { usuarioId_especialidadId: { usuarioId: tecnico.id, especialidadId: especialidadElectricidad.id } },
+    update: {},
+    create: { usuarioId: tecnico.id, especialidadId: especialidadElectricidad.id },
   });
 
   const coordinador = await prisma.usuario.upsert({

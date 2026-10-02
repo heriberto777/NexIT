@@ -14,22 +14,31 @@ export async function editarUsuario(input: EditarUsuarioInput) {
     throw new Error(`Tu rol (${usuario.rol}) no puede editar usuarios`);
   }
 
-  const { id, nombre, email, rol, clienteId, especialidad } = editarUsuarioSchema.parse(input);
+  const { id, nombre, email, rol, clienteId, especialidadIds } = editarUsuarioSchema.parse(input);
 
   const conFlictoEmail = await prisma.usuario.findFirst({ where: { email, NOT: { id } } });
   if (conFlictoEmail) {
     throw new Error("Ya existe otro usuario con ese correo");
   }
 
-  const actualizado = await prisma.usuario.update({
-    where: { id },
-    data: {
-      nombre,
-      email,
-      rol,
-      clienteId: rol === "CLIENTE" ? clienteId : null,
-      especialidad: rol === "TECNICO" ? especialidad : null,
-    },
+  // deleteMany + create (no un simple `set`, que no existe para una tabla de unión
+  // explícita como UsuarioEspecialidad) — reemplaza el conjunto completo en vez de
+  // intentar diffear cuáles se agregaron/quitaron.
+  const actualizado = await prisma.$transaction(async (tx) => {
+    await tx.usuarioEspecialidad.deleteMany({ where: { usuarioId: id } });
+    return tx.usuario.update({
+      where: { id },
+      data: {
+        nombre,
+        email,
+        rol,
+        clienteId: rol === "CLIENTE" ? clienteId : null,
+        especialidades:
+          rol === "TECNICO" && especialidadIds.length > 0
+            ? { create: especialidadIds.map((especialidadId) => ({ especialidadId })) }
+            : undefined,
+      },
+    });
   });
 
   await registrarAuditoria({

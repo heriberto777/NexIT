@@ -13,7 +13,9 @@ export const crearUsuarioSchema = z
     rol: rolUsuarioSchema,
     password: z.string().min(8, "Mínimo 8 caracteres").max(100),
     clienteId: optionalCuid(),
-    especialidad: z.string().trim().max(120).optional(),
+    // .min(1) y no .cuid(): algunas especialidades vienen de una migración de datos con
+    // id en formato UUID, no el cuid() que genera Prisma (ver admin.schema.ts).
+    especialidadIds: z.array(z.string().min(1)).default([]),
   })
   .refine((data) => (data.rol === "CLIENTE" ? Boolean(data.clienteId) : true), {
     message: "Selecciona la empresa del cliente",
@@ -28,7 +30,7 @@ export const editarUsuarioSchema = z
     email: z.string().trim().email("Correo inválido"),
     rol: rolUsuarioSchema,
     clienteId: optionalCuid(),
-    especialidad: z.string().trim().max(120).optional(),
+    especialidadIds: z.array(z.string().min(1)).default([]),
   })
   .refine((data) => (data.rol === "CLIENTE" ? Boolean(data.clienteId) : true), {
     message: "Selecciona la empresa del cliente",
