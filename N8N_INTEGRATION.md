@@ -1939,6 +1939,14 @@ viejo. Al crear el ticket, la conversación pasa a `CONVERTIDA_A_TICKET` y queda
 vinculada (`ticketId`) — puede usarse a futuro para mostrar la transcripción completa
 en el detalle del ticket.
 
+> **Identificación por correo + código** (`VerificacionIdentidadChat`): algunas cuentas
+> de WhatsApp activan la privacidad de "nombre de usuario" de Meta — en ese caso Twilio
+> ya no manda el teléfono real en `From`, sino un identificador opaco pero estable. Para
+> esos casos (y para cualquiera que tenga cuenta en NexIT pero nunca haya pegado su
+> chat id/teléfono en `/perfil`), `conversacion/mensaje` también prueba
+> `Usuario.whatsappIdentificadorAlterno` antes de dar por no encontrado a alguien — ver
+> `POST /api/n8n/vinculacion-identidad/mensaje` más abajo.
+
 ### c) Endpoints
 
 Ambos protegidos con `WEBHOOK_SECRET`, igual que el resto de `/api/n8n/*`.
@@ -2039,6 +2047,42 @@ siempre el real, nunca algo que el modelo podría llegar a inventar.
 > ejecución del técnico (nunca en `/portal`, para que el cliente no la confunda con un
 > diagnóstico oficial).
 
+**`POST /api/n8n/vinculacion-identidad/mensaje`** — body `{ canal, identificador, texto }`
+
+Se llama **solo** cuando `conversacion/mensaje` (o `tecnico/contexto`, ver §7) respondió
+`encontrado: false` / `autorizado: false`. Es una máquina de estados determinística (sin
+IA), igual de espíritu que `contacto-pendiente/mensaje`:
+
+1. Sin intento en curso → pregunta el correo registrado en NexIT (10 minutos de validez
+   para todo el intercambio).
+2. Ese mensaje es la respuesta de correo → si no pertenece a ningún `Usuario` activo,
+   responde `continuar: true` de inmediato (sin insistir) — **ahí el workflow debe
+   seguir con `contacto-pendiente/mensaje`** (mismo `canal`/`identificador`/`texto`), o
+   con el mensaje original de "no autorizado" en el caso de técnico. Si sí pertenece a
+   alguien, genera un código de 6 dígitos, lo manda por **correo real** (nunca por
+   Telegram/WhatsApp — canal de verificación independiente del canal a vincular) y pide
+   que lo escriba.
+3. Ese mensaje es el código → si coincide, vincula el identificador de ese canal al
+   `Usuario` (`telegramChatId` o `whatsappIdentificadorAlterno` según corresponda) y
+   responde `continuar: false` con un mensaje de éxito. Si no coincide, reintento (3
+   máximo); si vence o se agotan los intentos, hay que volver a escribir el correo.
+
+```json
+// 200 — pidiendo correo (primer mensaje de este intento)
+{ "continuar": false, "mensaje": "Antes de continuar, decime el correo con el que tenés cuenta en NexIT (si no tenés, no te preocupes, seguimos igual).", "canal": "WHATSAPP", "identificador": "DO.1123794910004499", "texto": "Hola" }
+
+// 200 — correo no pertenece a nadie: el workflow debe seguir con contacto-pendiente/mensaje
+{ "continuar": true, "mensaje": "", "canal": "WHATSAPP", "identificador": "DO.1123794910004499", "texto": "no.soy.nadie@ejemplo.com" }
+
+// 200 — vinculado con éxito
+{ "continuar": false, "mensaje": "¡Listo! Ya vinculamos tu cuenta. Contame qué necesitás.", "canal": "WHATSAPP", "identificador": "DO.1123794910004499", "texto": "482913" }
+```
+
+`continuar` es la única señal que le importa a n8n — `true` encadena con
+`contacto-pendiente/mensaje` (o, en el flujo de técnico, muestra de nuevo el mensaje
+original de "no encontramos tu número"); `false` responde `mensaje` tal cual y termina
+el turno, sin tocar ningún otro endpoint.
+
 ### d) El prompt: preguntar, y crear el ticket sin retrasarlo
 
 El nodo "IA: decidir siguiente paso" le manda al modelo el historial completo + las
@@ -2077,8 +2121,10 @@ está pensado como punto de partida, no como texto final.
 ```
 Telegram Trigger ──→ Normalizar Telegram ──┐
                                              ├─→ POST conversacion/mensaje → IF encontrado
-Webhook WhatsApp (Twilio) ──→ Normalizar WhatsApp ─┘                         ├─ false → POST contacto-pendiente/mensaje
-                                                                             │            → Switch por canal → responder
+Webhook WhatsApp (Twilio) ──→ Normalizar WhatsApp ─┘                         ├─ false → POST vinculación identidad → IF continuar
+                                                                             │            ├─ true  → POST contacto-pendiente/mensaje
+                                                                             │            │            → Switch por canal → responder
+                                                                             │            └─ false → Switch por canal → responder
                                                                              └─ true  → IA: decidir siguiente paso
                                                                                           → POST conversacion/turno
                                                                                           → Switch por canal → responder
@@ -2398,8 +2444,58 @@ URL/body del nodo Code si usás otro).
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
-        100
+        1320,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/vinculacion-identidad/mensaje",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
+      },
+      "id": "post-vinculacion-identidad-cliente",
+      "name": "POST vinculación identidad",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.continuar}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-vinculacion-continuar-cliente",
+      "name": "IF vinculación — continuar a contacto pendiente",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        160
       ]
     }
   ],
@@ -2470,7 +2566,7 @@ URL/body del nodo Code si usás otro).
         ],
         [
           {
-            "node": "POST contacto-pendiente",
+            "node": "POST vinculación identidad",
             "type": "main",
             "index": 0
           }
@@ -2527,6 +2623,35 @@ URL/body del nodo Code si usás otro).
           }
         ]
       ]
+    },
+    "POST vinculación identidad": {
+      "main": [
+        [
+          {
+            "node": "IF vinculación — continuar a contacto pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF vinculación — continuar a contacto pendiente": {
+      "main": [
+        [
+          {
+            "node": "POST contacto-pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   }
 }
@@ -2548,10 +2673,20 @@ Los 4 protegidos con `WEBHOOK_SECRET`, igual que el resto de `/api/n8n/*`.
 **`GET /api/n8n/tecnico/contexto?canal=&identificador=&texto=&tieneFoto=&fileId=&mediaUrl=`**
 
 Resuelve la identidad a un `Usuario` con rol `TECNICO` y devuelve sus tickets activos
-(no `RESUELTO`/`CERRADO`/`CANCELADO`). `texto`/`tieneFoto`/`fileId`/`mediaUrl` son puro
-passthrough — el endpoint no los usa, solo los hace viajar de vuelta para que el paso
-de IA los tenga disponibles después de esta llamada (mismo motivo que `texto` en
-`contexto-cliente`: un HTTP Request de n8n reemplaza `$json` con la respuesta).
+(no `RESUELTO`/`CERRADO`/`CANCELADO`). Prueba `whatsappTelefono`/`telegramChatId` y,
+para WhatsApp, también `whatsappIdentificadorAlterno` (ver §6.b — mismo mecanismo de
+privacidad de Meta que afecta al flujo de clientes). `texto`/`tieneFoto`/`fileId`/
+`mediaUrl` son puro passthrough — el endpoint no los usa, solo los hace viajar de
+vuelta para que el paso de IA los tenga disponibles después de esta llamada (mismo
+motivo que `texto` en `contexto-cliente`: un HTTP Request de n8n reemplaza `$json` con
+la respuesta).
+
+Si `autorizado: false`, el workflow debe llamar a
+**`POST /api/n8n/vinculacion-identidad/mensaje`** (mismo endpoint que usa el flujo de
+clientes, ver §6.c) antes de rendirse — si esa llamada responde `continuar: true`
+(el correo que dio no es de nadie), recién ahí se muestra el `mensaje` original de
+"no encontramos tu número". A diferencia del flujo de clientes, acá no hay
+`contacto-pendiente` de respaldo — un técnico no se "da de alta" por chat.
 
 ```json
 {
@@ -2604,7 +2739,10 @@ o crear uno separado si preferís mantenerlos distintos.
 ```
 Telegram Trigger ──→ Normalizar Telegram ──┐
                                              ├─→ GET tecnico/contexto → IF autorizado
-Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘                 ├─ false → Switch por canal → responder
+Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘                 ├─ false → POST vinculación identidad → IF continuar
+                                                                          │            ├─ true  → Restaurar mensaje no autorizado
+                                                                          │            │            → Switch por canal → responder
+                                                                          │            └─ false → Switch por canal → responder
                                                                           └─ true  → IA: interpretar mensaje
                                                                                        (clasifica intención y, si
                                                                                        tieneFoto=true, descarga y
@@ -2633,31 +2771,75 @@ dentro de un Code node de n8n).
   "name": "NexIT - Técnico seguimiento de tickets",
   "nodes": [
     {
-      "parameters": { "updates": ["message"] },
+      "parameters": {
+        "updates": [
+          "message"
+        ]
+      },
       "id": "telegram-trigger-tecnico",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [0, -160],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        0,
+        -160
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
-      "parameters": { "httpMethod": "POST", "path": "nexit-tecnico-whatsapp-in", "responseMode": "onReceived" },
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nexit-tecnico-whatsapp-in",
+        "responseMode": "onReceived"
+      },
       "id": "webhook-whatsapp-tecnico",
       "name": "Webhook WhatsApp (Twilio)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 160]
+      "position": [
+        0,
+        160
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "1", "name": "canal", "value": "TELEGRAM", "type": "string" },
-            { "id": "2", "name": "identificador", "value": "={{ $json.message.chat.id }}", "type": "string" },
-            { "id": "3", "name": "texto", "value": "={{ $json.message.text || $json.message.caption || '' }}", "type": "string" },
-            { "id": "4", "name": "tieneFoto", "value": "={{ $json.message.photo ? 'true' : 'false' }}", "type": "string" },
-            { "id": "5", "name": "fileId", "value": "={{ $json.message.photo ? $json.message.photo[$json.message.photo.length - 1].file_id : '' }}", "type": "string" }
+            {
+              "id": "1",
+              "name": "canal",
+              "value": "TELEGRAM",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "identificador",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "texto",
+              "value": "={{ $json.message.text || $json.message.caption || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tieneFoto",
+              "value": "={{ $json.message.photo ? 'true' : 'false' }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "fileId",
+              "value": "={{ $json.message.photo ? $json.message.photo[$json.message.photo.length - 1].file_id : '' }}",
+              "type": "string"
+            }
           ]
         }
       },
@@ -2665,17 +2847,45 @@ dentro de un Code node de n8n).
       "name": "Normalizar Telegram",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, -160]
+      "position": [
+        220,
+        -160
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "1", "name": "canal", "value": "WHATSAPP", "type": "string" },
-            { "id": "2", "name": "identificador", "value": "={{ $json.body.From.replace('whatsapp:', '') }}", "type": "string" },
-            { "id": "3", "name": "texto", "value": "={{ $json.body.Body || '' }}", "type": "string" },
-            { "id": "4", "name": "tieneFoto", "value": "={{ $json.body.NumMedia && $json.body.NumMedia !== '0' ? 'true' : 'false' }}", "type": "string" },
-            { "id": "5", "name": "mediaUrl", "value": "={{ $json.body.MediaUrl0 || '' }}", "type": "string" }
+            {
+              "id": "1",
+              "name": "canal",
+              "value": "WHATSAPP",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "identificador",
+              "value": "={{ $json.body.From.replace('whatsapp:', '') }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "texto",
+              "value": "={{ $json.body.Body || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tieneFoto",
+              "value": "={{ $json.body.NumMedia && $json.body.NumMedia !== '0' ? 'true' : 'false' }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "mediaUrl",
+              "value": "={{ $json.body.MediaUrl0 || '' }}",
+              "type": "string"
+            }
           ]
         }
       },
@@ -2683,7 +2893,10 @@ dentro de un Code node de n8n).
       "name": "Normalizar WhatsApp",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, 160]
+      "position": [
+        220,
+        160
+      ]
     },
     {
       "parameters": {
@@ -2692,32 +2905,74 @@ dentro de un Code node de n8n).
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "canal", "value": "={{ $json.canal }}" },
-            { "name": "identificador", "value": "={{ $json.identificador }}" },
-            { "name": "texto", "value": "={{ $json.texto }}" },
-            { "name": "tieneFoto", "value": "={{ $json.tieneFoto }}" },
-            { "name": "fileId", "value": "={{ $json.fileId || '' }}" },
-            { "name": "mediaUrl", "value": "={{ $json.mediaUrl || '' }}" }
+            {
+              "name": "canal",
+              "value": "={{ $json.canal }}"
+            },
+            {
+              "name": "identificador",
+              "value": "={{ $json.identificador }}"
+            },
+            {
+              "name": "texto",
+              "value": "={{ $json.texto }}"
+            },
+            {
+              "name": "tieneFoto",
+              "value": "={{ $json.tieneFoto }}"
+            },
+            {
+              "name": "fileId",
+              "value": "={{ $json.fileId || '' }}"
+            },
+            {
+              "name": "mediaUrl",
+              "value": "={{ $json.mediaUrl || '' }}"
+            }
           ]
         },
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        }
       },
       "id": "contexto-tecnico",
       "name": "Contexto técnico",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.autorizado}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.autorizado}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
       },
       "id": "if-autorizado-tecnico",
       "name": "IF autorizado",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -2727,16 +2982,71 @@ dentro de un Code node de n8n).
       "name": "IA: interpretar mensaje",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, -100]
+      "position": [
+        880,
+        -100
+      ]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.intencion}}", "rightValue": "LISTAR", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.intencion}}", "rightValue": "CHECKIN", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.intencion}}", "rightValue": "NOTA", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.intencion}}", "rightValue": "EVIDENCIA", "operator": { "type": "string", "operation": "equals" } }] } }
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.intencion}}",
+                    "rightValue": "LISTAR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.intencion}}",
+                    "rightValue": "CHECKIN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.intencion}}",
+                    "rightValue": "NOTA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.intencion}}",
+                    "rightValue": "EVIDENCIA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
           ]
         },
         "fallbackOutput": "extra"
@@ -2745,7 +3055,10 @@ dentro de un Code node de n8n).
       "name": "Switch por intención",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [1100, -100]
+      "position": [
+        1100,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -2755,14 +3068,24 @@ dentro de un Code node de n8n).
       "name": "Formatear lista de tickets",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, -280]
+      "position": [
+        1320,
+        -280
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://nexit.tuempresa.com/api/n8n/tecnico/checkin",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, numeroTicket: $json.numeroTicket }) }}"
@@ -2771,14 +3094,24 @@ dentro de un Code node de n8n).
       "name": "POST check-in",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, -100]
+      "position": [
+        1320,
+        -100
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://nexit.tuempresa.com/api/n8n/tecnico/nota",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, numeroTicket: $json.numeroTicket, comentario: $json.comentario }) }}"
@@ -2787,14 +3120,24 @@ dentro de un Code node de n8n).
       "name": "POST nota",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 60]
+      "position": [
+        1320,
+        60
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://nexit.tuempresa.com/api/n8n/tecnico/evidencia",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, numeroTicket: $json.numeroTicket, imagenBase64: $json.imagenBase64, contentType: $json.contentType }) }}"
@@ -2803,14 +3146,27 @@ dentro de un Code node de n8n).
       "name": "POST evidencia",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 220]
+      "position": [
+        1320,
+        220
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "1", "name": "canal", "value": "={{ $json.canal }}", "type": "string" },
-            { "id": "2", "name": "identificador", "value": "={{ $json.identificador }}", "type": "string" },
+            {
+              "id": "1",
+              "name": "canal",
+              "value": "={{ $json.canal }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "identificador",
+              "value": "={{ $json.identificador }}",
+              "type": "string"
+            },
             {
               "id": "3",
               "name": "mensaje",
@@ -2824,14 +3180,43 @@ dentro de un Code node de n8n).
       "name": "Mensaje: no entendido",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [1320, 380]
+      "position": [
+        1320,
+        380
+      ]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "TELEGRAM", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "WHATSAPP", "operator": { "type": "string", "operation": "equals" } }] } }
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.canal}}",
+                    "rightValue": "TELEGRAM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.canal}}",
+                    "rightValue": "WHATSAPP",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
           ]
         }
       },
@@ -2839,58 +3224,360 @@ dentro de un Code node de n8n).
       "name": "Switch por canal",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [1560, 0]
+      "position": [
+        1560,
+        0
+      ]
     },
     {
-      "parameters": { "chatId": "={{ $json.identificador }}", "text": "={{ $json.mensaje }}" },
+      "parameters": {
+        "chatId": "={{ $json.identificador }}",
+        "text": "={{ $json.mensaje }}"
+      },
       "id": "telegram-responder-tecnico",
       "name": "Telegram - Responder",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1780, -100],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        1780,
+        -100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
-      "parameters": { "from": "whatsapp:+14155238886", "to": "=whatsapp:{{ $json.identificador }}", "message": "={{ $json.mensaje }}" },
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{ $json.identificador }}",
+        "message": "={{ $json.mensaje }}"
+      },
       "id": "twilio-responder-tecnico",
       "name": "Twilio - Responder",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [1780, 100],
-      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+      "position": [
+        1780,
+        100
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/vinculacion-identidad/mensaje",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
+      },
+      "id": "post-vinculacion-identidad-tecnico",
+      "name": "POST vinculación identidad",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.continuar}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-vinculacion-continuar-tecnico",
+      "name": "IF vinculación — continuar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "mensaje",
+              "value": "={{ $('Contexto técnico').item.json.mensaje }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-mensaje-no-autorizado-tecnico",
+      "name": "Restaurar mensaje no autorizado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1320,
+        300
+      ]
     }
   ],
   "connections": {
-    "Telegram Trigger": { "main": [[{ "node": "Normalizar Telegram", "type": "main", "index": 0 }]] },
-    "Webhook WhatsApp (Twilio)": { "main": [[{ "node": "Normalizar WhatsApp", "type": "main", "index": 0 }]] },
-    "Normalizar Telegram": { "main": [[{ "node": "Contexto técnico", "type": "main", "index": 0 }]] },
-    "Normalizar WhatsApp": { "main": [[{ "node": "Contexto técnico", "type": "main", "index": 0 }]] },
-    "Contexto técnico": { "main": [[{ "node": "IF autorizado", "type": "main", "index": 0 }]] },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook WhatsApp (Twilio)": {
+      "main": [
+        [
+          {
+            "node": "Normalizar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Telegram": {
+      "main": [
+        [
+          {
+            "node": "Contexto técnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Contexto técnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexto técnico": {
+      "main": [
+        [
+          {
+            "node": "IF autorizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "IF autorizado": {
       "main": [
-        [{ "node": "IA: interpretar mensaje", "type": "main", "index": 0 }],
-        [{ "node": "Switch por canal", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "IA: interpretar mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST vinculación identidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "IA: interpretar mensaje": { "main": [[{ "node": "Switch por intención", "type": "main", "index": 0 }]] },
+    "IA: interpretar mensaje": {
+      "main": [
+        [
+          {
+            "node": "Switch por intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Switch por intención": {
       "main": [
-        [{ "node": "Formatear lista de tickets", "type": "main", "index": 0 }],
-        [{ "node": "POST check-in", "type": "main", "index": 0 }],
-        [{ "node": "POST nota", "type": "main", "index": 0 }],
-        [{ "node": "POST evidencia", "type": "main", "index": 0 }],
-        [{ "node": "Mensaje: no entendido", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Formatear lista de tickets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST check-in",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST nota",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST evidencia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje: no entendido",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Formatear lista de tickets": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
-    "POST check-in": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
-    "POST nota": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
-    "POST evidencia": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
-    "Mensaje: no entendido": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "Formatear lista de tickets": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST check-in": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST nota": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST evidencia": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje: no entendido": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Switch por canal": {
       "main": [
-        [{ "node": "Telegram - Responder", "type": "main", "index": 0 }],
-        [{ "node": "Twilio - Responder", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Telegram - Responder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Twilio - Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST vinculación identidad": {
+      "main": [
+        [
+          {
+            "node": "IF vinculación — continuar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF vinculación — continuar": {
+      "main": [
+        [
+          {
+            "node": "Restaurar mensaje no autorizado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restaurar mensaje no autorizado": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   }

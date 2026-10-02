@@ -3,6 +3,7 @@ import type { EstadoTicket } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { contextoTecnicoSchema } from "@/lib/zod/n8n.schema";
+import { resolverUsuarioPorChatId } from "@/server/services/vinculacion-identidad.service";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +34,10 @@ export async function GET(request: Request) {
   const responder = (body: Record<string, unknown>) =>
     NextResponse.json({ ...body, canal, identificador, texto, tieneFoto, fileId, mediaUrl });
 
-  const usuario = await prisma.usuario.findUnique({
-    where: canal === "TELEGRAM" ? { telegramChatId: identificador } : { whatsappTelefono: identificador },
-  });
+  // Para WhatsApp, también prueba whatsappIdentificadorAlterno (cuentas con la
+  // privacidad de "nombre de usuario" de Meta activada — ver
+  // vinculacion-identidad.service.ts).
+  const usuario = await resolverUsuarioPorChatId(canal, identificador);
 
   if (!usuario || usuario.rol !== "TECNICO" || usuario.estado !== "ACTIVO") {
     return responder({

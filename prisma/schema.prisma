@@ -289,6 +289,15 @@ model Usuario {
   // a un Usuario/Cliente de NexIT.
   telegramChatId   String? @unique
   whatsappTelefono String? @unique
+  // Algunos usuarios de WhatsApp activan la privacidad de "nombre de usuario" de Meta:
+  // Twilio deja de mandar el teléfono real en el webhook y en su lugar manda un
+  // identificador opaco estable (ver conversación de diseño) — se guarda acá, nunca en
+  // whatsappTelefono, para no mezclar un teléfono real con algo que no lo es. Se llena
+  // solo mediante el código de verificación por correo (vinculacion-identidad.service.ts).
+  whatsappIdentificadorAlterno String? @unique
+  // Puramente informativo (el @usuario de WhatsApp que esa persona eligió) — nunca se
+  // usa para buscar/matchear, solo ayuda a un humano a reconocer de quién se trata.
+  whatsappUsername             String?
 
   ticketsCreados             Ticket[]                      @relation("TicketCreador")
   ticketsAsignados           Ticket[]                      @relation("TicketTecnico")
@@ -302,6 +311,7 @@ model Usuario {
   conversacionesChat         ConversacionChat[]
   contactosPendientesCreados ContactoPendiente[]
   notificaciones             Notificacion[]
+  verificacionesIdentidad    VerificacionIdentidadChat[]
 
   @@index([clienteId])
   @@map("usuarios")
@@ -746,6 +756,26 @@ model ContactoPendiente {
   @@index([canal, identificador])
   @@index([estado])
   @@map("contactos_pendientes")
+}
+
+// Vinculación de identidad vía chat (ver vinculacion-identidad.service.ts): cuando
+// alguien escribe y no matchea por whatsappTelefono/telegramChatId/
+// whatsappIdentificadorAlterno, se le pide su correo y se le manda un código de un solo
+// uso por email — si lo confirma, se vincula el identificador de ESE canal al Usuario
+// correspondiente. Fila efímera: se borra apenas se resuelve (vinculado, vencido,
+// demasiados intentos fallidos, o el correo no pertenece a nadie).
+model VerificacionIdentidadChat {
+  id            String   @id @default(cuid())
+  canal         String
+  identificador String
+  usuarioId     String?
+  usuario       Usuario? @relation(fields: [usuarioId], references: [id])
+  codigo        String?
+  intentos      Int      @default(0)
+  expiraEn      DateTime
+
+  @@index([canal, identificador])
+  @@map("verificaciones_identidad_chat")
 }
 
 enum TipoNotificacion {

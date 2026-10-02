@@ -6,6 +6,24 @@ export interface ResultadoPruebaSmtp {
   mensaje: string;
 }
 
+// Lanza si no se pudo enviar — a diferencia de probarEnvioSmtp, el caller (vinculación
+// de identidad por chat) necesita saber con certeza si el código salió o no, para no
+// decirle a alguien "te lo mandamos" cuando en realidad SMTP no está configurado.
+export async function enviarCodigoVinculacionChat(usuario: { email: string; nombre: string }, codigo: string): Promise<void> {
+  const config = await obtenerConfiguracion();
+  const transporte = construirTransporte(config);
+  if (!transporte || !config.smtpFromEmail) {
+    throw new Error("SMTP no configurado");
+  }
+
+  await transporte.sendMail({
+    from: config.smtpFromName ? `"${config.smtpFromName}" <${config.smtpFromEmail}>` : config.smtpFromEmail,
+    to: usuario.email,
+    subject: `Tu código de verificación — ${config.empresaNombre}`,
+    text: `Hola ${usuario.nombre},\n\nTu código para vincular tu chat de Telegram/WhatsApp con NexIT es: ${codigo}\n\nVence en 10 minutos. Si no lo pediste vos, ignorá este correo.`,
+  });
+}
+
 function construirTransporte(config: {
   smtpHost: string | null;
   smtpPort: number | null;

@@ -301,8 +301,58 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
-        100
+        1320,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/vinculacion-identidad/mensaje",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
+      },
+      "id": "post-vinculacion-identidad-cliente",
+      "name": "POST vinculación identidad",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.continuar}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-vinculacion-continuar-cliente",
+      "name": "IF vinculación — continuar a contacto pendiente",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        160
       ]
     }
   ],
@@ -373,7 +423,7 @@
         ],
         [
           {
-            "node": "POST contacto-pendiente",
+            "node": "POST vinculación identidad",
             "type": "main",
             "index": 0
           }
@@ -422,6 +472,35 @@
     },
     "POST contacto-pendiente": {
       "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST vinculación identidad": {
+      "main": [
+        [
+          {
+            "node": "IF vinculación — continuar a contacto pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF vinculación — continuar a contacto pendiente": {
+      "main": [
+        [
+          {
+            "node": "POST contacto-pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Switch por canal",

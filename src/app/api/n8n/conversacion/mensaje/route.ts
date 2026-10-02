@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { mensajeConversacionSchema } from "@/lib/zod/n8n.schema";
+import { resolverUsuarioPorChatId } from "@/server/services/vinculacion-identidad.service";
 
 export const dynamic = "force-dynamic";
 
@@ -27,27 +28,36 @@ export async function POST(request: Request) {
   const { canal, identificador, texto } = parsed.data;
   const responder = (body: Record<string, unknown>) => NextResponse.json({ ...body, canal, identificador });
 
-  const usuario = await prisma.usuario.findUnique({
-    where: canal === "TELEGRAM" ? { telegramChatId: identificador } : { whatsappTelefono: identificador },
-    include: {
-      cliente: {
+  // Prueba whatsappTelefono/telegramChatId y, para WhatsApp, también
+  // whatsappIdentificadorAlterno (cuentas con la privacidad de "nombre de usuario" de
+  // Meta activada — ver vinculacion-identidad.service.ts). Segunda consulta con
+  // `include` solo si la primera encontró algo, para no pedir ese árbol completo en el
+  // caso — más frecuente — de no encontrar nada.
+  const usuarioBase = await resolverUsuarioPorChatId(canal, identificador);
+  const usuario = usuarioBase
+    ? await prisma.usuario.findUnique({
+        where: { id: usuarioBase.id },
         include: {
-          sucursales: { include: { activos: { include: { categoria: true } } }, orderBy: { nombre: "asc" } },
-          sistemasSoftware: { where: { estado: "ACTIVO" }, orderBy: { nombre: "asc" } },
+          cliente: {
+            include: {
+              sucursales: { include: { activos: { include: { categoria: true } } }, orderBy: { nombre: "asc" } },
+              sistemasSoftware: { where: { estado: "ACTIVO" }, orderBy: { nombre: "asc" } },
+            },
+          },
         },
-      },
-    },
-  });
+      })
+    : null;
 
   if (!usuario || usuario.rol !== "CLIENTE" || !usuario.cliente || usuario.estado !== "ACTIVO") {
     // No hay con qué cliente/sede asociarlo de forma segura — en vez de que la IA
     // intente adivinar o listarle todos los clientes al que escribe, el workflow de
-    // n8n debe llamar a POST /contacto-pendiente/mensaje para recolectar los datos
-    // básicos (nombre, empresa, teléfono, correo, motivo) antes de avisarle a un
-    // Coordinador (ver contacto-pendiente.service.ts). `texto` viaja de vuelta en la
-    // respuesta (mismo motivo que en contextoTecnicoSchema): ese próximo paso del
-    // workflow ya no tiene el mensaje original disponible, porque esta misma llamada
-    // pisó $json.
+    // n8n debe llamar a POST /vinculacion-identidad/mensaje primero (le pide su correo
+    // y, si corresponde, lo vincula con un código) y, si eso tampoco resuelve a nadie,
+    // recién ahí a POST /contacto-pendiente/mensaje para recolectar los datos básicos
+    // (nombre, empresa, teléfono, correo, motivo) antes de avisarle a un Coordinador
+    // (ver contacto-pendiente.service.ts). `texto` viaja de vuelta en la respuesta
+    // (mismo motivo que en contextoTecnicoSchema): ese próximo paso del workflow ya no
+    // tiene el mensaje original disponible, porque esta misma llamada pisó $json.
     return responder({ encontrado: false, texto });
   }
 
