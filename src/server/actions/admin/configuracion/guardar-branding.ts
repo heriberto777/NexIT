@@ -6,54 +6,59 @@ import { storageService } from "@/server/services/storage.service";
 import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { guardarBrandingSchema } from "@/lib/zod/configuracion.schema";
 import type { GuardarBrandingInput } from "@/lib/zod/configuracion.schema";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["ADMIN"] as const;
 
-export async function guardarBranding(input: GuardarBrandingInput) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede modificar la configuración`);
-  }
+export async function guardarBranding(input: GuardarBrandingInput): Promise<ActionResult<{ ok: true }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede modificar la configuración`);
+    }
 
-  const { empresaNombre, empresaRnc, empresaTelefono, empresaEmail, empresaDireccion } = guardarBrandingSchema.parse(input);
+    const { empresaNombre, empresaRnc, empresaTelefono, empresaEmail, empresaDireccion } = guardarBrandingSchema.parse(input);
 
-  await actualizarConfiguracion({
-    empresaNombre,
-    empresaRnc: empresaRnc || null,
-    empresaTelefono: empresaTelefono || null,
-    empresaEmail: empresaEmail || null,
-    empresaDireccion: empresaDireccion || null,
+    await actualizarConfiguracion({
+      empresaNombre,
+      empresaRnc: empresaRnc || null,
+      empresaTelefono: empresaTelefono || null,
+      empresaEmail: empresaEmail || null,
+      empresaDireccion: empresaDireccion || null,
+    });
+
+    await registrarAuditoria({ usuario, accion: "configuracion.branding", entidad: "ConfiguracionSistema" });
+
+    return { ok: true };
   });
-
-  await registrarAuditoria({ usuario, accion: "configuracion.branding", entidad: "ConfiguracionSistema" });
-
-  return { ok: true };
 }
 
 // Acción aparte del formulario principal: el logo se sube apenas se elige el archivo
 // (como las evidencias del wizard), no al enviar el resto del formulario de branding.
-export async function subirLogoEmpresa(formData: FormData) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede modificar la configuración`);
-  }
+export async function subirLogoEmpresa(formData: FormData): Promise<ActionResult<{ url: string }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede modificar la configuración`);
+    }
 
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    throw new Error("Archivo no recibido");
-  }
-  if (!file.type.startsWith("image/")) {
-    throw new Error("El logo debe ser una imagen");
-  }
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+      throw new Error("Archivo no recibido");
+    }
+    if (!file.type.startsWith("image/")) {
+      throw new Error("El logo debe ser una imagen");
+    }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const { key, url } = await storageService.upload({
-    buffer,
-    contentType: file.type,
-    pathPrefix: "configuracion/logo",
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const { key, url } = await storageService.upload({
+      buffer,
+      contentType: file.type,
+      pathPrefix: "configuracion/logo",
+    });
+
+    await actualizarConfiguracion({ empresaLogoUrl: key });
+
+    return { url };
   });
-
-  await actualizarConfiguracion({ empresaLogoUrl: key });
-
-  return { url };
 }

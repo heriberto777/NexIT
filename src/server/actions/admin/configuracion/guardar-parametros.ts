@@ -5,19 +5,22 @@ import { actualizarConfiguracion } from "@/server/services/configuracion.service
 import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { guardarParametrosSchema } from "@/lib/zod/configuracion.schema";
 import type { GuardarParametrosInput } from "@/lib/zod/configuracion.schema";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["ADMIN"] as const;
 
-export async function guardarParametros(input: GuardarParametrosInput) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede modificar la configuración`);
-  }
+export async function guardarParametros(input: GuardarParametrosInput): Promise<ActionResult<{ ok: true }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede modificar la configuración`);
+    }
 
-  const data = guardarParametrosSchema.parse(input);
-  await actualizarConfiguracion(data);
+    const data = guardarParametrosSchema.parse(input);
+    await actualizarConfiguracion(data);
 
-  await registrarAuditoria({ usuario, accion: "configuracion.parametros", entidad: "ConfiguracionSistema" });
+    await registrarAuditoria({ usuario, accion: "configuracion.parametros", entidad: "ConfiguracionSistema" });
 
-  return { ok: true };
+    return { ok: true };
+  });
 }

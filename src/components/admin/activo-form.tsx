@@ -63,16 +63,20 @@ export function ActivoForm({ sucursales, categorias: categoriasIniciales, modoEd
 
   async function onSubmit(values: CrearActivoInput | EditarActivoInput) {
     setError(null);
-    try {
-      if (modoEdicion) {
-        const { id } = await editarActivo(values as EditarActivoInput);
-        router.push(`/admin/activos/${id}`);
-      } else {
-        const { id } = await crearActivo(values as CrearActivoInput);
-        router.push(`/admin/activos?nuevo=${id}`);
+    if (modoEdicion) {
+      const resultado = await editarActivo(values as EditarActivoInput);
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      router.push(`/admin/activos/${resultado.data.id}`);
+    } else {
+      const resultado = await crearActivo(values as CrearActivoInput);
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
+      }
+      router.push(`/admin/activos?nuevo=${resultado.data.id}`);
     }
   }
 
@@ -84,17 +88,17 @@ export function ActivoForm({ sucursales, categorias: categoriasIniciales, modoEd
     }
     setCreandoCategoria(true);
     setError(null);
-    try {
-      const categoria = await crearCategoriaActivo(parsed.data);
-      setCategorias((prev) => [...prev, { id: categoria.id, nombre: categoria.nombre, checklist: null }]);
-      setValue("categoriaId", categoria.id);
-      setNuevaCategoriaNombre("");
-      setNuevaCategoriaAbierta(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear la categoría");
-    } finally {
-      setCreandoCategoria(false);
+    const resultado = await crearCategoriaActivo(parsed.data);
+    setCreandoCategoria(false);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    const categoria = resultado.data;
+    setCategorias((prev) => [...prev, { id: categoria.id, nombre: categoria.nombre, checklist: null }]);
+    setValue("categoriaId", categoria.id);
+    setNuevaCategoriaNombre("");
+    setNuevaCategoriaAbierta(false);
   }
 
   return (

@@ -5,26 +5,29 @@ import { requireUsuario } from "@/server/auth/session";
 import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { editarCategoriaActivoSchema } from "@/lib/zod/admin.schema";
 import type { EditarCategoriaActivoInput } from "@/lib/zod/admin.schema";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["COORDINADOR", "ADMIN"] as const;
 
-export async function editarCategoriaActivo(input: EditarCategoriaActivoInput) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede editar categorías de activo`);
-  }
-
-  const { id, nombre } = editarCategoriaActivoSchema.parse(input);
-
-  try {
-    const categoria = await prisma.categoriaActivo.update({ where: { id }, data: { nombre } });
-    await registrarAuditoria({ usuario, accion: "categoria_activo.editar", entidad: "CategoriaActivo", entidadId: id, detalle: `Renombró a "${nombre}"` });
-    return { id: categoria.id, nombre: categoria.nombre };
-  } catch (error) {
-    // P2002: violación de @unique en `nombre` — ya existe otra categoría con ese nombre.
-    if (error instanceof Object && "code" in error && error.code === "P2002") {
-      throw new Error(`Ya existe una categoría llamada "${nombre}"`);
+export async function editarCategoriaActivo(input: EditarCategoriaActivoInput): Promise<ActionResult<{ id: string; nombre: string }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede editar categorías de activo`);
     }
-    throw error;
-  }
+
+    const { id, nombre } = editarCategoriaActivoSchema.parse(input);
+
+    try {
+      const categoria = await prisma.categoriaActivo.update({ where: { id }, data: { nombre } });
+      await registrarAuditoria({ usuario, accion: "categoria_activo.editar", entidad: "CategoriaActivo", entidadId: id, detalle: `Renombró a "${nombre}"` });
+      return { id: categoria.id, nombre: categoria.nombre };
+    } catch (error) {
+      // P2002: violación de @unique en `nombre` — ya existe otra categoría con ese nombre.
+      if (error instanceof Object && "code" in error && error.code === "P2002") {
+        throw new Error(`Ya existe una categoría llamada "${nombre}"`);
+      }
+      throw error;
+    }
+  });
 }

@@ -36,39 +36,38 @@ export function EspecialidadesForm({ especialidades }: { especialidades: Especia
 
   async function onCrear(values: CrearEspecialidadInput) {
     setError(null);
-    try {
-      await crearEspecialidad(values);
-      reset();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await crearEspecialidad(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    reset();
+    router.refresh();
   }
 
   async function guardarEdicion(id: string) {
     setError(null);
     setGuardando(true);
-    try {
-      await editarEspecialidad({ id, nombre: nombreEdicion });
-      setEditandoId(null);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
-    } finally {
-      setGuardando(false);
+    const resultado = await editarEspecialidad({ id, nombre: nombreEdicion });
+    setGuardando(false);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setEditandoId(null);
+    router.refresh();
   }
 
   async function eliminar(id: string, nombre: string) {
     const ok = await confirm({ mensaje: `¿Eliminar la especialidad "${nombre}"?`, textoConfirmar: "Eliminar", peligroso: true });
     if (!ok) return;
     setError(null);
-    try {
-      await eliminarEspecialidad({ id });
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await eliminarEspecialidad({ id });
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    router.refresh();
   }
 
   return (

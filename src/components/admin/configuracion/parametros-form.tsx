@@ -24,13 +24,13 @@ export function ParametrosForm({ valores }: { valores: ParametrosValues }) {
   async function onSubmit(values: GuardarParametrosInput) {
     setError(null);
     setGuardado(false);
-    try {
-      await guardarParametros(values);
-      setGuardado(true);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await guardarParametros(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setGuardado(true);
+    router.refresh();
   }
 
   return (

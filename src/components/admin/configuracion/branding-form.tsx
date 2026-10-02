@@ -34,29 +34,28 @@ export function BrandingForm({ valores, logoUrl }: { valores: BrandingValues; lo
   async function onSubmit(values: GuardarBrandingInput) {
     setError(null);
     setGuardado(false);
-    try {
-      await guardarBranding(values);
-      setGuardado(true);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await guardarBranding(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setGuardado(true);
+    router.refresh();
   }
 
   async function subirLogo(file: File) {
     setErrorLogo(null);
     setSubiendoLogo(true);
-    try {
-      const formData = new FormData();
-      formData.set("file", file);
-      const { url } = await subirLogoEmpresa(formData);
-      setLogoActual(url);
-      router.refresh();
-    } catch (err) {
-      setErrorLogo(err instanceof Error ? err.message : "No se pudo subir el logo");
-    } finally {
-      setSubiendoLogo(false);
+    const formData = new FormData();
+    formData.set("file", file);
+    const resultado = await subirLogoEmpresa(formData);
+    setSubiendoLogo(false);
+    if (!resultado.ok) {
+      setErrorLogo(resultado.error);
+      return;
     }
+    setLogoActual(resultado.data.url);
+    router.refresh();
   }
 
   return (

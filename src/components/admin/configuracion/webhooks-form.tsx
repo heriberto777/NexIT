@@ -40,8 +40,12 @@ export function WebhooksForm({ valores }: { valores: WebhooksValues }) {
   function generarSecreto() {
     setCopiado(false);
     startGenerar(async () => {
-      const { secreto } = await generarWebhookSecret();
-      setValue("webhookSecret", secreto, { shouldDirty: true });
+      const resultado = await generarWebhookSecret();
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
+      }
+      setValue("webhookSecret", resultado.data.secreto, { shouldDirty: true });
       setSecretoRecienGenerado(true);
     });
   }
@@ -59,22 +63,22 @@ export function WebhooksForm({ valores }: { valores: WebhooksValues }) {
   async function onSubmit(values: GuardarWebhooksInput) {
     setError(null);
     setGuardado(false);
-    try {
-      await guardarWebhooks(values);
-      setGuardado(true);
-      setSecretoRecienGenerado(false);
-      setCopiado(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await guardarWebhooks(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setGuardado(true);
+    setSecretoRecienGenerado(false);
+    setCopiado(false);
+    router.refresh();
   }
 
   function probar() {
     setResultadoPrueba(null);
     startPrueba(async () => {
       const resultado = await probarWebhookAction();
-      setResultadoPrueba(resultado);
+      setResultadoPrueba(resultado.ok ? resultado.data : { ok: false, mensaje: resultado.error });
     });
   }
 

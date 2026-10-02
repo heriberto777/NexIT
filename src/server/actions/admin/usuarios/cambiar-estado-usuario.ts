@@ -5,33 +5,36 @@ import { requireUsuario } from "@/server/auth/session";
 import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { cambiarEstadoUsuarioSchema } from "@/lib/zod/usuario.schema";
 import type { CambiarEstadoUsuarioInput } from "@/lib/zod/usuario.schema";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["ADMIN"] as const;
 
 // Desactivar un usuario no lo borra (preserva su historial, tickets creados/asignados,
 // evidencias, etc.) — solo le bloquea el login: src/auth.ts ya rechaza cualquier
 // usuario con estado != ACTIVO en authorize().
-export async function cambiarEstadoUsuario(input: CambiarEstadoUsuarioInput) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede cambiar el estado de usuarios`);
-  }
+export async function cambiarEstadoUsuario(input: CambiarEstadoUsuarioInput): Promise<ActionResult<{ id: string; estado: string }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede cambiar el estado de usuarios`);
+    }
 
-  const { id, estado } = cambiarEstadoUsuarioSchema.parse(input);
+    const { id, estado } = cambiarEstadoUsuarioSchema.parse(input);
 
-  if (id === usuario.id && estado === "INACTIVO") {
-    throw new Error("No puedes desactivar tu propia cuenta");
-  }
+    if (id === usuario.id && estado === "INACTIVO") {
+      throw new Error("No puedes desactivar tu propia cuenta");
+    }
 
-  const actualizado = await prisma.usuario.update({ where: { id }, data: { estado } });
+    const actualizado = await prisma.usuario.update({ where: { id }, data: { estado } });
 
-  await registrarAuditoria({
-    usuario,
-    accion: "usuario.cambiar_estado",
-    entidad: "Usuario",
-    entidadId: actualizado.id,
-    detalle: `Cambió el estado a ${estado}`,
+    await registrarAuditoria({
+      usuario,
+      accion: "usuario.cambiar_estado",
+      entidad: "Usuario",
+      entidadId: actualizado.id,
+      detalle: `Cambió el estado a ${estado}`,
+    });
+
+    return { id: actualizado.id, estado: actualizado.estado };
   });
-
-  return { id: actualizado.id, estado: actualizado.estado };
 }

@@ -94,18 +94,14 @@ export function UsuarioFormModal({
 
   async function onSubmit(values: CrearUsuarioInput | EditarUsuarioInput) {
     setError(null);
-    try {
-      if (esEdicion) {
-        await editarUsuario(values as EditarUsuarioInput);
-      } else {
-        await crearUsuario(values as CrearUsuarioInput);
-      }
-      setOpen(false);
-      if (!esEdicion) reset({ rol: "TECNICO" });
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = esEdicion ? await editarUsuario(values as EditarUsuarioInput) : await crearUsuario(values as CrearUsuarioInput);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setOpen(false);
+    if (!esEdicion) reset({ rol: "TECNICO" });
+    router.refresh();
   }
 
   async function alternarEstado() {
@@ -121,15 +117,14 @@ export function UsuarioFormModal({
       if (!ok) return;
     }
     setCambiandoEstado(true);
-    try {
-      await cambiarEstadoUsuario({ id: usuarioExistente.id, estado: nuevoEstado });
-      setEstadoActual(nuevoEstado);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
-    } finally {
-      setCambiandoEstado(false);
+    const resultado = await cambiarEstadoUsuario({ id: usuarioExistente.id, estado: nuevoEstado });
+    setCambiandoEstado(false);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setEstadoActual(nuevoEstado);
+    router.refresh();
   }
 
   async function resetearPassword() {
@@ -141,14 +136,13 @@ export function UsuarioFormModal({
     });
     if (!ok) return;
     setReseteandoPassword(true);
-    try {
-      const { passwordTemporal } = await resetearPasswordUsuario({ id: usuarioExistente.id });
-      setPasswordTemporal(passwordTemporal);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
-    } finally {
-      setReseteandoPassword(false);
+    const resultado = await resetearPasswordUsuario({ id: usuarioExistente.id });
+    setReseteandoPassword(false);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setPasswordTemporal(resultado.data.passwordTemporal);
   }
 
   return (

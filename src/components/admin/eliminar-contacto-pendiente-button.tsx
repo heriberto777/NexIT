@@ -22,12 +22,12 @@ export function EliminarContactoPendienteButton({ id, nombre }: { id: string; no
     if (!ok) return;
 
     startTransition(async () => {
-      try {
-        await eliminarContactoPendiente({ id });
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      const resultado = await eliminarContactoPendiente({ id });
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      router.refresh();
     });
   }
 

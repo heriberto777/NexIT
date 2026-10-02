@@ -7,6 +7,7 @@ import { requireUsuario } from "@/server/auth/session";
 import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { resetearPasswordUsuarioSchema } from "@/lib/zod/usuario.schema";
 import type { ResetearPasswordUsuarioInput } from "@/lib/zod/usuario.schema";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["ADMIN"] as const;
 
@@ -17,20 +18,22 @@ function generarPasswordTemporal(): string {
   return crypto.randomBytes(9).toString("base64url"); // 12 caracteres, alfanumérico URL-safe
 }
 
-export async function resetearPasswordUsuario(input: ResetearPasswordUsuarioInput) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede resetear contraseñas`);
-  }
+export async function resetearPasswordUsuario(input: ResetearPasswordUsuarioInput): Promise<ActionResult<{ passwordTemporal: string }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede resetear contraseñas`);
+    }
 
-  const { id } = resetearPasswordUsuarioSchema.parse(input);
+    const { id } = resetearPasswordUsuarioSchema.parse(input);
 
-  const passwordTemporal = generarPasswordTemporal();
-  const passwordHash = await bcrypt.hash(passwordTemporal, 10);
+    const passwordTemporal = generarPasswordTemporal();
+    const passwordHash = await bcrypt.hash(passwordTemporal, 10);
 
-  await prisma.usuario.update({ where: { id }, data: { passwordHash } });
+    await prisma.usuario.update({ where: { id }, data: { passwordHash } });
 
-  await registrarAuditoria({ usuario, accion: "usuario.resetear_password", entidad: "Usuario", entidadId: id });
+    await registrarAuditoria({ usuario, accion: "usuario.resetear_password", entidad: "Usuario", entidadId: id });
 
-  return { passwordTemporal };
+    return { passwordTemporal };
+  });
 }

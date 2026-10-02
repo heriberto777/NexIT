@@ -35,39 +35,38 @@ export function CategoriasForm({ categorias }: { categorias: CategoriaActivoValu
 
   async function onCrear(values: CrearCategoriaActivoInput) {
     setError(null);
-    try {
-      await crearCategoriaActivo(values);
-      reset();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await crearCategoriaActivo(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    reset();
+    router.refresh();
   }
 
   async function guardarEdicion(id: string) {
     setError(null);
     setGuardando(true);
-    try {
-      await editarCategoriaActivo({ id, nombre: nombreEdicion });
-      setEditandoId(null);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
-    } finally {
-      setGuardando(false);
+    const resultado = await editarCategoriaActivo({ id, nombre: nombreEdicion });
+    setGuardando(false);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setEditandoId(null);
+    router.refresh();
   }
 
   async function eliminar(id: string, nombre: string) {
     const ok = await confirm({ mensaje: `¿Eliminar la categoría "${nombre}"?`, textoConfirmar: "Eliminar", peligroso: true });
     if (!ok) return;
     setError(null);
-    try {
-      await eliminarCategoriaActivo({ id });
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await eliminarCategoriaActivo({ id });
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    router.refresh();
   }
 
   return (

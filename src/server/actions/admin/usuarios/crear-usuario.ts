@@ -6,45 +6,48 @@ import { requireUsuario } from "@/server/auth/session";
 import { registrarAuditoria } from "@/server/services/auditoria.service";
 import { crearUsuarioSchema } from "@/lib/zod/usuario.schema";
 import type { CrearUsuarioInput } from "@/lib/zod/usuario.schema";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["ADMIN"] as const;
 
-export async function crearUsuario(input: CrearUsuarioInput) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede crear usuarios`);
-  }
+export async function crearUsuario(input: CrearUsuarioInput): Promise<ActionResult<{ id: string }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede crear usuarios`);
+    }
 
-  const { nombre, email, rol, password, clienteId, especialidadIds } = crearUsuarioSchema.parse(input);
+    const { nombre, email, rol, password, clienteId, especialidadIds } = crearUsuarioSchema.parse(input);
 
-  const existente = await prisma.usuario.findUnique({ where: { email } });
-  if (existente) {
-    throw new Error("Ya existe un usuario con ese correo");
-  }
+    const existente = await prisma.usuario.findUnique({ where: { email } });
+    if (existente) {
+      throw new Error("Ya existe un usuario con ese correo");
+    }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-  const nuevo = await prisma.usuario.create({
-    data: {
-      nombre,
-      email,
-      passwordHash,
-      rol,
-      clienteId: rol === "CLIENTE" ? clienteId : undefined,
-      especialidades:
-        rol === "TECNICO" && especialidadIds.length > 0
-          ? { create: especialidadIds.map((especialidadId) => ({ especialidadId })) }
-          : undefined,
-    },
+    const nuevo = await prisma.usuario.create({
+      data: {
+        nombre,
+        email,
+        passwordHash,
+        rol,
+        clienteId: rol === "CLIENTE" ? clienteId : undefined,
+        especialidades:
+          rol === "TECNICO" && especialidadIds.length > 0
+            ? { create: especialidadIds.map((especialidadId) => ({ especialidadId })) }
+            : undefined,
+      },
+    });
+
+    await registrarAuditoria({
+      usuario,
+      accion: "usuario.crear",
+      entidad: "Usuario",
+      entidadId: nuevo.id,
+      detalle: `Creó a ${nombre} (${email}) con rol ${rol}`,
+    });
+
+    return { id: nuevo.id };
   });
-
-  await registrarAuditoria({
-    usuario,
-    accion: "usuario.crear",
-    entidad: "Usuario",
-    entidadId: nuevo.id,
-    detalle: `Creó a ${nombre} (${email}) con rol ${rol}`,
-  });
-
-  return { id: nuevo.id };
 }

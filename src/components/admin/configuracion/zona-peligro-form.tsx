@@ -29,18 +29,18 @@ export function ZonaPeligroForm({ conteo }: { conteo: ConteoDatosPrueba }) {
     setError(null);
     setResultado(null);
     setIsPending(true);
-    try {
-      const r = await resetearDatosPrueba({ confirmacion });
-      setResultado(
-        `Listo: ${r.tickets} tickets, ${r.notificaciones} notificaciones, ${r.conversaciones} conversaciones y ${r.contactosPendientes} contactos pendientes eliminados.`,
-      );
-      setConfirmacion("");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
-    } finally {
-      setIsPending(false);
+    const resultadoAccion = await resetearDatosPrueba({ confirmacion });
+    setIsPending(false);
+    if (!resultadoAccion.ok) {
+      setError(resultadoAccion.error);
+      return;
     }
+    const r = resultadoAccion.data;
+    setResultado(
+      `Listo: ${r.tickets} tickets, ${r.notificaciones} notificaciones, ${r.conversaciones} conversaciones y ${r.contactosPendientes} contactos pendientes eliminados.`,
+    );
+    setConfirmacion("");
+    router.refresh();
   }
 
   return (

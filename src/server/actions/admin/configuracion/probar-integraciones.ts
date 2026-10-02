@@ -1,8 +1,9 @@
 "use server";
 
 import { requireUsuario } from "@/server/auth/session";
-import { probarWebhook } from "@/server/services/webhook.service";
-import { probarEnvioSmtp } from "@/server/services/email.service";
+import { probarWebhook, type ResultadoPruebaWebhook } from "@/server/services/webhook.service";
+import { probarEnvioSmtp, type ResultadoPruebaSmtp } from "@/server/services/email.service";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["ADMIN"] as const;
 
@@ -13,12 +14,18 @@ async function verificarAcceso() {
   }
 }
 
-export async function probarWebhookAction() {
-  await verificarAcceso();
-  return probarWebhook();
+// probarWebhook()/probarEnvioSmtp() ya devuelven su propio { ok, mensaje } (nunca
+// lanzan) — el ActionResult de acá solo envuelve el chequeo de rol, que sí puede lanzar.
+export async function probarWebhookAction(): Promise<ActionResult<ResultadoPruebaWebhook>> {
+  return ejecutarAccion(async () => {
+    await verificarAcceso();
+    return probarWebhook();
+  });
 }
 
-export async function probarSmtpAction() {
-  await verificarAcceso();
-  return probarEnvioSmtp();
+export async function probarSmtpAction(): Promise<ActionResult<ResultadoPruebaSmtp>> {
+  return ejecutarAccion(async () => {
+    await verificarAcceso();
+    return probarEnvioSmtp();
+  });
 }

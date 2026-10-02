@@ -33,31 +33,29 @@ export function PlantillasForm({ plantillas }: { plantillas: PlantillaValue[] })
     setError(null);
     setMensajeOk(null);
     setGuardando(clave);
-    try {
-      await guardarPlantillaNotificacion({ clave, cuerpo: valores[clave] });
-      setMensajeOk(`Mensaje de "${clave}" actualizado.`);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
-    } finally {
-      setGuardando(null);
+    const resultado = await guardarPlantillaNotificacion({ clave, cuerpo: valores[clave] });
+    setGuardando(null);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setMensajeOk(`Mensaje de "${clave}" actualizado.`);
+    router.refresh();
   }
 
   async function restablecer(clave: string, cuerpoPorDefecto: string) {
     setError(null);
     setMensajeOk(null);
     setGuardando(clave);
-    try {
-      await restablecerPlantillaNotificacion({ clave });
-      setValores((prev) => ({ ...prev, [clave]: cuerpoPorDefecto }));
-      setMensajeOk(`Mensaje de "${clave}" restablecido al valor por defecto.`);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
-    } finally {
-      setGuardando(null);
+    const resultado = await restablecerPlantillaNotificacion({ clave });
+    setGuardando(null);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setValores((prev) => ({ ...prev, [clave]: cuerpoPorDefecto }));
+    setMensajeOk(`Mensaje de "${clave}" restablecido al valor por defecto.`);
+    router.refresh();
   }
 
   return (

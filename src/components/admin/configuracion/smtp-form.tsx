@@ -38,20 +38,20 @@ export function SmtpForm({ valores }: { valores: SmtpValues }) {
   async function onSubmit(values: GuardarSmtpInput) {
     setError(null);
     setGuardado(false);
-    try {
-      await guardarSmtp(values);
-      setGuardado(true);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await guardarSmtp(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setGuardado(true);
+    router.refresh();
   }
 
   function probar() {
     setResultadoPrueba(null);
     startPrueba(async () => {
       const resultado = await probarSmtpAction();
-      setResultadoPrueba(resultado);
+      setResultadoPrueba(resultado.ok ? resultado.data : { ok: false, mensaje: resultado.error });
     });
   }
 
