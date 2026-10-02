@@ -142,25 +142,26 @@ export function NuevoTicketWizard({
   async function onSubmit(values: CrearTicketPortalInput) {
     setError(null);
     setEnviando(true);
-    try {
-      const { id } = await crearTicketPortal(values);
-
-      for (const foto of fotos) {
-        const formData = new FormData();
-        formData.append("file", foto);
-        // FOTO_ANTES, no OTRO: es conceptualmente una foto "antes" (la falla, previa a
-        // cualquier intervención) — así aparece sola, sin cambios adicionales, en la
-        // sección "Antes" que ya existe en /tickets/[id], en el PDF y en cualquier otra
-        // pantalla que filtre evidencias por tipo.
-        formData.append("tipo", "FOTO_ANTES");
-        await fetch(`/api/tickets/${id}/evidencias`, { method: "POST", body: formData });
-      }
-
-      router.push(`/portal/tickets/${id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await crearTicketPortal(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
       setEnviando(false);
+      return;
     }
+    const { id } = resultado.data;
+
+    for (const foto of fotos) {
+      const formData = new FormData();
+      formData.append("file", foto);
+      // FOTO_ANTES, no OTRO: es conceptualmente una foto "antes" (la falla, previa a
+      // cualquier intervención) — así aparece sola, sin cambios adicionales, en la
+      // sección "Antes" que ya existe en /tickets/[id], en el PDF y en cualquier otra
+      // pantalla que filtre evidencias por tipo.
+      formData.append("tipo", "FOTO_ANTES");
+      await fetch(`/api/tickets/${id}/evidencias`, { method: "POST", body: formData });
+    }
+
+    router.push(`/portal/tickets/${id}`);
   }
 
   return (

@@ -7,112 +7,117 @@ import { emitirEvento } from "@/server/services/webhook.service";
 import { notificarTicketSinAsignar } from "@/server/services/notificacion.service";
 import { crearTicketPortalSchema } from "@/lib/zod/portal.schema";
 import type { CrearTicketPortalInput } from "@/lib/zod/portal.schema";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 // El cliente solo reporta fallas (tipo siempre CORRECTIVO); instalaciones y preventivos
 // los agenda el coordinador desde /admin. clienteId nunca viaja en el input — sale de la
 // sesión, así un cliente no puede crear un ticket a nombre de otra empresa.
-export async function crearTicketPortal(input: CrearTicketPortalInput) {
-  const usuario = await requireUsuario("CLIENTE");
-  if (!usuario.clienteId) {
-    throw new Error("Tu usuario no está asociado a ninguna empresa");
-  }
-
-  const {
-    sucursalId,
-    activoId,
-    ubicacionNoCatalogada,
-    sistemaSoftwareId,
-    sistemaNoCatalogado,
-    categoriaSoporte,
-    titulo,
-    descripcion,
-    prioridadPercibida,
-  } = crearTicketPortalSchema.parse(input);
-
-  const sucursal = await prisma.sucursal.findUniqueOrThrow({ where: { id: sucursalId } });
-  if (sucursal.clienteId !== usuario.clienteId) {
-    throw new Error("Esa sucursal no pertenece a tu empresa");
-  }
-
-  if (activoId) {
-    const activo = await prisma.activo.findUniqueOrThrow({ where: { id: activoId } });
-    if (activo.sucursalId !== sucursalId) {
-      throw new Error("Ese activo no pertenece a la sucursal seleccionada");
+export async function crearTicketPortal(
+  input: CrearTicketPortalInput
+): Promise<ActionResult<{ id: string; numeroTicket: string }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario("CLIENTE");
+    if (!usuario.clienteId) {
+      throw new Error("Tu usuario no está asociado a ninguna empresa");
     }
-  }
 
-  if (sistemaSoftwareId) {
-    const sistema = await prisma.sistemaSoftware.findUniqueOrThrow({ where: { id: sistemaSoftwareId } });
-    if (sistema.clienteId !== usuario.clienteId) {
-      throw new Error("Ese sistema no pertenece a tu empresa");
+    const {
+      sucursalId,
+      activoId,
+      ubicacionNoCatalogada,
+      sistemaSoftwareId,
+      sistemaNoCatalogado,
+      categoriaSoporte,
+      titulo,
+      descripcion,
+      prioridadPercibida,
+    } = crearTicketPortalSchema.parse(input);
+
+    const sucursal = await prisma.sucursal.findUniqueOrThrow({ where: { id: sucursalId } });
+    if (sucursal.clienteId !== usuario.clienteId) {
+      throw new Error("Esa sucursal no pertenece a tu empresa");
     }
-  }
 
-  const contrato = await prisma.contrato.findFirst({
-    where: { clienteId: usuario.clienteId, estado: "ACTIVO" },
-    orderBy: { fechaInicio: "desc" },
-  });
-  const sla = contrato
-    ? await prisma.contratoSla.findFirst({ where: { contratoId: contrato.id, prioridad: prioridadPercibida } })
-    : null;
+    if (activoId) {
+      const activo = await prisma.activo.findUniqueOrThrow({ where: { id: activoId } });
+      if (activo.sucursalId !== sucursalId) {
+        throw new Error("Ese activo no pertenece a la sucursal seleccionada");
+      }
+    }
 
-  const notas = [
-    ubicacionNoCatalogada && `[Equipo/ubicación no catalogada: ${ubicacionNoCatalogada}]`,
-    sistemaNoCatalogado && `[Sistema: ${sistemaNoCatalogado}]`,
-  ].filter(Boolean);
-  const descripcionFinal = notas.length ? `${notas.join("\n")}\n\n${descripcion}` : descripcion;
+    if (sistemaSoftwareId) {
+      const sistema = await prisma.sistemaSoftware.findUniqueOrThrow({ where: { id: sistemaSoftwareId } });
+      if (sistema.clienteId !== usuario.clienteId) {
+        throw new Error("Ese sistema no pertenece a tu empresa");
+      }
+    }
 
-  const numeroTicket = await siguienteNumeroTicket();
+    const contrato = await prisma.contrato.findFirst({
+      where: { clienteId: usuario.clienteId, estado: "ACTIVO" },
+      orderBy: { fechaInicio: "desc" },
+    });
+    const sla = contrato
+      ? await prisma.contratoSla.findFirst({ where: { contratoId: contrato.id, prioridad: prioridadPercibida } })
+      : null;
 
-  const ticket = await prisma.$transaction(async (tx) => {
-    const nuevo = await tx.ticket.create({
-      data: {
-        numeroTicket,
-        clienteId: usuario.clienteId!,
-        sucursalId,
-        activoId,
-        sistemaSoftwareId,
-        tipo: "CORRECTIVO",
-        categoriaSoporte,
-        prioridad: prioridadPercibida,
-        estado: "ABIERTO",
-        titulo,
-        descripcion: descripcionFinal,
-        creadoPorId: usuario.id,
-        slaId: sla?.id,
-        origen: "PORTAL",
-      },
-      include: { cliente: true, creadoPor: true },
+    const notas = [
+      ubicacionNoCatalogada && `[Equipo/ubicación no catalogada: ${ubicacionNoCatalogada}]`,
+      sistemaNoCatalogado && `[Sistema: ${sistemaNoCatalogado}]`,
+    ].filter(Boolean);
+    const descripcionFinal = notas.length ? `${notas.join("\n")}\n\n${descripcion}` : descripcion;
+
+    const numeroTicket = await siguienteNumeroTicket();
+
+    const ticket = await prisma.$transaction(async (tx) => {
+      const nuevo = await tx.ticket.create({
+        data: {
+          numeroTicket,
+          clienteId: usuario.clienteId!,
+          sucursalId,
+          activoId,
+          sistemaSoftwareId,
+          tipo: "CORRECTIVO",
+          categoriaSoporte,
+          prioridad: prioridadPercibida,
+          estado: "ABIERTO",
+          titulo,
+          descripcion: descripcionFinal,
+          creadoPorId: usuario.id,
+          slaId: sla?.id,
+          origen: "PORTAL",
+        },
+        include: { cliente: true, creadoPor: true },
+      });
+
+      await tx.ticketHistorial.create({
+        data: {
+          ticketId: nuevo.id,
+          usuarioId: usuario.id,
+          estadoNuevo: "ABIERTO",
+          comentario: "Ticket creado por el cliente desde el portal de auto-servicio",
+        },
+      });
+
+      return nuevo;
     });
 
-    await tx.ticketHistorial.create({
-      data: {
-        ticketId: nuevo.id,
-        usuarioId: usuario.id,
-        estadoNuevo: "ABIERTO",
-        comentario: "Ticket creado por el cliente desde el portal de auto-servicio",
-      },
+    emitirEvento({
+      tipo: "TICKET_CREADO",
+      ticketId: ticket.id,
+      numeroTicket: ticket.numeroTicket,
+      clienteId: ticket.clienteId,
+      clienteNombre: ticket.cliente.nombre,
+      titulo: ticket.titulo,
+      prioridad: ticket.prioridad,
+      origen: "PORTAL",
+      reportadoPorNombre: usuario.nombre,
+      reportadoPorEmail: usuario.email,
+      reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
+      reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
     });
 
-    return nuevo;
+    await notificarTicketSinAsignar(ticket, titulo);
+
+    return { id: ticket.id, numeroTicket: ticket.numeroTicket };
   });
-
-  emitirEvento({
-    tipo: "TICKET_CREADO",
-    ticketId: ticket.id,
-    numeroTicket: ticket.numeroTicket,
-    clienteId: ticket.clienteId,
-    clienteNombre: ticket.cliente.nombre,
-    titulo: ticket.titulo,
-    prioridad: ticket.prioridad,
-    origen: "PORTAL",
-    reportadoPorNombre: usuario.nombre,
-    reportadoPorEmail: usuario.email,
-    reportadoPorTelegramChatId: ticket.creadoPor.telegramChatId,
-    reportadoPorWhatsapp: ticket.creadoPor.whatsappTelefono,
-  });
-
-  await notificarTicketSinAsignar(ticket, titulo);
-
-  return { id: ticket.id, numeroTicket: ticket.numeroTicket };
 }

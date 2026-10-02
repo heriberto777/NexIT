@@ -31,13 +31,13 @@ export function EditarPerfilForm({ nombre, email, telegramChatId, whatsappTelefo
   async function onSubmit(values: EditarPerfilInput) {
     setError(null);
     setGuardado(false);
-    try {
-      await editarPerfil(values);
-      setGuardado(true);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await editarPerfil(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setGuardado(true);
+    router.refresh();
   }
 
   return (

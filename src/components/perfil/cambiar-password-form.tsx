@@ -20,13 +20,13 @@ export function CambiarPasswordForm() {
   async function onSubmit(values: CambiarPasswordPropioInput) {
     setError(null);
     setGuardado(false);
-    try {
-      await cambiarPasswordPropio(values);
-      reset();
-      setGuardado(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await cambiarPasswordPropio(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    reset();
+    setGuardado(true);
   }
 
   return (

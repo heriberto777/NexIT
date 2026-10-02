@@ -15,12 +15,12 @@ export function CotizacionActions({ cotizacionId }: { cotizacionId: string }) {
   function ejecutar(decision: "APROBADO" | "RECHAZADO") {
     setError(null);
     startTransition(async () => {
-      try {
-        await resolverCotizacion({ cotizacionId, decision, comentario: comentario || undefined });
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      const resultado = await resolverCotizacion({ cotizacionId, decision, comentario: comentario || undefined });
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      router.refresh();
     });
   }
 

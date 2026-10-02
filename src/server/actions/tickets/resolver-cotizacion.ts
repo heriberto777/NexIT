@@ -6,54 +6,59 @@ import { resolverCotizacionSchema } from "@/lib/zod/ticket.schema";
 import type { ResolverCotizacionInput } from "@/lib/zod/ticket.schema";
 import { formatCurrency } from "@/lib/utils/currency";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["CLIENTE", "COORDINADOR", "ADMIN"] as const;
 
 // Mismo patrón que validar-visita.ts: el Cliente resuelve lo suyo; Coordinador/Admin
 // pueden hacerlo como override (ej. el cliente no respondió a tiempo por teléfono).
-export async function resolverCotizacion(input: ResolverCotizacionInput) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede resolver cotizaciones`);
-  }
+export async function resolverCotizacion(
+  input: ResolverCotizacionInput
+): Promise<ActionResult<{ id: string; estado: string }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede resolver cotizaciones`);
+    }
 
-  const { cotizacionId, decision, comentario } = resolverCotizacionSchema.parse(input);
+    const { cotizacionId, decision, comentario } = resolverCotizacionSchema.parse(input);
 
-  const cotizacion = await prisma.cotizacion.findUniqueOrThrow({
-    where: { id: cotizacionId },
-    include: { ticket: true },
-  });
-
-  if (usuario.rol === "CLIENTE" && usuario.clienteId !== cotizacion.ticket.clienteId) {
-    throw new Error("No tienes acceso a esta cotización");
-  }
-  if (cotizacion.estado !== "PENDIENTE") {
-    throw new Error(`Esta cotización ya fue ${cotizacion.estado.toLowerCase()}`);
-  }
-
-  const { monedaSimbolo } = await obtenerConfiguracion();
-  const montoFormateado = formatCurrency(cotizacion.monto.toNumber(), monedaSimbolo);
-
-  const actualizada = await prisma.$transaction(async (tx) => {
-    const cotizacionActualizada = await tx.cotizacion.update({
+    const cotizacion = await prisma.cotizacion.findUniqueOrThrow({
       where: { id: cotizacionId },
-      data: { estado: decision, aprobadoPorId: usuario.id },
+      include: { ticket: true },
     });
 
-    await tx.ticketHistorial.create({
-      data: {
-        ticketId: cotizacion.ticketId,
-        usuarioId: usuario.id,
-        estadoNuevo: cotizacion.ticket.estado,
-        comentario:
-          decision === "APROBADO"
-            ? `Cotización de ${montoFormateado} aprobada`
-            : `Cotización de ${montoFormateado} rechazada: ${comentario}`,
-      },
+    if (usuario.rol === "CLIENTE" && usuario.clienteId !== cotizacion.ticket.clienteId) {
+      throw new Error("No tienes acceso a esta cotización");
+    }
+    if (cotizacion.estado !== "PENDIENTE") {
+      throw new Error(`Esta cotización ya fue ${cotizacion.estado.toLowerCase()}`);
+    }
+
+    const { monedaSimbolo } = await obtenerConfiguracion();
+    const montoFormateado = formatCurrency(cotizacion.monto.toNumber(), monedaSimbolo);
+
+    const actualizada = await prisma.$transaction(async (tx) => {
+      const cotizacionActualizada = await tx.cotizacion.update({
+        where: { id: cotizacionId },
+        data: { estado: decision, aprobadoPorId: usuario.id },
+      });
+
+      await tx.ticketHistorial.create({
+        data: {
+          ticketId: cotizacion.ticketId,
+          usuarioId: usuario.id,
+          estadoNuevo: cotizacion.ticket.estado,
+          comentario:
+            decision === "APROBADO"
+              ? `Cotización de ${montoFormateado} aprobada`
+              : `Cotización de ${montoFormateado} rechazada: ${comentario}`,
+        },
+      });
+
+      return cotizacionActualizada;
     });
 
-    return cotizacionActualizada;
+    return { id: actualizada.id, estado: actualizada.estado };
   });
-
-  return { id: actualizada.id, estado: actualizada.estado };
 }

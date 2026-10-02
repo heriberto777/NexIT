@@ -23,13 +23,13 @@ export function ComentarioForm({ ticketId }: { ticketId: string }) {
 
   async function onSubmit(values: AgregarComentarioInput) {
     setError(null);
-    try {
-      await agregarComentarioTicket(values);
-      reset({ ticketId, mensaje: "" });
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await agregarComentarioTicket(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    reset({ ticketId, mensaje: "" });
+    router.refresh();
   }
 
   return (
