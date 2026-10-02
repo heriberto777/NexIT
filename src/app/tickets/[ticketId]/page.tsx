@@ -12,6 +12,7 @@ import { ESTADOS_CON_WIZARD_ACTIVO, ESTADOS_TERMINALES } from "@/lib/utils/ticke
 import { formatCurrency } from "@/lib/utils/currency";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { ImageThumbnail } from "@/components/ui/image-thumbnail";
+import { tieneAccesoAlTicket } from "@/server/services/ticket-acceso.service";
 
 const ESTADOS_GESTIONABLES = new Set(["ABIERTO", "ASIGNADO", "EN_DIAGNOSTICO", "ESPERANDO_REPUESTO", "EN_EJECUCION", "REABIERTO"]);
 
@@ -51,6 +52,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
       repuestos: { include: { repuesto: true } },
       cotizaciones: { orderBy: { fecha: "desc" } },
       historial: { include: { usuario: true }, orderBy: { fecha: "asc" } },
+      colaboradores: { include: { usuario: true } },
     },
   });
 
@@ -58,9 +60,10 @@ export default async function TicketDetailPage({ params }: PageProps) {
 
   const sesion = await getSesionActual();
 
-  // El técnico solo puede ver el detalle de SUS propios tickets — antes cualquier
-  // técnico autenticado podía abrir el de cualquier otro solo conociendo el ticketId.
-  if (sesion?.rol === "TECNICO" && ticket.tecnicoAsignadoId !== sesion.id) {
+  // El técnico solo puede ver el detalle de SUS propios tickets (como responsable o como
+  // colaborador) — antes cualquier técnico autenticado podía abrir el de cualquier otro
+  // solo conociendo el ticketId.
+  if (sesion?.rol === "TECNICO" && !tieneAccesoAlTicket(ticket, sesion.id)) {
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
         <h1 className="text-lg font-semibold text-gray-900">Acceso restringido</h1>
@@ -149,6 +152,12 @@ export default async function TicketDetailPage({ params }: PageProps) {
             <dt className="font-medium text-gray-400">Técnico</dt>
             <dd className="text-gray-700">{ticket.tecnicoAsignado?.nombre ?? "Sin asignar"}</dd>
           </div>
+          {ticket.colaboradores.length > 0 && (
+            <div>
+              <dt className="font-medium text-gray-400">Colaboradores</dt>
+              <dd className="text-gray-700">{ticket.colaboradores.map((c) => c.usuario.nombre).join(", ")}</dd>
+            </div>
+          )}
           <div>
             <dt className="font-medium text-gray-400">Creado</dt>
             <dd className="text-gray-700">{FORMATO_FECHA.format(ticket.fechaCreacion)}</dd>
@@ -163,7 +172,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      {sesion?.id === ticket.tecnicoAsignadoId && ESTADOS_CON_WIZARD_ACTIVO.has(ticket.estado) && (
+      {sesion && tieneAccesoAlTicket(ticket, sesion.id) && ESTADOS_CON_WIZARD_ACTIVO.has(ticket.estado) && (
         <Link
           href={`/tickets/${ticket.id}/ejecucion`}
           className="block rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-medium text-white hover:bg-blue-700"
@@ -202,6 +211,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
             tecnicoAsignadoId: ticket.tecnicoAsignadoId,
           }}
           tecnicos={tecnicos.map((t) => ({ id: t.id, nombre: t.nombre, rol: t.rol }))}
+          colaboradoresIniciales={ticket.colaboradores.map((c) => c.usuarioId)}
           hayTrabajoEnProgreso={ticket.evidencias.length > 0 || ticket.checklistRespuestas.length > 0}
         />
       )}

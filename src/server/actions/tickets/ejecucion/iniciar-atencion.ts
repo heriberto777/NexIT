@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { emitirEvento } from "@/server/services/webhook.service";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 const iniciarAtencionSchema = z.object({
   ticketId: z.string().cuid(),
@@ -25,9 +26,9 @@ export async function iniciarAtencion(
 
     const ticket = await prisma.ticket.findUniqueOrThrow({
       where: { id: ticketId },
-      include: { cliente: true, creadoPor: true },
+      include: { cliente: true, creadoPor: true, ...INCLUDE_COLABORADORES },
     });
-    if (ticket.tecnicoAsignadoId !== usuario.id) {
+    if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
 

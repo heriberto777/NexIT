@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUsuario } from "@/server/auth/session";
 import { storageService } from "@/server/services/storage.service";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 type RouteParams = { params: Promise<{ ticketId: string }> };
 
@@ -11,11 +12,16 @@ type RouteParams = { params: Promise<{ ticketId: string }> };
 // completo; esta ruta solo sube el archivo y devuelve la key para incluir en ese envío,
 // igual patrón que /api/tickets/[ticketId]/evidencias).
 export async function POST(request: NextRequest, { params }: RouteParams) {
-  const usuario = await requireUsuario("TECNICO");
+  // Sin restricción de rol: un Admin/Coordinador puede estar asignado como "técnico" de
+  // este ticket (ver asignar-tecnico.ts) y ejecutar el wizard él mismo.
+  const usuario = await requireUsuario();
   const { ticketId } = await params;
 
-  const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, select: { tecnicoAsignadoId: true } });
-  if (ticket.tecnicoAsignadoId !== usuario.id) {
+  const ticket = await prisma.ticket.findUniqueOrThrow({
+    where: { id: ticketId },
+    select: { tecnicoAsignadoId: true, ...INCLUDE_COLABORADORES },
+  });
+  if (!tieneAccesoAlTicket(ticket, usuario.id)) {
     return NextResponse.json({ error: "Este ticket no está asignado a este técnico" }, { status: 403 });
   }
 

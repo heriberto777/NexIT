@@ -7,6 +7,7 @@ import { storageService } from "@/server/services/storage.service";
 import { capturarFirmaSchema } from "@/lib/zod/firma.schema";
 import type { CapturarFirmaInput } from "@/lib/zod/firma.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 // Paso 5: sube la firma capturada en el canvas y la asocia al ticket con trazabilidad
 // (quién firmó, desde qué IP, cuándo).
@@ -18,8 +19,8 @@ export async function capturarFirma(input: CapturarFirmaInput): Promise<ActionRe
     const usuario = await requireUsuario();
     const { ticketId, nombreFirmante, cargoFirmante, firmaBase64 } = capturarFirmaSchema.parse(input);
 
-    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
-    if (ticket.tecnicoAsignadoId !== usuario.id) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: INCLUDE_COLABORADORES });
+    if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
 

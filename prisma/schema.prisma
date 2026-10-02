@@ -339,6 +339,7 @@ model Usuario {
   notificaciones             Notificacion[]
   verificacionesIdentidad    VerificacionIdentidadChat[]
   especialidades             UsuarioEspecialidad[]
+  ticketsColaborador         TicketColaborador[]
 
   @@index([clienteId])
   @@map("usuarios")
@@ -550,11 +551,29 @@ model Ticket {
   conversacionIA      ConversacionTicketIA?
   contactoPendiente   ContactoPendiente?
   notificaciones      Notificacion[]
+  colaboradores       TicketColaborador[]
 
   @@index([clienteId, estado])
   @@index([tecnicoAsignadoId, estado])
   @@index([fechaCreacion])
   @@map("tickets")
+}
+
+// Opción A del análisis "¿un ticket puede tener varios técnicos?": tecnicoAsignadoId
+// sigue siendo EL responsable (dueño del ticket — notificaciones, PDF del informe de
+// servicio, alertas de SLA y el canal de n8n siguen hablando de un solo técnico, sin
+// cambios). Esto es solo gente adicional que puede ENTRAR al wizard de ejecución y
+// ayudar con los pasos — ver ticket-acceso.service.ts, que es el único lugar que decide
+// "quién puede tocar este ticket" (responsable O colaborador).
+model TicketColaborador {
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  creadoEn  DateTime @default(now())
+
+  @@id([ticketId, usuarioId])
+  @@map("ticket_colaboradores")
 }
 
 model TicketHistorial {

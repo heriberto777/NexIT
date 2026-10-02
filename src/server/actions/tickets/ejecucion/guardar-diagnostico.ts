@@ -5,6 +5,7 @@ import { requireUsuario } from "@/server/auth/session";
 import { diagnosticoSchema } from "@/lib/zod/checklist.schema";
 import type { DiagnosticoInput } from "@/lib/zod/checklist.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 // Paso 1 (continuación): guarda los hallazgos del diagnóstico antes de avanzar al checklist.
 export async function guardarDiagnostico(input: DiagnosticoInput): Promise<ActionResult<{ ok: true }>> {
@@ -15,8 +16,8 @@ export async function guardarDiagnostico(input: DiagnosticoInput): Promise<Actio
     const usuario = await requireUsuario();
     const { ticketId, hallazgos, causaRaizIdentificada } = diagnosticoSchema.parse(input);
 
-    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
-    if (ticket.tecnicoAsignadoId !== usuario.id) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: INCLUDE_COLABORADORES });
+    if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
 

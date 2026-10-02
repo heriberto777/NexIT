@@ -8,9 +8,11 @@ import { editarTicketSchema, type EditarTicketInput } from "@/lib/zod/ticket.sch
 import { asignarTecnico } from "@/server/actions/tickets/asignar-tecnico";
 import { editarTicket } from "@/server/actions/tickets/editar-ticket";
 import { cancelarTicket } from "@/server/actions/tickets/cancelar-ticket";
+import { actualizarColaboradoresTicket } from "@/server/actions/tickets/actualizar-colaboradores";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
+import { SelectorEtiquetas } from "@/components/ui/selector-etiquetas";
 
 interface TecnicoOpcion {
   id: string;
@@ -29,6 +31,9 @@ interface Props {
     tecnicoAsignadoId: string | null;
   };
   tecnicos: TecnicoOpcion[];
+  // Opción A del análisis "¿un ticket puede tener varios técnicos?" — gente adicional
+  // que puede entrar al wizard de ejecución a ayudar, sin ser el responsable del ticket.
+  colaboradoresIniciales: string[];
   // El técnico ya subió evidencia o respondió el checklist — cancelar de todas formas
   // descarta ese trabajo, así que la UI lo advierte explícitamente antes de confirmar.
   hayTrabajoEnProgreso: boolean;
@@ -36,12 +41,14 @@ interface Props {
 
 // El caller (page.tsx) ya no renderiza este panel para tickets en RESUELTO/CERRADO/
 // CANCELADO — no se repite esa condición aquí.
-export function GestionTicketPanel({ ticket, tecnicos, hayTrabajoEnProgreso }: Props) {
+export function GestionTicketPanel({ ticket, tecnicos, colaboradoresIniciales, hayTrabajoEnProgreso }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const [tecnicoId, setTecnicoId] = useState(ticket.tecnicoAsignadoId ?? "");
+  const [colaboradorIds, setColaboradorIds] = useState(colaboradoresIniciales);
+  const [guardandoColaboradores, setGuardandoColaboradores] = useState(false);
   const [editando, setEditando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState("");
@@ -76,6 +83,20 @@ export function GestionTicketPanel({ ticket, tecnicos, hayTrabajoEnProgreso }: P
       return;
     }
     setEditando(false);
+    router.refresh();
+  }
+
+  async function guardarColaboradores(ids: string[]) {
+    setError(null);
+    setColaboradorIds(ids); // optimista: el chip se ve al toque, se revierte si falla
+    setGuardandoColaboradores(true);
+    const resultado = await actualizarColaboradoresTicket({ ticketId: ticket.id, usuarioIds: ids });
+    setGuardandoColaboradores(false);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      setColaboradorIds(colaboradoresIniciales);
+      return;
+    }
     router.refresh();
   }
 
@@ -115,6 +136,20 @@ export function GestionTicketPanel({ ticket, tecnicos, hayTrabajoEnProgreso }: P
         <Button type="button" onClick={guardarAsignacion} disabled={isPending || !tecnicoId || tecnicoId === ticket.tecnicoAsignadoId}>
           {isPending ? "Guardando..." : "Asignar"}
         </Button>
+      </div>
+
+      <div className="border-t border-gray-100 pt-3">
+        <label className="mb-1 block text-xs font-medium text-gray-600">
+          Colaboradores (opcional) {guardandoColaboradores && <span className="font-normal text-gray-400">guardando...</span>}
+        </label>
+        <p className="mb-2 text-xs text-gray-400">
+          Pueden entrar al wizard de ejecución a ayudar con los pasos, sin ser el responsable del ticket.
+        </p>
+        <SelectorEtiquetas
+          seleccionadas={colaboradorIds}
+          onChange={guardarColaboradores}
+          opciones={tecnicos.filter((t) => t.id !== tecnicoId).map((t) => ({ id: t.id, nombre: t.nombre }))}
+        />
       </div>
 
       <div className="flex gap-2 border-t border-gray-100 pt-3">

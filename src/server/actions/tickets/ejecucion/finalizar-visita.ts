@@ -7,6 +7,7 @@ import { notificarCambioEstadoCliente } from "@/server/services/notificacion.ser
 import { finalizarVisitaSchema } from "@/lib/zod/evidencia.schema";
 import type { FinalizarVisitaInput } from "@/lib/zod/evidencia.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 // Paso 6: cierre del wizard. Valida que existan firma y evidencias mínimas antes de
 // transicionar el ticket (a ESPERANDO_VALIDACION o RESUELTO, según config del contrato).
@@ -22,10 +23,10 @@ export async function finalizarVisita(
 
     const ticket = await prisma.ticket.findUniqueOrThrow({
       where: { id: ticketId },
-      include: { firmas: true, evidencias: true, cliente: true, creadoPor: true },
+      include: { firmas: true, evidencias: true, cliente: true, creadoPor: true, ...INCLUDE_COLABORADORES },
     });
 
-    if (ticket.tecnicoAsignadoId !== usuario.id) {
+    if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
     if (ticket.firmas.length === 0) {

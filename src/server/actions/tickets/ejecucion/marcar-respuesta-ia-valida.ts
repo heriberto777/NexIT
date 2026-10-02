@@ -5,6 +5,7 @@ import { requireUsuario } from "@/server/auth/session";
 import { marcarRespuestaIaValidaSchema } from "@/lib/zod/ia-chat.schema";
 import type { MarcarRespuestaIaValidaInput } from "@/lib/zod/ia-chat.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 export async function marcarRespuestaIaValida(input: MarcarRespuestaIaValidaInput): Promise<ActionResult<{ ok: true }>> {
   return ejecutarAccion(async () => {
@@ -16,9 +17,9 @@ export async function marcarRespuestaIaValida(input: MarcarRespuestaIaValidaInpu
 
     const mensaje = await prisma.mensajeTicketIA.findUniqueOrThrow({
       where: { id: mensajeId },
-      include: { conversacion: { include: { ticket: true } } },
+      include: { conversacion: { include: { ticket: { include: INCLUDE_COLABORADORES } } } },
     });
-    if (mensaje.conversacion.ticket.tecnicoAsignadoId !== usuario.id) {
+    if (!tieneAccesoAlTicket(mensaje.conversacion.ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
     if (mensaje.rol !== "ASISTENTE") {

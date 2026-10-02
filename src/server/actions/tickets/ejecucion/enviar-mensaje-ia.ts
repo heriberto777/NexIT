@@ -6,6 +6,7 @@ import { enviarMensajeIaSchema } from "@/lib/zod/ia-chat.schema";
 import type { EnviarMensajeIaInput } from "@/lib/zod/ia-chat.schema";
 import { generarRespuestaIA, type MensajeIA } from "@/server/services/ia.service";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 import type { MensajeIaPlano } from "@/types/ejecucion";
 
 // Arma el contexto del ticket que acompaña cada mensaje como system prompt — nunca se
@@ -75,8 +76,8 @@ export async function enviarMensajeIA(
     const usuario = await requireUsuario();
     const { ticketId, mensaje } = enviarMensajeIaSchema.parse(input);
 
-    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
-    if (ticket.tecnicoAsignadoId !== usuario.id) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: INCLUDE_COLABORADORES });
+    if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
 

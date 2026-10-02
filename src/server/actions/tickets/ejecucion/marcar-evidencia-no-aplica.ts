@@ -5,6 +5,7 @@ import { requireUsuario } from "@/server/auth/session";
 import { marcarEvidenciaNoAplicaSchema } from "@/lib/zod/evidencia.schema";
 import type { MarcarEvidenciaNoAplicaInput } from "@/lib/zod/evidencia.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 // Paso 3 (excepción): no todo ticket deja algo fotografiable — el técnico decide caso
 // por caso, con un motivo obligatorio que queda en el historial para que
@@ -18,8 +19,8 @@ export async function marcarEvidenciaNoAplica(input: MarcarEvidenciaNoAplicaInpu
     const usuario = await requireUsuario();
     const { ticketId, motivo } = marcarEvidenciaNoAplicaSchema.parse(input);
 
-    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
-    if (ticket.tecnicoAsignadoId !== usuario.id) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: INCLUDE_COLABORADORES });
+    if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
 

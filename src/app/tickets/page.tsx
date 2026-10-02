@@ -11,6 +11,7 @@ import { ESTADOS_CON_WIZARD_ACTIVO, ESTADOS_TERMINALES } from "@/lib/utils/ticke
 import { TableScroll } from "@/components/ui/table-scroll";
 import { TicketCard } from "@/components/tickets/ticket-card";
 import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
+import { tieneAccesoAlTicket } from "@/server/services/ticket-acceso.service";
 
 export const dynamic = "force-dynamic";
 
@@ -35,17 +36,21 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   const asignadoAMi = !esTecnico && params.asignadoAMi === "1";
 
   const whereBase = { estado: estado as never, prioridad: prioridad as never, clienteId };
+  // "Lo mío" ahora es responsable O colaborador (ver TicketColaborador /
+  // ticket-acceso.service.ts) — un colaborador necesita poder ENCONTRAR el ticket acá
+  // para poder abrirlo, no solo que el wizard lo deje entrar si ya tiene la URL.
+  const filtroMio = sesion ? { OR: [{ tecnicoAsignadoId: sesion.id }, { colaboradores: { some: { usuarioId: sesion.id } } }] } : {};
 
   const [tickets, asignadosAMiCount, clientes, config] = await Promise.all([
     prisma.ticket.findMany({
       where: {
         ...whereBase,
-        tecnicoAsignadoId: esTecnico ? sesion.id : asignadoAMi ? sesion!.id : undefined,
+        ...(esTecnico || asignadoAMi ? filtroMio : {}),
       },
-      include: { cliente: true, sucursal: true, tecnicoAsignado: true, sla: true },
+      include: { cliente: true, sucursal: true, tecnicoAsignado: true, sla: true, colaboradores: { select: { usuarioId: true } } },
       orderBy: { fechaCreacion: "desc" },
     }),
-    !esTecnico && sesion ? prisma.ticket.count({ where: { ...whereBase, tecnicoAsignadoId: sesion.id } }) : Promise.resolve(0),
+    !esTecnico && sesion ? prisma.ticket.count({ where: { ...whereBase, ...filtroMio } }) : Promise.resolve(0),
     esTecnico ? Promise.resolve([]) : prisma.cliente.findMany({ orderBy: { nombre: "asc" } }),
     obtenerConfiguracion(),
   ]);
@@ -72,8 +77,9 @@ export default async function TicketsPage({ searchParams }: PageProps) {
 
   // La columna de acción aparece para el técnico (siempre ve solo lo suyo) y también
   // para un Admin/Coordinador que tenga al menos un ticket de esta lista asignado a sí
-  // mismo — evita una columna vacía para quien nunca se autoasigna nada.
-  const mostrarColumnaAccion = esTecnico || tickets.some((t) => t.tecnicoAsignadoId === sesion?.id);
+  // mismo (como responsable o colaborador) — evita una columna vacía para quien nunca
+  // se autoasigna nada.
+  const mostrarColumnaAccion = esTecnico || (sesion && tickets.some((t) => tieneAccesoAlTicket(t, sesion.id)));
 
   // Preserva Estado/Prioridad/Cliente al alternar "Asignados a mí" — un simple toggle,
   // no un formulario propio, para que sea un botón de un clic.
@@ -157,7 +163,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
             key={t.id}
             ticket={t}
             fecha={FORMATO_FECHA.format(t.fechaCreacion)}
-            esMio={t.tecnicoAsignadoId === sesion?.id}
+            esMio={Boolean(sesion && tieneAccesoAlTicket(t, sesion.id))}
           />
         ))}
         {tickets.length === 0 && (
@@ -207,7 +213,8 @@ export default async function TicketsPage({ searchParams }: PageProps) {
                 <td className="px-3 py-2 text-gray-500">{FORMATO_FECHA.format(t.fechaCreacion)}</td>
                 {mostrarColumnaAccion && (
                   <td className="px-3 py-2 text-right">
-                    {t.tecnicoAsignadoId === sesion?.id &&
+                    {sesion &&
+                      tieneAccesoAlTicket(t, sesion.id) &&
                       (ESTADOS_CON_WIZARD_ACTIVO.has(t.estado) ? (
                         <Link
                           href={`/tickets/${t.id}/ejecucion`}

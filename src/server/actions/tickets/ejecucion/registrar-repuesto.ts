@@ -5,6 +5,7 @@ import { requireUsuario } from "@/server/auth/session";
 import { registrarRepuestoSchema } from "@/lib/zod/evidencia.schema";
 import type { RegistrarRepuestoInput } from "@/lib/zod/evidencia.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 // Paso 4: registra el consumo de un repuesto de inventario en el ticket.
 // Si no hay stock suficiente, el repuesto queda PENDIENTE y el ticket pasa a ESPERANDO_REPUESTO
@@ -24,8 +25,8 @@ export async function registrarRepuesto(input: RegistrarRepuestoInput): Promise<
     const usuario = await requireUsuario();
     const { ticketId, repuestoId, cantidad } = registrarRepuestoSchema.parse(input);
 
-    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
-    if (ticket.tecnicoAsignadoId !== usuario.id) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: INCLUDE_COLABORADORES });
+    if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
 

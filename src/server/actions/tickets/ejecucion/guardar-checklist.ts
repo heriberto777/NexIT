@@ -5,6 +5,7 @@ import { requireUsuario } from "@/server/auth/session";
 import { guardarChecklistSchema } from "@/lib/zod/checklist.schema";
 import type { GuardarChecklistInput } from "@/lib/zod/checklist.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 // Paso 2: guarda (upsert) las respuestas del checklist dinámico del activo.
 // Se llama una vez por ítem respondido (autoguardado) o en batch al avanzar de paso.
@@ -16,8 +17,8 @@ export async function guardarChecklist(input: GuardarChecklistInput): Promise<Ac
     const usuario = await requireUsuario();
     const { ticketId, respuestas } = guardarChecklistSchema.parse(input);
 
-    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
-    if (ticket.tecnicoAsignadoId !== usuario.id) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: INCLUDE_COLABORADORES });
+    if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
 

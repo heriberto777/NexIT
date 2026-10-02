@@ -89,6 +89,14 @@ export const asignarTicketSchema = z.object({
 });
 export type AsignarTicketInput = z.infer<typeof asignarTicketSchema>;
 
+// Reemplaza el conjunto completo de colaboradores del ticket (no un diff) — mismo
+// criterio que especialidadIds en usuario.schema.ts. Array vacío = sin colaboradores.
+export const actualizarColaboradoresSchema = z.object({
+  ticketId: z.string().cuid(),
+  usuarioIds: z.array(z.string().cuid()),
+});
+export type ActualizarColaboradoresInput = z.infer<typeof actualizarColaboradoresSchema>;
+
 // Validación de la visita por el Cliente (o Admin como override): aprobar cierra el
 // ciclo (-> RESUELTO), rechazar reabre el ticket y exige justificar por qué.
 export const validarVisitaSchema = z

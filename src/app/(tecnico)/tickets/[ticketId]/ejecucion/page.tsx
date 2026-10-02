@@ -5,6 +5,7 @@ import { getSesionActual } from "@/server/auth/session";
 import { ExecutionWizard } from "@/components/checklist/execution-wizard";
 import { storageService } from "@/server/services/storage.service";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
 
 // Esta pantalla depende de datos siempre frescos del ticket (estado, evidencias, firma)
 // y de sesión del técnico — nunca debe pre-renderizarse estáticamente en el build.
@@ -28,6 +29,7 @@ export default async function EjecucionPage({ params }: PageProps) {
       evidencias: true,
       firmas: true,
       conversacionIA: { include: { mensajes: { orderBy: { createdAt: "asc" } } } },
+      ...INCLUDE_COLABORADORES,
     },
   });
 
@@ -41,9 +43,10 @@ export default async function EjecucionPage({ params }: PageProps) {
   // el ticketId — no llegaba a mutar nada, pero sí exponía el detalle del caso.
   // Un Admin/Coordinador también puede ejecutar el wizard cuando el ticket terminó
   // asignado a él mismo (ver asignar-tecnico.ts) — la propiedad (no el rol) es lo que
-  // habilita el acceso.
+  // habilita el acceso. Un colaborador (ver TicketColaborador / ticket-acceso.service.ts)
+  // entra con el mismo derecho que el responsable, sin ser el dueño del ticket.
   const sesion = await getSesionActual();
-  if (!sesion || !ROLES_EJECUTABLES.has(sesion.rol) || ticket.tecnicoAsignadoId !== sesion.id) {
+  if (!sesion || !ROLES_EJECUTABLES.has(sesion.rol) || !tieneAccesoAlTicket(ticket, sesion.id)) {
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
         <h1 className="text-lg font-semibold text-gray-900">Acceso restringido</h1>
