@@ -8,6 +8,7 @@ import { crearTicketSchema, type CrearTicketInput } from "@/lib/zod/ticket.schem
 import { crearTicket } from "@/server/actions/tickets/crear-ticket";
 import { buscarContactosCliente } from "@/server/actions/tickets/buscar-contactos-cliente";
 import { Button } from "@/components/ui/button";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 interface ContactoEncontrado {
   id: string;
@@ -157,6 +158,11 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
     setValue("sistemaNoCatalogado", undefined);
   }
 
+  function cambiarCliente(v: string) {
+    setValue("clienteId", v, { shouldValidate: true });
+    if (!contactoInicial) resetContacto();
+  }
+
   // Cambiar de cliente invalida cualquier contacto ya elegido — buscarlo de nuevo evita
   // enviar un contactoUsuarioId que pertenece a otro cliente.
   function resetContacto() {
@@ -217,17 +223,12 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-        <select
-          {...register("clienteId", { onChange: () => !contactoInicial && resetContacto() })}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="">Selecciona un cliente...</option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
+        <ComboboxBuscable
+          value={clienteId ?? ""}
+          onChange={cambiarCliente}
+          placeholder="Selecciona un cliente..."
+          options={clientes.map((c) => ({ value: c.id, label: c.nombre }))}
+        />
         {errors.clienteId && <p className="mt-1 text-xs text-red-600">{errors.clienteId.message}</p>}
       </div>
 
@@ -316,14 +317,13 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Sede</label>
-        <select {...register("sucursalId")} disabled={!clienteId} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50">
-          <option value="">Selecciona una sede...</option>
-          {sucursalesDelCliente.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.nombre}
-            </option>
-          ))}
-        </select>
+        <ComboboxBuscable
+          value={watch("sucursalId") ?? ""}
+          onChange={(v) => setValue("sucursalId", v, { shouldValidate: true })}
+          disabled={!clienteId}
+          placeholder="Selecciona una sede..."
+          options={sucursalesDelCliente.map((s) => ({ value: s.id, label: s.nombre }))}
+        />
         {errors.sucursalId && <p className="mt-1 text-xs text-red-600">{errors.sucursalId.message}</p>}
       </div>
 
@@ -355,14 +355,13 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
         !sinActivo ? (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Equipo (opcional)</label>
-            <select {...register("activoId")} disabled={!sucursalId} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50">
-              <option value="">Selecciona un equipo...</option>
-              {activosDeSucursal.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
+            <ComboboxBuscable
+              value={watch("activoId") ?? ""}
+              onChange={(v) => setValue("activoId", v, { shouldValidate: true })}
+              disabled={!sucursalId}
+              placeholder="Selecciona un equipo..."
+              options={activosDeSucursal.map((a) => ({ value: a.id, label: a.label }))}
+            />
             <button type="button" onClick={() => setSinActivo(true)} className="mt-1 text-xs text-blue-600 underline">
               No sé cuál es / no está en la lista
             </button>
@@ -383,30 +382,16 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
       ) : !sinSistema ? (
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Sistema (opcional)</label>
-          <select
+          <ComboboxBuscable
             value={sistemaSeleccion}
-            onChange={(e) => onSistemaChange(e.target.value)}
+            onChange={onSistemaChange}
             disabled={!clienteId}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
-          >
-            <option value="">Selecciona un sistema...</option>
-            {sistemasDelCliente.length > 0 && (
-              <optgroup label="Sistemas del cliente">
-                {sistemasDelCliente.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            <optgroup label="General">
-              {SISTEMAS_GENERICOS.map((g) => (
-                <option key={g.value} value={g.value}>
-                  {g.label}
-                </option>
-              ))}
-            </optgroup>
-          </select>
+            placeholder="Selecciona un sistema..."
+            options={[
+              ...sistemasDelCliente.map((s) => ({ value: s.id, label: s.nombre, grupo: "Sistemas del cliente" })),
+              ...SISTEMAS_GENERICOS.map((g) => ({ value: g.value, label: g.label, grupo: "General" })),
+            ]}
+          />
           <button type="button" onClick={activarSinSistema} className="mt-1 text-xs text-blue-600 underline">
             No sé cuál es / no está en la lista
           </button>

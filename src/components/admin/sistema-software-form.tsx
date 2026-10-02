@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, type UseFormRegister } from "react-hook-form";
+import { useForm, type UseFormRegister, type UseFormWatch, type UseFormSetValue } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import {
 import { crearSistemaSoftware } from "@/server/actions/admin/crear-sistema-software";
 import { editarSistemaSoftware } from "@/server/actions/admin/editar-sistema-software";
 import { Button } from "@/components/ui/button";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 interface Cliente {
   id: string;
@@ -43,6 +44,8 @@ export function SistemaSoftwareForm({ clientes, modoEdicion, valoresIniciales, c
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CrearSistemaSoftwareInput | EditarSistemaSoftwareInput>({
     resolver: zodResolver(modoEdicion ? editarSistemaSoftwareSchema : crearSistemaSoftwareSchema),
@@ -51,8 +54,9 @@ export function SistemaSoftwareForm({ clientes, modoEdicion, valoresIniciales, c
   // clienteId (solo crear) y estado (solo editar) no son comunes a ambos schemas, así
   // que TypeScript no deja registrarlos directo sobre el tipo unión — se castea el
   // register al tipo del modo correspondiente, cada uno usado solo en su rama de la UI.
-  const registerCrear = register as unknown as UseFormRegister<CrearSistemaSoftwareInput>;
   const registerEditar = register as unknown as UseFormRegister<EditarSistemaSoftwareInput>;
+  const watchCrear = watch as unknown as UseFormWatch<CrearSistemaSoftwareInput>;
+  const setValueCrear = setValue as unknown as UseFormSetValue<CrearSistemaSoftwareInput>;
 
   async function onSubmit(values: CrearSistemaSoftwareInput | EditarSistemaSoftwareInput) {
     setError(null);
@@ -86,14 +90,12 @@ export function SistemaSoftwareForm({ clientes, modoEdicion, valoresIniciales, c
         ) : (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-            <select {...registerCrear("clienteId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-              <option value="">Selecciona...</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
+            <ComboboxBuscable
+              value={watchCrear("clienteId") ?? ""}
+              onChange={(v) => setValueCrear("clienteId", v, { shouldValidate: true })}
+              placeholder="Selecciona..."
+              options={clientes.map((c) => ({ value: c.id, label: c.nombre }))}
+            />
             {"clienteId" in errors && errors.clienteId && <p className="mt-1 text-xs text-red-600">{errors.clienteId.message}</p>}
           </div>
         )}

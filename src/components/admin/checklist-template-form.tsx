@@ -8,6 +8,7 @@ import Link from "next/link";
 import { guardarChecklistTemplateSchema, type GuardarChecklistTemplateInput } from "@/lib/zod/checklist-template.schema";
 import { guardarChecklistTemplate } from "@/server/actions/checklists/guardar-checklist-template";
 import { Button } from "@/components/ui/button";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 interface Categoria {
   id: string;
@@ -36,6 +37,7 @@ export function ChecklistTemplateForm({ categorias, modoEdicion, valoresIniciale
     control,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<GuardarChecklistTemplateInput>({
     resolver: zodResolver(guardarChecklistTemplateSchema),
@@ -77,18 +79,13 @@ export function ChecklistTemplateForm({ categorias, modoEdicion, valoresIniciale
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Categoría de activo</label>
-            <select
-              {...register("categoriaActivoId")}
+            <ComboboxBuscable
+              value={watch("categoriaActivoId") ?? ""}
+              onChange={(v) => setValue("categoriaActivoId", v, { shouldValidate: true })}
               disabled={modoEdicion}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
-            >
-              <option value="">Selecciona...</option>
-              {categorias.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
+              placeholder="Selecciona..."
+              options={categorias.map((c) => ({ value: c.id, label: c.nombre }))}
+            />
             {errors.categoriaActivoId && <p className="mt-1 text-xs text-red-600">{errors.categoriaActivoId.message}</p>}
           </div>
           <div>

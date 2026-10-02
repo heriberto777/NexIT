@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 export const dynamic = "force-dynamic";
 
@@ -41,16 +42,14 @@ export default async function SistemasSoftwarePage({ searchParams }: PageProps) 
       </div>
 
       <form className="flex items-end gap-2 rounded-xl border border-gray-200 bg-white p-3" method="GET">
-        <div>
+        <div className="w-48">
           <label className="mb-1 block text-xs font-medium text-gray-600">Cliente</label>
-          <select name="clienteId" defaultValue={clienteId ?? ""} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-            <option value="">Todos</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
+          <ComboboxBuscable
+            name="clienteId"
+            defaultValue={clienteId ?? ""}
+            placeholder="Todos"
+            options={[{ value: "", label: "Todos" }, ...clientes.map((c) => ({ value: c.id, label: c.nombre }))]}
+          />
         </div>
         <button type="submit" className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
           Filtrar

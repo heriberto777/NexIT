@@ -10,6 +10,7 @@ import { crearActivo } from "@/server/actions/admin/crear-activo";
 import { editarActivo } from "@/server/actions/admin/editar-activo";
 import { crearCategoriaActivo } from "@/server/actions/admin/crear-categoria-activo";
 import { Button } from "@/components/ui/button";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 interface Sucursal {
   id: string;
@@ -107,27 +108,23 @@ export function ActivoForm({ sucursales, categorias: categoriasIniciales, modoEd
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Sucursal</label>
-          <select {...register("sucursalId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-            <option value="">Selecciona...</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <ComboboxBuscable
+            value={watch("sucursalId") ?? ""}
+            onChange={(v) => setValue("sucursalId", v, { shouldValidate: true })}
+            placeholder="Selecciona..."
+            options={sucursales.map((s) => ({ value: s.id, label: s.label }))}
+          />
           {errors.sucursalId && <p className="mt-1 text-xs text-red-600">{errors.sucursalId.message}</p>}
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
-          <select {...register("categoriaId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-            <option value="">Selecciona...</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
+          <ComboboxBuscable
+            value={watch("categoriaId") ?? ""}
+            onChange={(v) => setValue("categoriaId", v, { shouldValidate: true })}
+            placeholder="Selecciona..."
+            options={categorias.map((c) => ({ value: c.id, label: c.nombre }))}
+          />
           {errors.categoriaId && <p className="mt-1 text-xs text-red-600">{errors.categoriaId.message}</p>}
 
           {categoriaSeleccionada &&

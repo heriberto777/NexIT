@@ -10,6 +10,7 @@ import { editarTicket } from "@/server/actions/tickets/editar-ticket";
 import { cancelarTicket } from "@/server/actions/tickets/cancelar-ticket";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 interface TecnicoOpcion {
   id: string;
@@ -101,19 +102,15 @@ export function GestionTicketPanel({ ticket, tecnicos, hayTrabajoEnProgreso }: P
           <label className="mb-1 block text-xs font-medium text-gray-600">
             {ticket.tecnicoAsignadoId ? "Reasignar técnico" : "Asignar técnico"}
           </label>
-          <select
+          <ComboboxBuscable
             value={tecnicoId}
-            onChange={(e) => setTecnicoId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value="">Selecciona un técnico</option>
-            {tecnicos.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nombre}
-                {ETIQUETA_ROL[t.rol] ? ` (${ETIQUETA_ROL[t.rol]})` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={setTecnicoId}
+            placeholder="Selecciona un técnico"
+            options={tecnicos.map((t) => ({
+              value: t.id,
+              label: `${t.nombre}${ETIQUETA_ROL[t.rol] ? ` (${ETIQUETA_ROL[t.rol]})` : ""}`,
+            }))}
+          />
         </div>
         <Button type="button" onClick={guardarAsignacion} disabled={isPending || !tecnicoId || tecnicoId === ticket.tecnicoAsignadoId}>
           {isPending ? "Guardando..." : "Asignar"}

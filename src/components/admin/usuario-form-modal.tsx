@@ -9,6 +9,7 @@ import { crearUsuario } from "@/server/actions/admin/usuarios/crear-usuario";
 import { editarUsuario } from "@/server/actions/admin/usuarios/editar-usuario";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 interface ClienteOpcion {
   id: string;
@@ -37,6 +38,7 @@ export function UsuarioFormModal({ clientes, usuarioExistente }: { clientes: Cli
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CrearUsuarioInput | EditarUsuarioInput>({
     resolver: zodResolver(esEdicion ? editarUsuarioSchema : crearUsuarioSchema),
@@ -111,14 +113,12 @@ export function UsuarioFormModal({ clientes, usuarioExistente }: { clientes: Cli
           {rol === "CLIENTE" && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Empresa</label>
-              <select {...register("clienteId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option value="">Selecciona una empresa</option>
-                {clientes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
+              <ComboboxBuscable
+                value={watch("clienteId") ?? ""}
+                onChange={(v) => setValue("clienteId", v, { shouldValidate: true })}
+                placeholder="Selecciona una empresa"
+                options={clientes.map((c) => ({ value: c.id, label: c.nombre }))}
+              />
               {errors.clienteId && <p className="mt-1 text-xs text-red-600">{errors.clienteId.message}</p>}
             </div>
           )}

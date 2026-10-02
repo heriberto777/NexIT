@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { crearTicketPortalSchema, type CrearTicketPortalInput } from "@/lib/zod/portal.schema";
 import { crearTicketPortal } from "@/server/actions/portal/crear-ticket";
 import { Button } from "@/components/ui/button";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 interface Sucursal {
   id: string;
@@ -221,14 +222,12 @@ export function NuevoTicketWizard({
             {tipoProblema === "EQUIPO" ? (
               !sinActivo ? (
                 <>
-                  <select {...register("activoId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                    <option value="">Selecciona un equipo...</option>
-                    {activosDeSucursal.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.label}
-                      </option>
-                    ))}
-                  </select>
+                  <ComboboxBuscable
+                    value={watch("activoId") ?? ""}
+                    onChange={(v) => setValue("activoId", v, { shouldValidate: true })}
+                    placeholder="Selecciona un equipo..."
+                    options={activosDeSucursal.map((a) => ({ value: a.id, label: a.label }))}
+                  />
                   <button type="button" onClick={() => setSinActivo(true)} className="text-xs text-blue-600 underline">
                     No sé cuál es / no está en la lista
                   </button>
@@ -248,29 +247,15 @@ export function NuevoTicketWizard({
               )
             ) : !sinSistema ? (
               <>
-                <select
+                <ComboboxBuscable
                   value={sistemaSeleccion}
-                  onChange={(e) => onSistemaChange(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Selecciona un sistema...</option>
-                  {sistemasSoftware.length > 0 && (
-                    <optgroup label="Sistemas de tu empresa">
-                      {sistemasSoftware.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.nombre}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  <optgroup label="General">
-                    {SISTEMAS_GENERICOS.map((g) => (
-                      <option key={g.value} value={g.value}>
-                        {g.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
+                  onChange={onSistemaChange}
+                  placeholder="Selecciona un sistema..."
+                  options={[
+                    ...sistemasSoftware.map((s) => ({ value: s.id, label: s.nombre, grupo: "Sistemas de tu empresa" })),
+                    ...SISTEMAS_GENERICOS.map((g) => ({ value: g.value, label: g.label, grupo: "General" })),
+                  ]}
+                />
                 <button type="button" onClick={activarSinSistema} className="text-xs text-blue-600 underline">
                   No sé cuál es / no está en la lista
                 </button>

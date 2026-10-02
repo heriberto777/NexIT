@@ -8,6 +8,7 @@ import Link from "next/link";
 import { guardarPlanPreventivoSchema, type GuardarPlanPreventivoInput } from "@/lib/zod/plan-preventivo.schema";
 import { guardarPlanPreventivo } from "@/server/actions/admin/guardar-plan-preventivo";
 import { Button } from "@/components/ui/button";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 interface Opcion {
   id: string;
@@ -37,6 +38,8 @@ export function PlanPreventivoForm({ activos, sucursales, tecnicos, valoresInici
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<GuardarPlanPreventivoInput>({
     resolver: zodResolver(guardarPlanPreventivoSchema),
@@ -92,26 +95,22 @@ export function PlanPreventivoForm({ activos, sucursales, tecnicos, valoresInici
         {vinculo === "activo" ? (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Activo</label>
-            <select {...register("activoId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-              <option value="">Selecciona...</option>
-              {activos.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
+            <ComboboxBuscable
+              value={watch("activoId") ?? ""}
+              onChange={(v) => setValue("activoId", v, { shouldValidate: true })}
+              placeholder="Selecciona..."
+              options={activos.map((a) => ({ value: a.id, label: a.label }))}
+            />
           </div>
         ) : (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Sucursal</label>
-            <select {...register("sucursalId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-              <option value="">Selecciona...</option>
-              {sucursales.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            <ComboboxBuscable
+              value={watch("sucursalId") ?? ""}
+              onChange={(v) => setValue("sucursalId", v, { shouldValidate: true })}
+              placeholder="Selecciona..."
+              options={sucursales.map((s) => ({ value: s.id, label: s.label }))}
+            />
           </div>
         )}
 
@@ -141,14 +140,12 @@ export function PlanPreventivoForm({ activos, sucursales, tecnicos, valoresInici
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Técnico asignado por defecto</label>
-            <select {...register("tecnicoAsignadoId")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-              <option value="">Sin asignar</option>
-              {tecnicos.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+            <ComboboxBuscable
+              value={watch("tecnicoAsignadoId") ?? ""}
+              onChange={(v) => setValue("tecnicoAsignadoId", v, { shouldValidate: true })}
+              placeholder="Sin asignar"
+              options={tecnicos.map((t) => ({ value: t.id, label: t.label }))}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Prioridad del ticket</label>
