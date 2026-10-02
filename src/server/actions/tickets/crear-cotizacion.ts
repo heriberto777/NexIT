@@ -7,43 +7,46 @@ import type { CrearCotizacionInput } from "@/lib/zod/ticket.schema";
 import { ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
 import { formatCurrency } from "@/lib/utils/currency";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["TECNICO", "COORDINADOR", "ADMIN"] as const;
 
-export async function crearCotizacion(input: CrearCotizacionInput) {
-  const usuario = await requireUsuario();
-  if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
-    throw new Error(`Tu rol (${usuario.rol}) no puede solicitar cotizaciones`);
-  }
+export async function crearCotizacion(input: CrearCotizacionInput): Promise<ActionResult<{ id: string }>> {
+  return ejecutarAccion(async () => {
+    const usuario = await requireUsuario();
+    if (!ROLES_PERMITIDOS.includes(usuario.rol as (typeof ROLES_PERMITIDOS)[number])) {
+      throw new Error(`Tu rol (${usuario.rol}) no puede solicitar cotizaciones`);
+    }
 
-  const { ticketId, monto, descripcion } = crearCotizacionSchema.parse(input);
+    const { ticketId, monto, descripcion } = crearCotizacionSchema.parse(input);
 
-  const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
-  if (ESTADOS_TERMINALES.has(ticket.estado)) {
-    throw new Error(`No se puede solicitar una cotización en un ticket ${ticket.estado}`);
-  }
-  if (usuario.rol === "TECNICO" && ticket.tecnicoAsignadoId !== usuario.id) {
-    throw new Error("Este ticket no está asignado a este técnico");
-  }
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+    if (ESTADOS_TERMINALES.has(ticket.estado)) {
+      throw new Error(`No se puede solicitar una cotización en un ticket ${ticket.estado}`);
+    }
+    if (usuario.rol === "TECNICO" && ticket.tecnicoAsignadoId !== usuario.id) {
+      throw new Error("Este ticket no está asignado a este técnico");
+    }
 
-  const { monedaSimbolo } = await obtenerConfiguracion();
+    const { monedaSimbolo } = await obtenerConfiguracion();
 
-  const cotizacion = await prisma.$transaction(async (tx) => {
-    const nueva = await tx.cotizacion.create({
-      data: { ticketId, monto, descripcion },
+    const cotizacion = await prisma.$transaction(async (tx) => {
+      const nueva = await tx.cotizacion.create({
+        data: { ticketId, monto, descripcion },
+      });
+
+      await tx.ticketHistorial.create({
+        data: {
+          ticketId,
+          usuarioId: usuario.id,
+          estadoNuevo: ticket.estado,
+          comentario: `Cotización solicitada por ${formatCurrency(monto, monedaSimbolo)}: ${descripcion}`,
+        },
+      });
+
+      return nueva;
     });
 
-    await tx.ticketHistorial.create({
-      data: {
-        ticketId,
-        usuarioId: usuario.id,
-        estadoNuevo: ticket.estado,
-        comentario: `Cotización solicitada por ${formatCurrency(monto, monedaSimbolo)}: ${descripcion}`,
-      },
-    });
-
-    return nueva;
+    return { id: cotizacion.id };
   });
-
-  return { id: cotizacion.id };
 }

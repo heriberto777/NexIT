@@ -182,7 +182,7 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
     setBuscando(true);
     const timeout = setTimeout(() => {
       buscarContactosCliente({ clienteId, query: busqueda.trim() })
-        .then(setResultados)
+        .then((resultado) => setResultados(resultado.ok ? resultado.data : []))
         .finally(() => setBuscando(false));
     }, 300);
     return () => clearTimeout(timeout);
@@ -202,12 +202,12 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
 
   async function onSubmit(values: CrearTicketInput) {
     setError(null);
-    try {
-      const { id } = await crearTicket(values);
-      router.push(`/tickets/${id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await crearTicket(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    router.push(`/tickets/${resultado.data.id}`);
   }
 
   return (

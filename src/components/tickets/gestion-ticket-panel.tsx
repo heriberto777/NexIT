@@ -59,36 +59,36 @@ export function GestionTicketPanel({ ticket, tecnicos, hayTrabajoEnProgreso }: P
     setError(null);
     if (!tecnicoId) return;
     startTransition(async () => {
-      try {
-        await asignarTecnico({ ticketId: ticket.id, tecnicoId });
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      const resultado = await asignarTecnico({ ticketId: ticket.id, tecnicoId });
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      router.refresh();
     });
   }
 
   async function guardarEdicion(values: EditarTicketInput) {
     setError(null);
-    try {
-      await editarTicket(values);
-      setEditando(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await editarTicket(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    setEditando(false);
+    router.refresh();
   }
 
   function confirmarCancelacion() {
     setError(null);
     startTransition(async () => {
-      try {
-        await cancelarTicket({ ticketId: ticket.id, motivo: motivoCancelacion });
-        setCancelando(false);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      const resultado = await cancelarTicket({ ticketId: ticket.id, motivo: motivoCancelacion });
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      setCancelando(false);
+      router.refresh();
     });
   }
 

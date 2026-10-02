@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { validarVisita } from "@/server/actions/tickets/validar-visita";
 import { cerrarTicket } from "@/server/actions/tickets/cerrar-ticket";
+import type { ActionResult } from "@/server/actions/action-result";
 
 interface Props {
   ticketId: string;
@@ -19,15 +20,15 @@ export function ValidationActions({ ticketId, estado, rolActual }: Props) {
   const [mostrarRechazo, setMostrarRechazo] = useState(false);
   const [comentario, setComentario] = useState("");
 
-  function ejecutar<T>(accion: () => Promise<T>) {
+  function ejecutar<T>(accion: () => Promise<ActionResult<T>>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await accion();
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      const resultado = await accion();
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      router.refresh();
     });
   }
 

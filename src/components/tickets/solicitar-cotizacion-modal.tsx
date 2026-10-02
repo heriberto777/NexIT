@@ -26,14 +26,14 @@ export function SolicitarCotizacionModal({ ticketId, monedaSimbolo }: { ticketId
 
   async function onSubmit(values: CrearCotizacionInput) {
     setError(null);
-    try {
-      await crearCotizacion(values);
-      reset({ ticketId, monto: undefined, descripcion: "" });
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await crearCotizacion(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    reset({ ticketId, monto: undefined, descripcion: "" });
+    setOpen(false);
+    router.refresh();
   }
 
   return (
