@@ -2,49 +2,115 @@
   "name": "NexIT - Resumen diario",
   "nodes": [
     {
-      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }] } },
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
       "id": "schedule-resumen-diario",
       "name": "Todos los días 8am",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "GET",
         "url": "https://nexit.tuempresa.com/api/n8n/staff/resumen",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        }
       },
       "id": "get-resumen-diario",
       "name": "GET resumen",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const r = $json;\nconst lineas = [\n  '📊 Resumen diario NexIT',\n  '',\n  `Tickets activos: ${r.ticketsActivos}`,\n  `Críticos/altos sin asignar: ${r.criticosSinAsignar.length}`,\n  `Cumplimiento SLA: ${r.slaCumplimiento.pctCumplimiento ?? '—'}%`,\n  `Preventivos vencidos: ${r.preventivosPorVigencia.vencido}`,\n];\nif (r.criticosSinAsignar.length) {\n  lineas.push('', 'Sin asignar:');\n  for (const t of r.criticosSinAsignar.slice(0, 5)) {\n    lineas.push(`- #${t.numeroTicket} (${t.clienteNombre}, ${t.prioridad}, ${t.horasAbierto}h)`);\n  }\n}\nreturn [{ json: { mensaje: lineas.join('\\n') } }];"
+        "jsCode": "const r = $json;\nconst lineas = [\n  `📊 Resumen diario ${r.empresaNombre}`,\n  '',\n  `Tickets activos: ${r.ticketsActivos}`,\n  `Críticos/altos sin asignar: ${r.criticosSinAsignar.length}`,\n  `Cumplimiento SLA: ${r.slaCumplimiento.pctCumplimiento ?? '—'}%`,\n  `Preventivos vencidos: ${r.preventivosPorVigencia.vencido}`,\n];\nif (r.criticosSinAsignar.length) {\n  lineas.push('', 'Sin asignar:');\n  for (const t of r.criticosSinAsignar.slice(0, 5)) {\n    lineas.push(`- #${t.numeroTicket} (${t.clienteNombre}, ${t.prioridad}, ${t.horasAbierto}h)`);\n  }\n}\nreturn [{ json: { mensaje: lineas.join('\\n') } }];"
       },
       "id": "formatear-resumen-diario",
       "name": "Formatear resumen",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
-      "parameters": { "chatId": "={{ $env.NEXIT_TELEGRAM_CHAT_ID }}", "text": "={{ $json.mensaje }}" },
+      "parameters": {
+        "chatId": "={{ $env.NEXIT_TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.mensaje }}"
+      },
       "id": "telegram-resumen-diario",
       "name": "Telegram - Grupo",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [660, 0],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     }
   ],
   "connections": {
-    "Todos los días 8am": { "main": [[{ "node": "GET resumen", "type": "main", "index": 0 }]] },
-    "GET resumen": { "main": [[{ "node": "Formatear resumen", "type": "main", "index": 0 }]] },
-    "Formatear resumen": { "main": [[{ "node": "Telegram - Grupo", "type": "main", "index": 0 }]] }
+    "Todos los días 8am": {
+      "main": [
+        [
+          {
+            "node": "GET resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET resumen": {
+      "main": [
+        [
+          {
+            "node": "Formatear resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear resumen": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Grupo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   }
 }

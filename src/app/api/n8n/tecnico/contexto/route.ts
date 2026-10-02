@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { contextoTecnicoSchema } from "@/lib/zod/n8n.schema";
 import { resolverUsuarioPorChatId } from "@/server/services/vinculacion-identidad.service";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +41,10 @@ export async function GET(request: Request) {
   const usuario = await resolverUsuarioPorChatId(canal, identificador);
 
   if (!usuario || usuario.rol !== "TECNICO" || usuario.estado !== "ACTIVO") {
+    const { empresaNombre } = await obtenerConfiguracion();
     return responder({
       autorizado: false,
-      mensaje: "No encontramos tu número vinculado a NexIT como técnico. Pedile al administrador que lo configure en tu perfil.",
+      mensaje: `No encontramos tu número vinculado a ${empresaNombre} como técnico. Pedile al administrador que lo configure en tu perfil.`,
     });
   }
 

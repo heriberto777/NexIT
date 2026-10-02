@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { enviarCodigoVinculacionChat } from "@/server/services/email.service";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 const MINUTOS_VIGENCIA = 10;
 const INTENTOS_MAXIMOS = 3;
@@ -70,9 +71,10 @@ export async function procesarMensajeVinculacion(input: {
     await prisma.verificacionIdentidadChat.create({
       data: { canal, identificador, expiraEn: new Date(Date.now() + MINUTOS_VIGENCIA * 60 * 1000) },
     });
+    const { empresaNombre } = await obtenerConfiguracion();
     return {
       continuar: false,
-      mensaje: "Antes de continuar, decime el correo con el que tenés cuenta en NexIT (si no tenés, no te preocupes, seguimos igual).",
+      mensaje: `Antes de continuar, decime el correo con el que tenés cuenta en ${empresaNombre} (si no tenés, no te preocupes, seguimos igual).`,
     };
   }
 

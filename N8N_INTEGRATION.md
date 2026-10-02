@@ -11,9 +11,17 @@ Todo evento se envía como `POST` a `WEBHOOK_N8N_URL` con este sobre común:
 {
   "evento": "TICKET_CREADO | TICKET_CAMBIO_ESTADO | SLA_EN_RIESGO | TICKET_ASIGNADO | CONTACTO_CREADO | CONTACTO_NO_IDENTIFICADO",
   "timestamp": "2026-09-22T19:35:41.001Z",
+  "empresaNombre": "NexIT Soporte Técnico",
   "data": { /* específico de cada evento, ver abajo */ }
 }
 ```
+
+> `empresaNombre` viaja en la raíz del sobre (no dentro de `data`) en **todo** evento —
+> es `ConfiguracionSistema.empresaNombre` (editable en `/admin/configuracion` → "Perfil
+> de la empresa"), nunca un string fijo. Los nodos de texto de los workflows (correo de
+> bienvenida, aviso de contacto no identificado, etc.) lo referencian con
+> `{{ $json.empresaNombre }}` en vez de tener el nombre de la empresa escrito a mano —
+> si renombrás la empresa ahí, esos mensajes cambian solos, sin tocar ningún workflow.
 
 Headers en cada request (fuente: `src/server/services/webhook.service.ts`):
 
@@ -1389,8 +1397,8 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "fromEmail": "notificaciones@nexit.tuempresa.com",
         "toEmail": "={{$json.data.email}}",
-        "subject": "=Bienvenido a NexIT — acceso a tu Portal",
-        "text": "=Hola {{$json.data.nombre}}, un representante de {{$json.data.clienteNombre}} te registró en NexIT para dar seguimiento a tus solicitudes de soporte.\n\nIngresa en {{$env.NEXIT_BASE_URL}}/login con:\nUsuario: {{$json.data.email}}\nContraseña temporal: {{$json.data.passwordTemporal}}\n\nTe recomendamos cambiarla ni bien inicies sesión, desde tu Perfil."
+        "subject": "=Bienvenido a {{ $json.empresaNombre }} — acceso a tu Portal",
+        "text": "=Hola {{$json.data.nombre}}, un representante de {{$json.data.clienteNombre}} te registró en {{ $json.empresaNombre }} para dar seguimiento a tus solicitudes de soporte.\n\nIngresa en {{$env.NEXIT_BASE_URL}}/login con:\nUsuario: {{$json.data.email}}\nContraseña temporal: {{$json.data.passwordTemporal}}\n\nTe recomendamos cambiarla ni bien inicies sesión, desde tu Perfil."
       },
       "id": "email-contacto-creado",
       "name": "Email bienvenida contacto",
@@ -1429,7 +1437,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.data.whatsapp}}",
-        "message": "=Hola {{$json.data.nombre}}! Te registramos en NexIT para dar seguimiento a tus solicitudes de soporte. Ingresa en {{$env.NEXIT_BASE_URL}}/login con tu correo ({{$json.data.email}}) y la contraseña temporal: {{$json.data.passwordTemporal}}"
+        "message": "=Hola {{$json.data.nombre}}! Te registramos en {{ $json.empresaNombre }} para dar seguimiento a tus solicitudes de soporte. Ingresa en {{$env.NEXIT_BASE_URL}}/login con tu correo ({{$json.data.email}}) y la contraseña temporal: {{$json.data.passwordTemporal}}"
       },
       "id": "twilio-contacto-creado",
       "name": "Twilio bienvenida contacto",
@@ -1449,7 +1457,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "chatId": "={{$env.NEXIT_TELEGRAM_CHAT_ID}}",
-        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\nNombre: {{$json.data.nombre}}\nEmpresa (reportada por él, sin confirmar): {{$json.data.empresaReportada}}\nTeléfono: {{$json.data.telefonoReportado}}\nCorreo: {{$json.data.correoReportado}}\nMotivo: {{$json.data.motivo}}\n\nNo hay ningún usuario de NexIT con ese chat/teléfono vinculado. Un representante debe confirmar a qué cliente pertenece y crear su ticket desde \"Crear ticket\" en NexIT (o desde /admin/contactos-pendientes)."
+        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\nNombre: {{$json.data.nombre}}\nEmpresa (reportada por él, sin confirmar): {{$json.data.empresaReportada}}\nTeléfono: {{$json.data.telefonoReportado}}\nCorreo: {{$json.data.correoReportado}}\nMotivo: {{$json.data.motivo}}\n\nNo hay ningún usuario de {{ $json.empresaNombre }} con ese chat/teléfono vinculado. Un representante debe confirmar a qué cliente pertenece y crear su ticket desde \"Crear ticket\" en {{ $json.empresaNombre }} (o desde /admin/contactos-pendientes)."
       },
       "id": "telegram-contacto-no-identificado",
       "name": "Telegram contacto no identificado",
@@ -1486,7 +1494,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.telefono}}",
-        "message": "=📵 Contacto no identificado por {{$('Switch por evento').item.json.data.canal}}: {{$('Switch por evento').item.json.data.nombre}}, de \"{{$('Switch por evento').item.json.data.empresaReportada}}\" — Tel: {{$('Switch por evento').item.json.data.telefonoReportado}}, correo: {{$('Switch por evento').item.json.data.correoReportado}}. Motivo: {{$('Switch por evento').item.json.data.motivo}}. Contactalo y levantá el ticket en NexIT."
+        "message": "=📵 Contacto no identificado por {{$('Switch por evento').item.json.data.canal}}: {{$('Switch por evento').item.json.data.nombre}}, de \"{{$('Switch por evento').item.json.data.empresaReportada}}\" — Tel: {{$('Switch por evento').item.json.data.telefonoReportado}}, correo: {{$('Switch por evento').item.json.data.correoReportado}}. Motivo: {{$('Switch por evento').item.json.data.motivo}}. Contactalo y levantá el ticket en {{ $('Switch por evento').item.json.empresaNombre }}."
       },
       "id": "twilio-staff-contacto-no-identificado",
       "name": "Twilio aviso staff (contacto no identificado)",
@@ -1963,6 +1971,7 @@ cliente (sucursales y sus activos, y sus sistemas de software — ver
 // 200 — encontrado
 {
   "encontrado": true,
+  "empresaNombre": "NexIT Soporte Técnico",
   "conversacionId": "cmuluoqaj0001p40ujpv2csxe",
   "usuarioNombre": "Juan Pérez",
   "clienteNombre": "Constructora ABC S.A.",
@@ -2300,7 +2309,7 @@ URL/body del nodo Code si usás otro).
     },
     {
       "parameters": {
-        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nconst historialTexto = contexto.historial.map((m) => `${m.rol === 'USUARIO' ? 'Cliente' : 'Asistente'}: ${m.contenido}`).join('\\n');\n\nconst prompt = `Sos el asistente de soporte tecnico de NexIT, atendiendo por chat a ${contexto.usuarioNombre} de ${contexto.clienteNombre}.\n\nSucursales y equipos (activos) de este cliente:\n${JSON.stringify(contexto.sucursales)}\n\nSistemas de software/terceros que este cliente tiene registrado (ademas de \"sistema operativo\" y \"suite de oficina\", que son opciones genericas validas para cualquier cliente aunque no aparezcan en esta lista):\n${JSON.stringify(contexto.sistemasSoftware)}\n\nHistorial completo de la conversacion (el ultimo mensaje es el mas reciente):\n${historialTexto}\n\nTu trabajo, en este orden:\n1. Si el ultimo mensaje del cliente es un saludo o no tiene detalle tecnico (\"hola\", \"tengo un problema\"), NO crees un ticket todavia - respondé con una pregunta concreta para entender que pasa (que equipo o sistema, que sintoma exacto, desde cuando).\n2. En cuanto tengas un problema concreto, crea el ticket DE INMEDIATO - no le pidas al cliente que pruebe nada primero ni esperes que confirme si funciono. Muchos contactos no tienen el conocimiento ni las facilidades para seguir un procedimiento tecnico por chat, y hacerlo esperar solo demora que un tecnico real se entere. Si conoces una sugerencia breve y segura para que intente mientras el tecnico llega (reiniciar el equipo, revisar corriente/cables), incluila en ticket.sugerenciaIA como dato informativo para el tecnico - nunca la uses como excusa para retrasar el ticket, y en tu mensaje al cliente aclara que igual ya se genero el ticket. Prioriza ALTA o CRITICA para fallas totales/de seguridad, MEDIA para el resto.\n3. Si el cliente dice que ya se soluciono solo (antes de llegar al punto 2), cerra la conversacion sin ticket.\n\nDecidi si el problema es de un EQUIPO fisico o de un SISTEMA, y completa ticket.categoriaSoporte segun corresponda - nunca pidas esta clasificacion explicitamente al cliente, inferila de lo que describe:\n- Equipo fisico (UPS, switch, PC, impresora, etc.) -> categoriaSoporte \"HARDWARE\" (el equipo en si fallo) o \"INFRAESTRUCTURA\" (problema de red/cableado), y completa activoId si identificas cual de la lista de activos es (o null si no esta claro).\n- El cliente menciona un sistema de la lista de sistemas de software -> categoriaSoporte \"SOFTWARE_TERCEROS\" y completa sistemaSoftwareId con el id de ese sistema.\n- El cliente dice \"el sistema operativo\", \"Windows\", \"el servidor no actualiza\", \"Office\", \"Excel\", etc. (no es un sistema de la lista ni un equipo fisico) -> categoriaSoporte \"SOFTWARE_SISTEMA\" y describi brevemente cual en sistemaNoCatalogado (ej. \"Sistema operativo\", \"Suite de oficina\").\n- No queda claro si es equipo o sistema, o es un sistema que no reconoces y no es ninguno de los anteriores -> categoriaSoporte \"SOFTWARE\" y, si aplica, describi lo que el cliente dijo en sistemaNoCatalogado.\nactivoId y sistemaSoftwareId nunca van los dos a la vez en el mismo ticket.\n\nNunca inventes datos que el cliente no dio - si falta el nombre de la sede y el cliente tiene mas de una, deja sucursalId en null (el sistema le va a preguntar directamente cual es).\n\nDevolve SOLO un JSON con esta forma exacta:\n{\n  \"accion\": \"PREGUNTAR\" o \"CREAR_TICKET\" o \"CERRAR_SIN_TICKET\",\n  \"mensaje\": \"el texto que le vas a responder al cliente, en español, tono cordial y breve - si accion=CREAR_TICKET, mencionale que ya se genero el ticket, nunca le pidas que pruebe algo antes\",\n  \"ticket\": null o { \"titulo\": \"...\", \"descripcion\": \"...\", \"prioridad\": \"CRITICA\" o \"ALTA\" o \"MEDIA\" o \"BAJA\", \"sucursalId\": \"...\" o null, \"categoriaSoporte\": \"HARDWARE\" o \"INFRAESTRUCTURA\" o \"SOFTWARE_TERCEROS\" o \"SOFTWARE_SISTEMA\" o \"SOFTWARE\", \"activoId\": \"...\" o null, \"sistemaSoftwareId\": \"...\" o null, \"sistemaNoCatalogado\": \"...\" o null, \"sugerenciaIA\": \"...\" o null }\n}`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  conversacionId: contexto.conversacionId,\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  accion: ai.accion,\n  mensajeAsistente: ai.mensaje,\n  ticket: ai.ticket && ai.ticket.titulo ? ai.ticket : undefined,\n} }];"
+        "jsCode": "const contexto = $json;\nconst openaiKey = $env.OPENAI_API_KEY;\n\nconst historialTexto = contexto.historial.map((m) => `${m.rol === 'USUARIO' ? 'Cliente' : 'Asistente'}: ${m.contenido}`).join('\\n');\n\nconst prompt = `Sos el asistente de soporte tecnico de ${contexto.empresaNombre}, atendiendo por chat a ${contexto.usuarioNombre} de ${contexto.clienteNombre}.\n\nSucursales y equipos (activos) de este cliente:\n${JSON.stringify(contexto.sucursales)}\n\nSistemas de software/terceros que este cliente tiene registrado (ademas de \"sistema operativo\" y \"suite de oficina\", que son opciones genericas validas para cualquier cliente aunque no aparezcan en esta lista):\n${JSON.stringify(contexto.sistemasSoftware)}\n\nHistorial completo de la conversacion (el ultimo mensaje es el mas reciente):\n${historialTexto}\n\nTu trabajo, en este orden:\n1. Si el ultimo mensaje del cliente es un saludo o no tiene detalle tecnico (\"hola\", \"tengo un problema\"), NO crees un ticket todavia - respondé con una pregunta concreta para entender que pasa (que equipo o sistema, que sintoma exacto, desde cuando).\n2. En cuanto tengas un problema concreto, crea el ticket DE INMEDIATO - no le pidas al cliente que pruebe nada primero ni esperes que confirme si funciono. Muchos contactos no tienen el conocimiento ni las facilidades para seguir un procedimiento tecnico por chat, y hacerlo esperar solo demora que un tecnico real se entere. Si conoces una sugerencia breve y segura para que intente mientras el tecnico llega (reiniciar el equipo, revisar corriente/cables), incluila en ticket.sugerenciaIA como dato informativo para el tecnico - nunca la uses como excusa para retrasar el ticket, y en tu mensaje al cliente aclara que igual ya se genero el ticket. Prioriza ALTA o CRITICA para fallas totales/de seguridad, MEDIA para el resto.\n3. Si el cliente dice que ya se soluciono solo (antes de llegar al punto 2), cerra la conversacion sin ticket.\n\nDecidi si el problema es de un EQUIPO fisico o de un SISTEMA, y completa ticket.categoriaSoporte segun corresponda - nunca pidas esta clasificacion explicitamente al cliente, inferila de lo que describe:\n- Equipo fisico (UPS, switch, PC, impresora, etc.) -> categoriaSoporte \"HARDWARE\" (el equipo en si fallo) o \"INFRAESTRUCTURA\" (problema de red/cableado), y completa activoId si identificas cual de la lista de activos es (o null si no esta claro).\n- El cliente menciona un sistema de la lista de sistemas de software -> categoriaSoporte \"SOFTWARE_TERCEROS\" y completa sistemaSoftwareId con el id de ese sistema.\n- El cliente dice \"el sistema operativo\", \"Windows\", \"el servidor no actualiza\", \"Office\", \"Excel\", etc. (no es un sistema de la lista ni un equipo fisico) -> categoriaSoporte \"SOFTWARE_SISTEMA\" y describi brevemente cual en sistemaNoCatalogado (ej. \"Sistema operativo\", \"Suite de oficina\").\n- No queda claro si es equipo o sistema, o es un sistema que no reconoces y no es ninguno de los anteriores -> categoriaSoporte \"SOFTWARE\" y, si aplica, describi lo que el cliente dijo en sistemaNoCatalogado.\nactivoId y sistemaSoftwareId nunca van los dos a la vez en el mismo ticket.\n\nNunca inventes datos que el cliente no dio - si falta el nombre de la sede y el cliente tiene mas de una, deja sucursalId en null (el sistema le va a preguntar directamente cual es).\n\nDevolve SOLO un JSON con esta forma exacta:\n{\n  \"accion\": \"PREGUNTAR\" o \"CREAR_TICKET\" o \"CERRAR_SIN_TICKET\",\n  \"mensaje\": \"el texto que le vas a responder al cliente, en español, tono cordial y breve - si accion=CREAR_TICKET, mencionale que ya se genero el ticket, nunca le pidas que pruebe algo antes\",\n  \"ticket\": null o { \"titulo\": \"...\", \"descripcion\": \"...\", \"prioridad\": \"CRITICA\" o \"ALTA\" o \"MEDIA\" o \"BAJA\", \"sucursalId\": \"...\" o null, \"categoriaSoporte\": \"HARDWARE\" o \"INFRAESTRUCTURA\" o \"SOFTWARE_TERCEROS\" o \"SOFTWARE_SISTEMA\" o \"SOFTWARE\", \"activoId\": \"...\" o null, \"sistemaSoftwareId\": \"...\" o null, \"sistemaNoCatalogado\": \"...\" o null, \"sugerenciaIA\": \"...\" o null }\n}`;\n\nconst respuesta = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/chat/completions',\n  headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n  body: { model: 'gpt-4o-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: prompt }] },\n  json: true,\n});\n\nconst ai = JSON.parse(respuesta.choices[0].message.content);\n\nreturn [{ json: {\n  conversacionId: contexto.conversacionId,\n  canal: contexto.canal,\n  identificador: contexto.identificador,\n  accion: ai.accion,\n  mensajeAsistente: ai.mensaje,\n  ticket: ai.ticket && ai.ticket.titulo ? ai.ticket : undefined,\n} }];"
       },
       "id": "ia-decidir-paso",
       "name": "IA: decidir siguiente paso",
@@ -3653,29 +3662,63 @@ Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘              
   "name": "NexIT - Staff consultas por chat",
   "nodes": [
     {
-      "parameters": { "updates": ["message"] },
+      "parameters": {
+        "updates": [
+          "message"
+        ]
+      },
       "id": "telegram-trigger-staff",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [0, -120],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        0,
+        -120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
-      "parameters": { "httpMethod": "POST", "path": "nexit-staff-whatsapp-in", "responseMode": "onReceived" },
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nexit-staff-whatsapp-in",
+        "responseMode": "onReceived"
+      },
       "id": "webhook-whatsapp-staff",
       "name": "Webhook WhatsApp (Twilio)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 120]
+      "position": [
+        0,
+        120
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "1", "name": "canal", "value": "TELEGRAM", "type": "string" },
-            { "id": "2", "name": "identificador", "value": "={{ $json.message.chat.id }}", "type": "string" },
-            { "id": "3", "name": "texto", "value": "={{ $json.message.text }}", "type": "string" }
+            {
+              "id": "1",
+              "name": "canal",
+              "value": "TELEGRAM",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "identificador",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "texto",
+              "value": "={{ $json.message.text }}",
+              "type": "string"
+            }
           ]
         }
       },
@@ -3683,15 +3726,33 @@ Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘              
       "name": "Normalizar Telegram",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, -120]
+      "position": [
+        220,
+        -120
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "1", "name": "canal", "value": "WHATSAPP", "type": "string" },
-            { "id": "2", "name": "identificador", "value": "={{ $json.body.From.replace('whatsapp:', '') }}", "type": "string" },
-            { "id": "3", "name": "texto", "value": "={{ $json.body.Body }}", "type": "string" }
+            {
+              "id": "1",
+              "name": "canal",
+              "value": "WHATSAPP",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "identificador",
+              "value": "={{ $json.body.From.replace('whatsapp:', '') }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "texto",
+              "value": "={{ $json.body.Body }}",
+              "type": "string"
+            }
           ]
         }
       },
@@ -3699,7 +3760,10 @@ Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘              
       "name": "Normalizar WhatsApp",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, 120]
+      "position": [
+        220,
+        120
+      ]
     },
     {
       "parameters": {
@@ -3708,59 +3772,131 @@ Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘              
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "canal", "value": "={{ $json.canal }}" },
-            { "name": "identificador", "value": "={{ $json.identificador }}" },
-            { "name": "texto", "value": "={{ $json.texto }}" }
+            {
+              "name": "canal",
+              "value": "={{ $json.canal }}"
+            },
+            {
+              "name": "identificador",
+              "value": "={{ $json.identificador }}"
+            },
+            {
+              "name": "texto",
+              "value": "={{ $json.texto }}"
+            }
           ]
         },
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        }
       },
       "id": "verificar-staff",
       "name": "Verificar staff",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
-        "conditions": { "conditions": [{ "leftValue": "={{$json.autorizado}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] }
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.autorizado}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
       },
       "id": "if-autorizado-staff",
       "name": "IF autorizado",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "GET",
         "url": "https://nexit.tuempresa.com/api/n8n/staff/resumen",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        }
       },
       "id": "get-resumen-staff",
       "name": "GET resumen",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, -100]
+      "position": [
+        880,
+        -100
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const resumen = $json;\nconst identidad = $('Verificar staff').item.json;\nconst texto = (identidad.texto || '').toLowerCase();\n\nfunction formatearAbiertos() {\n  const lineas = Object.entries(resumen.ticketsPorEstado).map(([k, v]) => `${k}: ${v}`).join('\\n');\n  return `Tickets por estado:\\n${lineas}`;\n}\nfunction formatearSla() {\n  const s = resumen.slaCumplimiento;\n  return s.resueltos === 0 ? 'Todavía no hay tickets resueltos para medir SLA.' : `Cumplimiento de SLA: ${s.pctCumplimiento}% (${s.cumplidos} de ${s.resueltos} resueltos a tiempo).`;\n}\nfunction formatearCriticos() {\n  if (!resumen.criticosSinAsignar.length) return 'No hay tickets críticos/altos sin asignar.';\n  const lineas = resumen.criticosSinAsignar.map((t) => `#${t.numeroTicket} - ${t.titulo} (${t.clienteNombre}, ${t.prioridad}, ${t.horasAbierto}h abierto)`).join('\\n');\n  return `Críticos/altos sin asignar:\\n${lineas}`;\n}\nfunction formatearCarga() {\n  if (!resumen.cargaPorTecnico.length) return 'Nadie tiene tickets activos ahora mismo.';\n  const lineas = resumen.cargaPorTecnico.map((t) => `${t.tecnico}: ${t.activos} activos, ${t.resueltosUltimos30Dias} resueltos (30d)`).join('\\n');\n  return `Carga por técnico:\\n${lineas}`;\n}\n\nlet mensaje = null;\nif (texto.includes('abiert')) mensaje = formatearAbiertos();\nelse if (texto.includes('sla')) mensaje = formatearSla();\nelse if (texto.includes('critic') || texto.includes('sin asignar')) mensaje = formatearCriticos();\nelse if (texto.includes('carga') || texto.includes('tecnico') || texto.includes('técnico')) mensaje = formatearCarga();\n\nif (!mensaje) {\n  const openaiKey = $env.OPENAI_API_KEY;\n  const prompt = `Sos un asistente que responde preguntas de un ${identidad.rol} de NexIT sobre el estado de los tickets, usando SOLO estos datos (no inventes nada que no este aca):\\n${JSON.stringify(resumen)}\\n\\nPregunta: \"${identidad.texto}\"\\n\\nRespondé en texto plano, corto y directo, en español.`;\n  const respuesta = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.openai.com/v1/chat/completions',\n    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n    body: { model: 'gpt-4o-mini', messages: [{ role: 'system', content: prompt }] },\n    json: true,\n  });\n  mensaje = respuesta.choices[0].message.content;\n}\n\nreturn [{ json: { canal: identidad.canal, identificador: identidad.identificador, mensaje } }];"
+        "jsCode": "const resumen = $json;\nconst identidad = $('Verificar staff').item.json;\nconst texto = (identidad.texto || '').toLowerCase();\n\nfunction formatearAbiertos() {\n  const lineas = Object.entries(resumen.ticketsPorEstado).map(([k, v]) => `${k}: ${v}`).join('\\n');\n  return `Tickets por estado:\\n${lineas}`;\n}\nfunction formatearSla() {\n  const s = resumen.slaCumplimiento;\n  return s.resueltos === 0 ? 'Todavía no hay tickets resueltos para medir SLA.' : `Cumplimiento de SLA: ${s.pctCumplimiento}% (${s.cumplidos} de ${s.resueltos} resueltos a tiempo).`;\n}\nfunction formatearCriticos() {\n  if (!resumen.criticosSinAsignar.length) return 'No hay tickets críticos/altos sin asignar.';\n  const lineas = resumen.criticosSinAsignar.map((t) => `#${t.numeroTicket} - ${t.titulo} (${t.clienteNombre}, ${t.prioridad}, ${t.horasAbierto}h abierto)`).join('\\n');\n  return `Críticos/altos sin asignar:\\n${lineas}`;\n}\nfunction formatearCarga() {\n  if (!resumen.cargaPorTecnico.length) return 'Nadie tiene tickets activos ahora mismo.';\n  const lineas = resumen.cargaPorTecnico.map((t) => `${t.tecnico}: ${t.activos} activos, ${t.resueltosUltimos30Dias} resueltos (30d)`).join('\\n');\n  return `Carga por técnico:\\n${lineas}`;\n}\n\nlet mensaje = null;\nif (texto.includes('abiert')) mensaje = formatearAbiertos();\nelse if (texto.includes('sla')) mensaje = formatearSla();\nelse if (texto.includes('critic') || texto.includes('sin asignar')) mensaje = formatearCriticos();\nelse if (texto.includes('carga') || texto.includes('tecnico') || texto.includes('técnico')) mensaje = formatearCarga();\n\nif (!mensaje) {\n  const openaiKey = $env.OPENAI_API_KEY;\n  const prompt = `Sos un asistente que responde preguntas de un ${identidad.rol} de ${identidad.empresaNombre} sobre el estado de los tickets, usando SOLO estos datos (no inventes nada que no este aca):\\n${JSON.stringify(resumen)}\\n\\nPregunta: \"${identidad.texto}\"\\n\\nRespondé en texto plano, corto y directo, en español.`;\n  const respuesta = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.openai.com/v1/chat/completions',\n    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n    body: { model: 'gpt-4o-mini', messages: [{ role: 'system', content: prompt }] },\n    json: true,\n  });\n  mensaje = respuesta.choices[0].message.content;\n}\n\nreturn [{ json: { canal: identidad.canal, identificador: identidad.identificador, mensaje } }];"
       },
       "id": "responder-consulta-staff",
       "name": "Responder consulta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, -100]
+      "position": [
+        1100,
+        -100
+      ]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "TELEGRAM", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "WHATSAPP", "operator": { "type": "string", "operation": "equals" } }] } }
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.canal}}",
+                    "rightValue": "TELEGRAM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.canal}}",
+                    "rightValue": "WHATSAPP",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
           ]
         }
       },
@@ -3768,45 +3904,165 @@ Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘              
       "name": "Switch por canal",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ]
     },
     {
-      "parameters": { "chatId": "={{ $json.identificador }}", "text": "={{ $json.mensaje }}" },
+      "parameters": {
+        "chatId": "={{ $json.identificador }}",
+        "text": "={{ $json.mensaje }}"
+      },
       "id": "telegram-responder-staff",
       "name": "Telegram - Responder",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1540, -100],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        1540,
+        -100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
-      "parameters": { "from": "whatsapp:+14155238886", "to": "=whatsapp:{{ $json.identificador }}", "message": "={{ $json.mensaje }}" },
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{ $json.identificador }}",
+        "message": "={{ $json.mensaje }}"
+      },
       "id": "twilio-responder-staff",
       "name": "Twilio - Responder",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [1540, 100],
-      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+      "position": [
+        1540,
+        100
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
     }
   ],
   "connections": {
-    "Telegram Trigger": { "main": [[{ "node": "Normalizar Telegram", "type": "main", "index": 0 }]] },
-    "Webhook WhatsApp (Twilio)": { "main": [[{ "node": "Normalizar WhatsApp", "type": "main", "index": 0 }]] },
-    "Normalizar Telegram": { "main": [[{ "node": "Verificar staff", "type": "main", "index": 0 }]] },
-    "Normalizar WhatsApp": { "main": [[{ "node": "Verificar staff", "type": "main", "index": 0 }]] },
-    "Verificar staff": { "main": [[{ "node": "IF autorizado", "type": "main", "index": 0 }]] },
-    "IF autorizado": {
+    "Telegram Trigger": {
       "main": [
-        [{ "node": "GET resumen", "type": "main", "index": 0 }],
-        [{ "node": "Switch por canal", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Normalizar Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "GET resumen": { "main": [[{ "node": "Responder consulta", "type": "main", "index": 0 }]] },
-    "Responder consulta": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "Webhook WhatsApp (Twilio)": {
+      "main": [
+        [
+          {
+            "node": "Normalizar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Telegram": {
+      "main": [
+        [
+          {
+            "node": "Verificar staff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Verificar staff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar staff": {
+      "main": [
+        [
+          {
+            "node": "IF autorizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF autorizado": {
+      "main": [
+        [
+          {
+            "node": "GET resumen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET resumen": {
+      "main": [
+        [
+          {
+            "node": "Responder consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder consulta": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Switch por canal": {
       "main": [
-        [{ "node": "Telegram - Responder", "type": "main", "index": 0 }],
-        [{ "node": "Twilio - Responder", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Telegram - Responder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Twilio - Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   }
@@ -3829,50 +4085,116 @@ horario que prefieras.
   "name": "NexIT - Resumen diario",
   "nodes": [
     {
-      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }] } },
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
       "id": "schedule-resumen-diario",
       "name": "Todos los días 8am",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "GET",
         "url": "https://nexit.tuempresa.com/api/n8n/staff/resumen",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        }
       },
       "id": "get-resumen-diario",
       "name": "GET resumen",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const r = $json;\nconst lineas = [\n  '📊 Resumen diario NexIT',\n  '',\n  `Tickets activos: ${r.ticketsActivos}`,\n  `Críticos/altos sin asignar: ${r.criticosSinAsignar.length}`,\n  `Cumplimiento SLA: ${r.slaCumplimiento.pctCumplimiento ?? '—'}%`,\n  `Preventivos vencidos: ${r.preventivosPorVigencia.vencido}`,\n];\nif (r.criticosSinAsignar.length) {\n  lineas.push('', 'Sin asignar:');\n  for (const t of r.criticosSinAsignar.slice(0, 5)) {\n    lineas.push(`- #${t.numeroTicket} (${t.clienteNombre}, ${t.prioridad}, ${t.horasAbierto}h)`);\n  }\n}\nreturn [{ json: { mensaje: lineas.join('\\n') } }];"
+        "jsCode": "const r = $json;\nconst lineas = [\n  `📊 Resumen diario ${r.empresaNombre}`,\n  '',\n  `Tickets activos: ${r.ticketsActivos}`,\n  `Críticos/altos sin asignar: ${r.criticosSinAsignar.length}`,\n  `Cumplimiento SLA: ${r.slaCumplimiento.pctCumplimiento ?? '—'}%`,\n  `Preventivos vencidos: ${r.preventivosPorVigencia.vencido}`,\n];\nif (r.criticosSinAsignar.length) {\n  lineas.push('', 'Sin asignar:');\n  for (const t of r.criticosSinAsignar.slice(0, 5)) {\n    lineas.push(`- #${t.numeroTicket} (${t.clienteNombre}, ${t.prioridad}, ${t.horasAbierto}h)`);\n  }\n}\nreturn [{ json: { mensaje: lineas.join('\\n') } }];"
       },
       "id": "formatear-resumen-diario",
       "name": "Formatear resumen",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
-      "parameters": { "chatId": "={{ $env.NEXIT_TELEGRAM_CHAT_ID }}", "text": "={{ $json.mensaje }}" },
+      "parameters": {
+        "chatId": "={{ $env.NEXIT_TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.mensaje }}"
+      },
       "id": "telegram-resumen-diario",
       "name": "Telegram - Grupo",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [660, 0],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     }
   ],
   "connections": {
-    "Todos los días 8am": { "main": [[{ "node": "GET resumen", "type": "main", "index": 0 }]] },
-    "GET resumen": { "main": [[{ "node": "Formatear resumen", "type": "main", "index": 0 }]] },
-    "Formatear resumen": { "main": [[{ "node": "Telegram - Grupo", "type": "main", "index": 0 }]] }
+    "Todos los días 8am": {
+      "main": [
+        [
+          {
+            "node": "GET resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET resumen": {
+      "main": [
+        [
+          {
+            "node": "Formatear resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear resumen": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Grupo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   }
 }
 ```
@@ -3949,42 +4271,93 @@ Schedule Trigger (7am) → GET resumen-diario
   "name": "NexIT - Resumen diario personalizado",
   "nodes": [
     {
-      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }] } },
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
       "id": "schedule-resumen-personalizado",
       "name": "Todos los días 7am",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "GET",
         "url": "https://nexit.tuempresa.com/api/n8n/resumen-diario",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WEBHOOK_SECRET }}" }] }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        }
       },
       "id": "get-resumen-diario-personalizado",
       "name": "GET resumen diario",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const data = $json;\nconst items = [];\n\nfunction agregarDestino(canal, identificador, mensaje) {\n  if (!identificador) return;\n  items.push({ json: { canal, identificador, mensaje } });\n}\n\nfor (const t of data.tecnicos) {\n  const lineasTickets = t.ticketsHoy.length\n    ? t.ticketsHoy.map((tk) => {\n        const alerta = tk.estadoSla === 'vencido' ? ' ⚠️ SLA VENCIDO' : tk.estadoSla === 'en_riesgo' ? ' ⏰ SLA en riesgo' : '';\n        return `- #${tk.numeroTicket} ${tk.titulo} (${tk.clienteNombre}, ${tk.prioridad})${alerta}`;\n      }).join('\\n')\n    : 'Sin tickets activos asignados.';\n  const lineasPreventivos = t.preventivosProximos.length\n    ? t.preventivosProximos.map((p) => `- ${p.titulo} (${p.clienteNombre}) — ${p.proximaFecha}`).join('\\n')\n    : null;\n\n  let mensaje = `☀️ Buenos días ${t.usuarioNombre.split(' ')[0]}, tus tickets activos:\\n${lineasTickets}`;\n  if (lineasPreventivos) mensaje += `\\n\\nPreventivos próximos (7 días):\\n${lineasPreventivos}`;\n\n  agregarDestino('TELEGRAM', t.telegramChatId, mensaje);\n  agregarDestino('WHATSAPP', t.whatsappTelefono, mensaje);\n}\n\nfor (const s of data.staff) {\n  const r = s.resumen;\n  const mensaje = `📊 Resumen diario NexIT\\n\\nTickets activos: ${r.ticketsActivos}\\nCríticos/altos sin asignar: ${r.criticosSinAsignar.length}\\nCumplimiento SLA: ${r.slaCumplimiento.pctCumplimiento ?? '—'}%\\nPreventivos vencidos: ${r.preventivosPorVigencia.vencido}`;\n  agregarDestino('TELEGRAM', s.telegramChatId, mensaje);\n  agregarDestino('WHATSAPP', s.whatsappTelefono, mensaje);\n}\n\nreturn items;"
+        "jsCode": "const data = $json;\nconst items = [];\n\nfunction agregarDestino(canal, identificador, mensaje) {\n  if (!identificador) return;\n  items.push({ json: { canal, identificador, mensaje } });\n}\n\nfor (const t of data.tecnicos) {\n  const lineasTickets = t.ticketsHoy.length\n    ? t.ticketsHoy.map((tk) => {\n        const alerta = tk.estadoSla === 'vencido' ? ' ⚠️ SLA VENCIDO' : tk.estadoSla === 'en_riesgo' ? ' ⏰ SLA en riesgo' : '';\n        return `- #${tk.numeroTicket} ${tk.titulo} (${tk.clienteNombre}, ${tk.prioridad})${alerta}`;\n      }).join('\\n')\n    : 'Sin tickets activos asignados.';\n  const lineasPreventivos = t.preventivosProximos.length\n    ? t.preventivosProximos.map((p) => `- ${p.titulo} (${p.clienteNombre}) — ${p.proximaFecha}`).join('\\n')\n    : null;\n\n  let mensaje = `☀️ Buenos días ${t.usuarioNombre.split(' ')[0]}, tus tickets activos:\\n${lineasTickets}`;\n  if (lineasPreventivos) mensaje += `\\n\\nPreventivos próximos (7 días):\\n${lineasPreventivos}`;\n\n  agregarDestino('TELEGRAM', t.telegramChatId, mensaje);\n  agregarDestino('WHATSAPP', t.whatsappTelefono, mensaje);\n}\n\nfor (const s of data.staff) {\n  const r = s.resumen;\n  const mensaje = `📊 Resumen diario ${data.empresaNombre}\\n\\nTickets activos: ${r.ticketsActivos}\\nCríticos/altos sin asignar: ${r.criticosSinAsignar.length}\\nCumplimiento SLA: ${r.slaCumplimiento.pctCumplimiento ?? '—'}%\\nPreventivos vencidos: ${r.preventivosPorVigencia.vencido}`;\n  agregarDestino('TELEGRAM', s.telegramChatId, mensaje);\n  agregarDestino('WHATSAPP', s.whatsappTelefono, mensaje);\n}\n\nreturn items;"
       },
       "id": "aplanar-destinatarios",
       "name": "Aplanar destinatarios",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "TELEGRAM", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "conditions": { "conditions": [{ "leftValue": "={{$json.canal}}", "rightValue": "WHATSAPP", "operator": { "type": "string", "operation": "equals" } }] } }
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.canal}}",
+                    "rightValue": "TELEGRAM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.canal}}",
+                    "rightValue": "WHATSAPP",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
           ]
         }
       },
@@ -3992,35 +4365,103 @@ Schedule Trigger (7am) → GET resumen-diario
       "name": "Switch por canal",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
-      "parameters": { "chatId": "={{ $json.identificador }}", "text": "={{ $json.mensaje }}" },
+      "parameters": {
+        "chatId": "={{ $json.identificador }}",
+        "text": "={{ $json.mensaje }}"
+      },
       "id": "telegram-resumen-personalizado",
       "name": "Telegram - Enviar",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [880, -100],
-      "credentials": { "telegramApi": { "id": "REEMPLAZAR", "name": "NexIT Telegram Bot" } }
+      "position": [
+        880,
+        -100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
     },
     {
-      "parameters": { "from": "whatsapp:+14155238886", "to": "=whatsapp:{{ $json.identificador }}", "message": "={{ $json.mensaje }}" },
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{ $json.identificador }}",
+        "message": "={{ $json.mensaje }}"
+      },
       "id": "twilio-resumen-personalizado",
       "name": "Twilio - Enviar",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [880, 100],
-      "credentials": { "twilioApi": { "id": "REEMPLAZAR", "name": "NexIT Twilio" } }
+      "position": [
+        880,
+        100
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
     }
   ],
   "connections": {
-    "Todos los días 7am": { "main": [[{ "node": "GET resumen diario", "type": "main", "index": 0 }]] },
-    "GET resumen diario": { "main": [[{ "node": "Aplanar destinatarios", "type": "main", "index": 0 }]] },
-    "Aplanar destinatarios": { "main": [[{ "node": "Switch por canal", "type": "main", "index": 0 }]] },
+    "Todos los días 7am": {
+      "main": [
+        [
+          {
+            "node": "GET resumen diario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET resumen diario": {
+      "main": [
+        [
+          {
+            "node": "Aplanar destinatarios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplanar destinatarios": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Switch por canal": {
       "main": [
-        [{ "node": "Telegram - Enviar", "type": "main", "index": 0 }],
-        [{ "node": "Twilio - Enviar", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Telegram - Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Twilio - Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   }

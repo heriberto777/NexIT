@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { emitirEvento } from "@/server/services/webhook.service";
 import { notificarContactoPendienteNuevo } from "@/server/services/notificacion.service";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import type { Prisma, ContactoPendiente } from "@prisma/client";
 
 const CAMPOS_ORDEN = ["nombre", "empresaReportada", "telefonoReportado", "correoReportado", "motivo"] as const;
@@ -61,7 +62,10 @@ export async function procesarMensajeContactoPendiente(input: { canal: string; i
 
   if (!existente) {
     await prisma.contactoPendiente.create({ data: { canal, identificador } });
-    return { mensaje: `No encontramos tu número vinculado a NexIT. Para que un representante te pueda contactar, necesitamos algunos datos.\n\n${PREGUNTAS.nombre}` };
+    const { empresaNombre } = await obtenerConfiguracion();
+    return {
+      mensaje: `No encontramos tu número vinculado a ${empresaNombre}. Para que un representante te pueda contactar, necesitamos algunos datos.\n\n${PREGUNTAS.nombre}`,
+    };
   }
 
   if (existente.estado === "PENDIENTE") {

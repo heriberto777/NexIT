@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { login } from "@/server/actions/auth/login";
 import { Button } from "@/components/ui/button";
 
-export function LoginForm({ allowDevImpersonation }: { allowDevImpersonation: boolean }) {
+export function LoginForm({ allowDevImpersonation, empresaNombre }: { allowDevImpersonation: boolean; empresaNombre: string }) {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const [state, formAction, isPending] = useActionState(login, { error: null });
@@ -18,7 +18,7 @@ export function LoginForm({ allowDevImpersonation }: { allowDevImpersonation: bo
   return (
     <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
       <div>
-        <h1 className="text-lg font-semibold text-gray-900">NexIT</h1>
+        <h1 className="text-lg font-semibold text-gray-900">{empresaNombre}</h1>
         <p className="text-sm text-gray-500">Inicia sesión para continuar</p>
       </div>
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { mensajeConversacionSchema } from "@/lib/zod/n8n.schema";
 import { resolverUsuarioPorChatId } from "@/server/services/vinculacion-identidad.service";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
@@ -88,8 +89,11 @@ export async function POST(request: Request) {
     select: { rol: true, contenido: true },
   });
 
+  const { empresaNombre } = await obtenerConfiguracion();
+
   return responder({
     encontrado: true,
+    empresaNombre,
     conversacionId: conversacion.id,
     usuarioNombre: usuario.nombre,
     clienteNombre: usuario.cliente.nombre,

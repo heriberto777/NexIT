@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { verificarStaffSchema } from "@/lib/zod/n8n.schema";
+import { resolverUsuarioPorChatId } from "@/server/services/vinculacion-identidad.service";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
@@ -24,19 +25,19 @@ export async function GET(request: Request) {
   }
   const { canal, identificador, texto } = parsed.data;
 
-  const usuario = await prisma.usuario.findUnique({
-    where: canal === "TELEGRAM" ? { telegramChatId: identificador } : { whatsappTelefono: identificador },
-  });
+  const usuario = await resolverUsuarioPorChatId(canal, identificador);
 
   if (!usuario || (usuario.rol !== "ADMIN" && usuario.rol !== "COORDINADOR") || usuario.estado !== "ACTIVO") {
+    const { empresaNombre } = await obtenerConfiguracion();
     return NextResponse.json({
       autorizado: false,
-      mensaje: "No encontramos tu número vinculado a NexIT con un rol autorizado (Admin o Coordinador).",
+      mensaje: `No encontramos tu número vinculado a ${empresaNombre} con un rol autorizado (Admin o Coordinador).`,
       canal,
       identificador,
       texto,
     });
   }
 
-  return NextResponse.json({ autorizado: true, usuarioNombre: usuario.nombre, rol: usuario.rol, canal, identificador, texto });
+  const { empresaNombre } = await obtenerConfiguracion();
+  return NextResponse.json({ autorizado: true, empresaNombre, usuarioNombre: usuario.nombre, rol: usuario.rol, canal, identificador, texto });
 }

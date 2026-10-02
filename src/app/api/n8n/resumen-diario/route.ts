@@ -80,5 +80,5 @@ export async function GET(request: Request) {
     resumen: resumenAgregado,
   }));
 
-  return NextResponse.json({ tecnicos, staff });
+  return NextResponse.json({ tecnicos, staff, empresaNombre: config.empresaNombre });
 }

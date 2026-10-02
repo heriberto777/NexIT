@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { obtenerResumenStaff } from "@/server/services/resumen-staff.service";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
@@ -12,5 +13,6 @@ export async function GET(request: Request) {
   const noAutorizado = await verificarSecretoWebhook(request);
   if (noAutorizado) return noAutorizado;
 
-  return NextResponse.json(await obtenerResumenStaff());
+  const [resumen, { empresaNombre }] = await Promise.all([obtenerResumenStaff(), obtenerConfiguracion()]);
+  return NextResponse.json({ ...resumen, empresaNombre });
 }

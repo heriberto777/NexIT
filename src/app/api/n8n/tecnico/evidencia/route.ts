@@ -4,6 +4,7 @@ import { verificarSecretoWebhook } from "@/server/auth/webhook-secret";
 import { evidenciaTecnicoSchema } from "@/lib/zod/n8n.schema";
 import { storageService } from "@/server/services/storage.service";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { resolverUsuarioPorChatId } from "@/server/services/vinculacion-identidad.service";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +25,10 @@ export async function POST(request: Request) {
   const { canal, identificador, numeroTicket, imagenBase64, contentType } = parsed.data;
   const responder = (body: Record<string, unknown>, status: number) => NextResponse.json({ ...body, canal, identificador }, { status });
 
-  const usuario = await prisma.usuario.findUnique({
-    where: canal === "TELEGRAM" ? { telegramChatId: identificador } : { whatsappTelefono: identificador },
-  });
+  const usuario = await resolverUsuarioPorChatId(canal, identificador);
   if (!usuario || usuario.rol !== "TECNICO" || usuario.estado !== "ACTIVO") {
-    return responder({ ok: false, error: "USUARIO_NO_VINCULADO", mensaje: "No encontramos tu número vinculado a NexIT como técnico." }, 404);
+    const { empresaNombre } = await obtenerConfiguracion();
+    return responder({ ok: false, error: "USUARIO_NO_VINCULADO", mensaje: `No encontramos tu número vinculado a ${empresaNombre} como técnico.` }, 404);
   }
 
   const ticket = await prisma.ticket.findUnique({ where: { numeroTicket }, include: { evidencias: true } });

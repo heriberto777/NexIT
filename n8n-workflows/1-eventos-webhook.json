@@ -809,8 +809,8 @@
       "parameters": {
         "fromEmail": "notificaciones@nexit.tuempresa.com",
         "toEmail": "={{$json.data.email}}",
-        "subject": "=Bienvenido a NexIT — acceso a tu Portal",
-        "text": "=Hola {{$json.data.nombre}}, un representante de {{$json.data.clienteNombre}} te registró en NexIT para dar seguimiento a tus solicitudes de soporte.\n\nIngresa en {{$env.NEXIT_BASE_URL}}/login con:\nUsuario: {{$json.data.email}}\nContraseña temporal: {{$json.data.passwordTemporal}}\n\nTe recomendamos cambiarla ni bien inicies sesión, desde tu Perfil."
+        "subject": "=Bienvenido a {{ $json.empresaNombre }} — acceso a tu Portal",
+        "text": "=Hola {{$json.data.nombre}}, un representante de {{$json.data.clienteNombre}} te registró en {{ $json.empresaNombre }} para dar seguimiento a tus solicitudes de soporte.\n\nIngresa en {{$env.NEXIT_BASE_URL}}/login con:\nUsuario: {{$json.data.email}}\nContraseña temporal: {{$json.data.passwordTemporal}}\n\nTe recomendamos cambiarla ni bien inicies sesión, desde tu Perfil."
       },
       "id": "email-contacto-creado",
       "name": "Email bienvenida contacto",
@@ -849,7 +849,7 @@
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.data.whatsapp}}",
-        "message": "=Hola {{$json.data.nombre}}! Te registramos en NexIT para dar seguimiento a tus solicitudes de soporte. Ingresa en {{$env.NEXIT_BASE_URL}}/login con tu correo ({{$json.data.email}}) y la contraseña temporal: {{$json.data.passwordTemporal}}"
+        "message": "=Hola {{$json.data.nombre}}! Te registramos en {{ $json.empresaNombre }} para dar seguimiento a tus solicitudes de soporte. Ingresa en {{$env.NEXIT_BASE_URL}}/login con tu correo ({{$json.data.email}}) y la contraseña temporal: {{$json.data.passwordTemporal}}"
       },
       "id": "twilio-contacto-creado",
       "name": "Twilio bienvenida contacto",
@@ -869,7 +869,7 @@
     {
       "parameters": {
         "chatId": "={{$env.NEXIT_TELEGRAM_CHAT_ID}}",
-        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\nNombre: {{$json.data.nombre}}\nEmpresa (reportada por él, sin confirmar): {{$json.data.empresaReportada}}\nTeléfono: {{$json.data.telefonoReportado}}\nCorreo: {{$json.data.correoReportado}}\nMotivo: {{$json.data.motivo}}\n\nNo hay ningún usuario de NexIT con ese chat/teléfono vinculado. Un representante debe confirmar a qué cliente pertenece y crear su ticket desde \"Crear ticket\" en NexIT (o desde /admin/contactos-pendientes)."
+        "text": "=📵 Contacto no identificado por {{$json.data.canal}} ({{$json.data.identificador}}):\n\nNombre: {{$json.data.nombre}}\nEmpresa (reportada por él, sin confirmar): {{$json.data.empresaReportada}}\nTeléfono: {{$json.data.telefonoReportado}}\nCorreo: {{$json.data.correoReportado}}\nMotivo: {{$json.data.motivo}}\n\nNo hay ningún usuario de {{ $json.empresaNombre }} con ese chat/teléfono vinculado. Un representante debe confirmar a qué cliente pertenece y crear su ticket desde \"Crear ticket\" en {{ $json.empresaNombre }} (o desde /admin/contactos-pendientes)."
       },
       "id": "telegram-contacto-no-identificado",
       "name": "Telegram contacto no identificado",
@@ -906,7 +906,7 @@
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.telefono}}",
-        "message": "=📵 Contacto no identificado por {{$('Switch por evento').item.json.data.canal}}: {{$('Switch por evento').item.json.data.nombre}}, de \"{{$('Switch por evento').item.json.data.empresaReportada}}\" — Tel: {{$('Switch por evento').item.json.data.telefonoReportado}}, correo: {{$('Switch por evento').item.json.data.correoReportado}}. Motivo: {{$('Switch por evento').item.json.data.motivo}}. Contactalo y levantá el ticket en NexIT."
+        "message": "=📵 Contacto no identificado por {{$('Switch por evento').item.json.data.canal}}: {{$('Switch por evento').item.json.data.nombre}}, de \"{{$('Switch por evento').item.json.data.empresaReportada}}\" — Tel: {{$('Switch por evento').item.json.data.telefonoReportado}}, correo: {{$('Switch por evento').item.json.data.correoReportado}}. Motivo: {{$('Switch por evento').item.json.data.motivo}}. Contactalo y levantá el ticket en {{ $('Switch por evento').item.json.empresaNombre }}."
       },
       "id": "twilio-staff-contacto-no-identificado",
       "name": "Twilio aviso staff (contacto no identificado)",

@@ -4,6 +4,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { navParaRol } from "@/lib/utils/nav-admin";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 const NAV_TECNICO = [
   { href: "/tickets", label: "Tickets" },
@@ -15,13 +16,13 @@ const NAV_TECNICO = [
 // barra de navegación ni botón de cerrar sesión al llegar aquí (la protección por rol
 // ya la hace middleware.ts, así que aquí solo decidimos qué nav mostrar).
 export default async function TicketsLayout({ children }: { children: ReactNode }) {
-  const sesion = await getSesionActual();
+  const [sesion, config] = await Promise.all([getSesionActual(), obtenerConfiguracion()]);
   const esTecnico = sesion?.rol === "TECNICO";
   const nav = esTecnico ? NAV_TECNICO : navParaRol(sesion?.rol);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainNav brand="NexIT" brandHref={esTecnico ? "/tickets" : "/admin"} links={nav}>
+      <MainNav brand={config.empresaNombre} brandHref={esTecnico ? "/tickets" : "/admin"} links={nav}>
         <NotificationBell />
         <LogoutButton />
       </MainNav>

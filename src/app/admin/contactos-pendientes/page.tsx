@@ -28,8 +28,8 @@ export default async function ContactosPendientesPage() {
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Contactos pendientes</h1>
         <p className="text-sm text-gray-500">
-          Personas que escribieron por Telegram/WhatsApp sin estar vinculadas a ningún usuario de NexIT. Ya completaron
-          sus datos — falta que alguien confirme el cliente real y les cree el ticket.
+          Personas que escribieron por Telegram/WhatsApp sin estar vinculadas a ningún usuario de {config.empresaNombre}.
+          Ya completaron sus datos — falta que alguien confirme el cliente real y les cree el ticket.
         </p>
       </div>
 

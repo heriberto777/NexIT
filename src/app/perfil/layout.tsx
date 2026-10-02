@@ -5,6 +5,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { navParaRol } from "@/lib/utils/nav-admin";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 const NAV_TECNICO = [
   { href: "/tickets", label: "Tickets" },
@@ -15,7 +16,7 @@ const NAV_TECNICO = [
 // que necesita su propio layout que reconstruya el mismo nav que el usuario ve en su
 // sección habitual — de otro modo llegaría a una página sin barra de navegación.
 export default async function PerfilLayout({ children }: { children: ReactNode }) {
-  const sesion = await getSesionActual();
+  const [sesion, config] = await Promise.all([getSesionActual(), obtenerConfiguracion()]);
 
   if (sesion?.rol === "CLIENTE") {
     const cliente = sesion.clienteId ? await prisma.cliente.findUnique({ where: { id: sesion.clienteId } }) : null;
@@ -43,7 +44,7 @@ export default async function PerfilLayout({ children }: { children: ReactNode }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainNav brand="NexIT" brandHref={esTecnico ? "/tickets" : "/admin"} links={nav}>
+      <MainNav brand={config.empresaNombre} brandHref={esTecnico ? "/tickets" : "/admin"} links={nav}>
         <NotificationBell />
         <LogoutButton />
       </MainNav>
