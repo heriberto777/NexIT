@@ -44,6 +44,20 @@ export async function procesarMensajeVinculacion(input: {
 }): Promise<{ continuar: boolean; mensaje: string }> {
   const { canal, identificador, texto } = input;
 
+  // Si ya hay una conversación de "Contacto pendiente" en curso (todavía respondiendo
+  // preguntas, o ya las completó y espera que un representante lo contacte), no hay que
+  // interrumpirla con la pregunta de vinculación — n8n llama a este endpoint en CADA
+  // mensaje mientras conversacion/mensaje siga devolviendo "no encontrado", así que sin
+  // este corte cada respuesta real de Contacto pendiente quedaba "comida" por la
+  // pregunta del correo (bug real: nombre/empresa terminaban guardados como el correo).
+  const contactoEnCurso = await prisma.contactoPendiente.findFirst({
+    where: { canal, identificador, estado: { in: ["RECOLECTANDO", "PENDIENTE"] } },
+  });
+  if (contactoEnCurso) {
+    await prisma.verificacionIdentidadChat.deleteMany({ where: { canal, identificador } });
+    return { continuar: true, mensaje: "" };
+  }
+
   const existente = await prisma.verificacionIdentidadChat.findFirst({
     where: { canal, identificador },
     orderBy: { expiraEn: "desc" },
