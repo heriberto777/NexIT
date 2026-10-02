@@ -53,15 +53,15 @@ export function PlanPreventivoForm({ activos, sucursales, tecnicos, valoresInici
 
   async function onSubmit(values: GuardarPlanPreventivoInput) {
     setError(null);
-    try {
-      // El campo que no corresponde al vínculo elegido no se envía (el schema exige
-      // exactamente uno de los dos).
-      const payload = vinculo === "activo" ? { ...values, sucursalId: undefined } : { ...values, activoId: undefined };
-      await guardarPlanPreventivo(payload);
-      router.push("/admin/preventivos");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    // El campo que no corresponde al vínculo elegido no se envía (el schema exige
+    // exactamente uno de los dos).
+    const payload = vinculo === "activo" ? { ...values, sucursalId: undefined } : { ...values, activoId: undefined };
+    const resultado = await guardarPlanPreventivo(payload);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    router.push("/admin/preventivos");
   }
 
   return (

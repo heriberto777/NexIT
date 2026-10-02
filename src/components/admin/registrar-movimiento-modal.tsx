@@ -29,14 +29,14 @@ export function RegistrarMovimientoModal({ repuestoId }: { repuestoId: string })
 
   async function onSubmit(values: RegistrarMovimientoManualInput) {
     setError(null);
-    try {
-      await registrarMovimientoInventario(values);
-      reset({ repuestoId, tipo: "ENTRADA", cantidad: 1, motivo: "" });
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await registrarMovimientoInventario(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    reset({ repuestoId, tipo: "ENTRADA", cantidad: 1, motivo: "" });
+    setOpen(false);
+    router.refresh();
   }
 
   return (

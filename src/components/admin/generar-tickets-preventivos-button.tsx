@@ -16,13 +16,13 @@ export function GenerarTicketsPreventivosButton() {
     setError(null);
     setResultado(null);
     startTransition(async () => {
-      try {
-        const { generados } = await generarTicketsPreventivos({});
-        setResultado(generados);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      const resultado = await generarTicketsPreventivos({});
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      setResultado(resultado.data.generados);
+      router.refresh();
     });
   }
 

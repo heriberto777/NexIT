@@ -30,12 +30,12 @@ export function RepuestoForm({ modoEdicion, valoresIniciales, monedaSimbolo }: P
 
   async function onSubmit(values: GuardarRepuestoInput) {
     setError(null);
-    try {
-      const { id } = await guardarRepuesto(values);
-      router.push(`/admin/inventario/${id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await guardarRepuesto(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    router.push(`/admin/inventario/${resultado.data.id}`);
   }
 
   return (

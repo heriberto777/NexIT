@@ -52,12 +52,12 @@ export function ChecklistTemplateForm({ categorias, modoEdicion, valoresIniciale
 
   async function onSubmit(values: GuardarChecklistTemplateInput) {
     setError(null);
-    try {
-      await guardarChecklistTemplate(values);
-      router.push("/admin/checklists");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+    const resultado = await guardarChecklistTemplate(values);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
     }
+    router.push("/admin/checklists");
   }
 
   return (
