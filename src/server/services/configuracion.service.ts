@@ -36,6 +36,11 @@ function defaultsDesdeEnv(): Omit<ConfiguracionSistema, "id" | "actualizadoEn"> 
     evidenciaMaxMB: process.env.EVIDENCIA_MAX_MB ? Number(process.env.EVIDENCIA_MAX_MB) : 8,
     diasVentanaProximoPreventivo: process.env.DIAS_VENTANA_PROXIMO_PREVENTIVO ? Number(process.env.DIAS_VENTANA_PROXIMO_PREVENTIVO) : 7,
     notificacionesIntervaloSegundos: process.env.NOTIFICACIONES_INTERVALO_SEGUNDOS ? Number(process.env.NOTIFICACIONES_INTERVALO_SEGUNDOS) : 30,
+    iaProveedor: process.env.IA_PROVEEDOR ?? null,
+    iaApiKey: process.env.IA_API_KEY ?? null,
+    iaModelo: process.env.IA_MODELO ?? null,
+    iaBaseUrl: process.env.IA_BASE_URL ?? null,
+    iaHabilitada: Boolean(process.env.IA_API_KEY),
   };
 }
 

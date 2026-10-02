@@ -39,3 +39,11 @@ export interface EvidenciaPlana {
   tipo: "FOTO_ANTES" | "FOTO_DESPUES" | "DOCUMENTO" | "OTRO";
   urlArchivo: string;
 }
+
+export interface MensajeIaPlano {
+  id: string;
+  rol: "USUARIO" | "ASISTENTE";
+  contenido: string;
+  esSolucion: boolean;
+  createdAt: string;
+}

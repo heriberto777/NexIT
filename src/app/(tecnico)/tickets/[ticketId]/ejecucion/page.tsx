@@ -27,6 +27,7 @@ export default async function EjecucionPage({ params }: PageProps) {
       activo: true,
       evidencias: true,
       firmas: true,
+      conversacionIA: { include: { mensajes: { orderBy: { createdAt: "asc" } } } },
     },
   });
 
@@ -74,6 +75,16 @@ export default async function EjecucionPage({ params }: PageProps) {
   return (
     <ExecutionWizard
       fotosMinimasEvidencia={config.fotosMinimasEvidencia}
+      iaHabilitada={config.iaHabilitada}
+      mensajesIniciales={
+        ticket.conversacionIA?.mensajes.map((m) => ({
+          id: m.id,
+          rol: m.rol,
+          contenido: m.contenido,
+          esSolucion: m.esSolucion,
+          createdAt: m.createdAt.toISOString(),
+        })) ?? []
+      }
       ticket={{
         id: ticket.id,
         numeroTicket: ticket.numeroTicket,

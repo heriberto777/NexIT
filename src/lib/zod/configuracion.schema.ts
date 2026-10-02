@@ -42,3 +42,21 @@ export const guardarParametrosSchema = z.object({
   notificacionesIntervaloSegundos: z.coerce.number().int().min(10).max(600),
 });
 export type GuardarParametrosInput = z.infer<typeof guardarParametrosSchema>;
+
+export const iaProveedorSchema = z.enum(["ANTHROPIC", "OPENAI", "LOCAL"]);
+
+// iaBaseUrl es obligatorio solo para "LOCAL" (dónde vive el servidor del modelo) — para
+// "ANTHROPIC"/"OPENAI" se deja vacío salvo que se quiera apuntar a un proxy/Azure OpenAI.
+export const guardarIaSchema = z
+  .object({
+    iaProveedor: iaProveedorSchema,
+    iaApiKey: z.string().trim().max(300).optional().or(z.literal("")),
+    iaModelo: z.string().trim().min(1, "Requerido").max(120),
+    iaBaseUrl: z.string().trim().url("URL inválida").optional().or(z.literal("")),
+    iaHabilitada: z.boolean(),
+  })
+  .refine((data) => data.iaProveedor !== "LOCAL" || Boolean(data.iaBaseUrl), {
+    message: "La URL del servidor es obligatoria para un modelo local",
+    path: ["iaBaseUrl"],
+  });
+export type GuardarIaInput = z.infer<typeof guardarIaSchema>;

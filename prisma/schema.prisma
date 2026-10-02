@@ -209,6 +209,18 @@ model ConfiguracionSistema {
   // ajustar el balance "se siente en vivo" vs "no sobrecargar el servidor" sin tocar código.
   notificacionesIntervaloSegundos Int @default(30)
 
+  // Asistente IA de soporte (chat del técnico en el wizard de ejecución, ver
+  // ia.service.ts) — "ANTHROPIC" | "OPENAI" | "LOCAL". Null/deshabilitada = el panel de
+  // chat ni se muestra. `iaBaseUrl` es obligatorio solo para "LOCAL" (ej. un servidor
+  // Ollama/LM Studio compatible con la API de OpenAI); para "OPENAI" es un override
+  // opcional (proxies, Azure OpenAI). `iaApiKey` nunca se manda de vuelta al cliente —
+  // mismo patrón que smtpPass/webhookSecret.
+  iaProveedor String?
+  iaApiKey    String?
+  iaModelo    String?
+  iaBaseUrl   String?
+  iaHabilitada Boolean @default(false)
+
   actualizadoEn DateTime @updatedAt
 
   @@map("configuracion_sistema")
@@ -535,6 +547,7 @@ model Ticket {
   repuestos           TicketRepuesto[]
   cotizaciones        Cotizacion[]
   conversacionChat    ConversacionChat?
+  conversacionIA      ConversacionTicketIA?
   contactoPendiente   ContactoPendiente?
   notificaciones      Notificacion[]
 
@@ -763,6 +776,35 @@ model MensajeConversacion {
 
   @@index([conversacionId])
   @@map("mensajes_conversacion")
+}
+
+// Hilo de chat entre el técnico y el Asistente IA de Soporte, uno por ticket (ver
+// ia-chat-panel.tsx — acordeón integrado al wizard de ejecución, nunca una pantalla
+// aparte). Reusa RolMensajeChat (USUARIO/ASISTENTE) en vez de un enum propio.
+model ConversacionTicketIA {
+  id        String   @id @default(cuid())
+  ticketId  String   @unique
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  createdAt DateTime @default(now())
+
+  mensajes MensajeTicketIA[]
+
+  @@map("conversaciones_ticket_ia")
+}
+
+model MensajeTicketIA {
+  id             String               @id @default(cuid())
+  conversacionId String
+  conversacion   ConversacionTicketIA @relation(fields: [conversacionId], references: [id])
+  rol            RolMensajeChat
+  contenido      String
+  // Como mucho un mensaje ASISTENTE marcado por conversación — marcar-respuesta-ia-
+  // valida.ts desmarca cualquier otro antes de marcar este, nunca hay dos a la vez.
+  esSolucion     Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+
+  @@index([conversacionId])
+  @@map("mensajes_ticket_ia")
 }
 
 // Captura de datos cuando escribe por Telegram/WhatsApp un chat_id/teléfono que no

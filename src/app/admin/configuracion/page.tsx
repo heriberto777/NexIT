@@ -95,6 +95,13 @@ export default async function ConfiguracionPage() {
           checklistTemplates: c._count.checklistTemplates,
         }))}
         especialidades={especialidadesRaw.map((e) => ({ id: e.id, nombre: e.nombre, usuarios: e._count.usuarios }))}
+        ia={{
+          iaProveedor: (config.iaProveedor as "ANTHROPIC" | "OPENAI" | "LOCAL" | null) ?? "ANTHROPIC",
+          iaModelo: config.iaModelo ?? "",
+          iaBaseUrl: config.iaBaseUrl ?? "",
+          iaHabilitada: config.iaHabilitada,
+          tieneIaApiKey: Boolean(config.iaApiKey),
+        }}
         plantillas={PLANTILLAS.map((p) => {
           const override = plantillasPersonalizadas.find((pp) => pp.clave === p.clave);
           return {

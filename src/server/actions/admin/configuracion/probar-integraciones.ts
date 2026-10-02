@@ -3,6 +3,7 @@
 import { requireUsuario } from "@/server/auth/session";
 import { probarWebhook, type ResultadoPruebaWebhook } from "@/server/services/webhook.service";
 import { probarEnvioSmtp, type ResultadoPruebaSmtp } from "@/server/services/email.service";
+import { probarConexionIA, type ResultadoPruebaIA } from "@/server/services/ia.service";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 
 const ROLES_PERMITIDOS = ["ADMIN"] as const;
@@ -27,5 +28,12 @@ export async function probarSmtpAction(): Promise<ActionResult<ResultadoPruebaSm
   return ejecutarAccion(async () => {
     await verificarAcceso();
     return probarEnvioSmtp();
+  });
+}
+
+export async function probarIaAction(): Promise<ActionResult<ResultadoPruebaIA>> {
+  return ejecutarAccion(async () => {
+    await verificarAcceso();
+    return probarConexionIA();
   });
 }

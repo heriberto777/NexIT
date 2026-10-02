@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { TicketEjecucionData, ChecklistItemPlano, RepuestoPlano, EvidenciaPlana } from "@/types/ejecucion";
+import type { TicketEjecucionData, ChecklistItemPlano, RepuestoPlano, EvidenciaPlana, MensajeIaPlano } from "@/types/ejecucion";
 import type { DiagnosticoInput, GuardarChecklistInput } from "@/lib/zod/checklist.schema";
 import type { RegistrarRepuestoInput } from "@/lib/zod/evidencia.schema";
 import type { CapturarFirmaInput } from "@/lib/zod/firma.schema";
@@ -14,6 +14,7 @@ import { registrarRepuesto } from "@/server/actions/tickets/ejecucion/registrar-
 import { capturarFirma } from "@/server/actions/tickets/ejecucion/capturar-firma";
 import { finalizarVisita } from "@/server/actions/tickets/ejecucion/finalizar-visita";
 import { marcarEvidenciaNoAplica } from "@/server/actions/tickets/ejecucion/marcar-evidencia-no-aplica";
+import { IaChatPanel } from "./ia-chat-panel";
 import { CheckInStep } from "./steps/check-in-step";
 import { ChecklistStep } from "./steps/checklist-step";
 import { EvidenceStep } from "./steps/evidence-step";
@@ -29,6 +30,8 @@ interface Props {
   repuestosDisponibles: RepuestoPlano[];
   evidenciasIniciales: EvidenciaPlana[];
   fotosMinimasEvidencia: number;
+  mensajesIniciales: MensajeIaPlano[];
+  iaHabilitada: boolean;
 }
 
 // El estado del wizard vivía SOLO en memoria del componente, nunca derivado del ticket
@@ -51,7 +54,15 @@ function calcularPasoInicial(ticket: TicketEjecucionData, evidenciasIniciales: E
   return 2; // ya hizo check-in — evita repetirlo y duplicar el historial
 }
 
-export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, evidenciasIniciales, fotosMinimasEvidencia }: Props) {
+export function ExecutionWizard({
+  ticket,
+  checklistItems,
+  repuestosDisponibles,
+  evidenciasIniciales,
+  fotosMinimasEvidencia,
+  mensajesIniciales,
+  iaHabilitada,
+}: Props) {
   const router = useRouter();
   const [step, setStep] = useState(() => calcularPasoInicial(ticket, evidenciasIniciales, fotosMinimasEvidencia));
   const [error, setError] = useState<string | null>(null);
@@ -185,12 +196,7 @@ export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, 
         </nav>
       </header>
 
-      {ticket.sugerenciaIA && (
-        <div className="mx-4 mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
-          <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-violet-700">🤖 Sugerencia de la IA</p>
-          {ticket.sugerenciaIA}
-        </div>
-      )}
+      <IaChatPanel ticketId={ticket.id} sugerenciaIA={ticket.sugerenciaIA} mensajesIniciales={mensajesIniciales} habilitada={iaHabilitada} />
 
       {error && <div className="mx-4 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
