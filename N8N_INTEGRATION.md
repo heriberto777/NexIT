@@ -796,7 +796,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         "fromEmail": "notificaciones@nexit.tuempresa.com",
         "toEmail": "={{$json.data.reportadoPorEmail}}",
         "subject": "=Ticket #{{$json.data.numeroTicket}} recibido",
-        "text": "=Hola {{$json.data.reportadoPorNombre}}, registramos tu solicitud \"{{$json.data.titulo}}\" con prioridad {{$json.data.prioridad}}. Te avisaremos cuando un tecnico la atienda."
+        "text": "={{$json.data.mensaje}}"
       },
       "id": "email-ticket-creado",
       "name": "Email confirmacion ticket",
@@ -834,7 +834,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
-        "text": "=Hola {{$json.data.reportadoPorNombre}}! Registramos tu solicitud \"{{$json.data.titulo}}\" (ticket #{{$json.data.numeroTicket}}) con prioridad {{$json.data.prioridad}}. Te avisaremos cuando un tecnico la atienda."
+        "text": "={{$json.data.mensaje}}"
       },
       "id": "telegram-confirmacion-creado",
       "name": "Telegram confirmacion ticket",
@@ -879,7 +879,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
-        "message": "=Hola {{$json.data.reportadoPorNombre}}! Registramos tu solicitud \"{{$json.data.titulo}}\" (ticket #{{$json.data.numeroTicket}}) con prioridad {{$json.data.prioridad}}. Te avisaremos cuando un tecnico la atienda."
+        "message": "={{$json.data.mensaje}}"
       },
       "id": "twilio-confirmacion-creado",
       "name": "Twilio confirmacion ticket",
@@ -925,7 +925,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         "fromEmail": "notificaciones@nexit.tuempresa.com",
         "toEmail": "={{$json.data.reportadoPorEmail}}",
         "subject": "=Visita completada - Ticket #{{$json.data.numeroTicket}}",
-        "text": "=El tecnico finalizo la visita. Ingresa a {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}} para revisar el informe y aprobar o rechazar."
+        "text": "={{$json.data.mensaje}} Ingresa a {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}} para revisar el informe y aprobar o rechazar."
       },
       "id": "email-esperando-validacion",
       "name": "Email revisar y aprobar",
@@ -963,7 +963,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
-        "text": "=El tecnico finalizo la visita del ticket #{{$json.data.numeroTicket}}. Ingresa a {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}} para revisar el informe y aprobar o rechazar."
+        "text": "={{$json.data.mensaje}} Ingresa a {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}} para revisar el informe y aprobar o rechazar."
       },
       "id": "telegram-revisar-aprobar",
       "name": "Telegram revisar y aprobar",
@@ -1008,7 +1008,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
-        "message": "=El tecnico finalizo la visita del ticket #{{$json.data.numeroTicket}}. Ingresa a {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}} para revisar el informe y aprobar o rechazar."
+        "message": "={{$json.data.mensaje}} Ingresa a {{$env.NEXIT_BASE_URL}}/portal/tickets/{{$json.data.ticketId}} para revisar el informe y aprobar o rechazar."
       },
       "id": "twilio-revisar-aprobar",
       "name": "Twilio revisar y aprobar",
@@ -1028,7 +1028,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "chatId": "={{$env.NEXIT_TELEGRAM_CHAT_ID}}",
-        "text": "=🚨 SLA {{$json.data.estadoSla === 'vencido' ? 'VENCIDO' : 'en riesgo'}} - Ticket #{{$json.data.numeroTicket}} ({{$json.data.clienteNombre}})\nPrioridad: {{$json.data.prioridad}}\nTecnico: {{$json.data.tecnicoAsignadoNombre || 'SIN ASIGNAR'}}\nRestan: {{$json.data.minutosRestantes}} min"
+        "text": "={{$json.data.mensaje}}"
       },
       "id": "telegram-alerta-sla",
       "name": "Telegram alerta SLA",
@@ -1072,7 +1072,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "chatId": "={{$json.data.tecnicoTelegramChatId}}",
-        "text": "={{$json.data.esReasignacion ? '🔄 Te reasignaron' : '🆕 Te asignaron'}} el ticket #{{$json.data.numeroTicket}} ({{$json.data.clienteNombre}})\nPrioridad: {{$json.data.prioridad}}\n{{$json.data.titulo}}"
+        "text": "={{$json.data.mensajeTecnico}}"
       },
       "id": "telegram-aviso-asignacion",
       "name": "Telegram aviso asignacion",
@@ -1117,7 +1117,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.data.tecnicoWhatsapp}}",
-        "message": "={{$json.data.esReasignacion ? '🔄 Te reasignaron' : '🆕 Te asignaron'}} el ticket #{{$json.data.numeroTicket}} ({{$json.data.clienteNombre}})\nPrioridad: {{$json.data.prioridad}}\n{{$json.data.titulo}}"
+        "message": "={{$json.data.mensajeTecnico}}"
       },
       "id": "twilio-aviso-asignacion",
       "name": "Twilio aviso asignacion",
@@ -1202,7 +1202,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
-        "text": "=Un tecnico ({{$json.data.tecnicoNombre}}) fue asignado a tu ticket #{{$json.data.numeroTicket}} y ya esta trabajando en tu solicitud."
+        "text": "={{$json.data.mensajeCliente}}"
       },
       "id": "telegram-aviso-asignacion-cliente",
       "name": "Telegram aviso asignacion (cliente)",
@@ -1247,7 +1247,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
-        "message": "=Un tecnico ({{$json.data.tecnicoNombre}}) fue asignado a tu ticket #{{$json.data.numeroTicket}} y ya esta trabajando en tu solicitud."
+        "message": "={{$json.data.mensajeCliente}}"
       },
       "id": "twilio-aviso-asignacion-cliente",
       "name": "Twilio aviso asignacion (cliente)",
@@ -1293,7 +1293,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         "fromEmail": "notificaciones@nexit.tuempresa.com",
         "toEmail": "={{$json.data.reportadoPorEmail}}",
         "subject": "=Ticket #{{$json.data.numeroTicket}} cancelado",
-        "text": "=Hola {{$json.data.reportadoPorNombre}}, tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+        "text": "={{$json.data.mensaje}}"
       },
       "id": "email-cancelado",
       "name": "Email aviso cancelacion",
@@ -1331,7 +1331,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
     {
       "parameters": {
         "chatId": "={{$json.data.reportadoPorTelegramChatId}}",
-        "text": "=Tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+        "text": "={{$json.data.mensaje}}"
       },
       "id": "telegram-cancelado",
       "name": "Telegram aviso cancelacion",
@@ -1376,7 +1376,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.data.reportadoPorWhatsapp}}",
-        "message": "=Tu ticket #{{$json.data.numeroTicket}} fue cancelado. Motivo: {{$json.data.motivo || 'no especificado'}}."
+        "message": "={{$json.data.mensaje}}"
       },
       "id": "twilio-cancelado",
       "name": "Twilio aviso cancelacion",
@@ -1398,7 +1398,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
         "fromEmail": "notificaciones@nexit.tuempresa.com",
         "toEmail": "={{$json.data.email}}",
         "subject": "=Bienvenido a {{ $json.empresaNombre }} — acceso a tu Portal",
-        "text": "=Hola {{$json.data.nombre}}, un representante de {{$json.data.clienteNombre}} te registró en {{ $json.empresaNombre }} para dar seguimiento a tus solicitudes de soporte.\n\nIngresa en {{$env.NEXIT_BASE_URL}}/login con:\nUsuario: {{$json.data.email}}\nContraseña temporal: {{$json.data.passwordTemporal}}\n\nTe recomendamos cambiarla ni bien inicies sesión, desde tu Perfil."
+        "text": "={{$json.data.mensaje}}\n\nIngresa en {{$env.NEXIT_BASE_URL}}/login con:\nUsuario: {{$json.data.email}}\nContraseña temporal: {{$json.data.passwordTemporal}}\n\nTe recomendamos cambiarla ni bien inicies sesión, desde tu Perfil."
       },
       "id": "email-contacto-creado",
       "name": "Email bienvenida contacto",
@@ -1437,7 +1437,7 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
       "parameters": {
         "from": "whatsapp:+14155238886",
         "to": "=whatsapp:{{$json.data.whatsapp}}",
-        "message": "=Hola {{$json.data.nombre}}! Te registramos en {{ $json.empresaNombre }} para dar seguimiento a tus solicitudes de soporte. Ingresa en {{$env.NEXIT_BASE_URL}}/login con tu correo ({{$json.data.email}}) y la contraseña temporal: {{$json.data.passwordTemporal}}"
+        "message": "={{$json.data.mensaje}} Ingresa en {{$env.NEXIT_BASE_URL}}/login con tu correo ({{$json.data.email}}) y la contraseña temporal: {{$json.data.passwordTemporal}}"
       },
       "id": "twilio-contacto-creado",
       "name": "Twilio bienvenida contacto",

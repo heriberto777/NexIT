@@ -162,7 +162,7 @@ async function renderizarMensajesEvento(evento: EventoWebhook): Promise<Record<s
         mensaje:
           (await renderizarPlantilla("TICKET_CREADO", {
             numeroTicket: evento.numeroTicket,
-            clienteNombre: evento.clienteNombre,
+            reportadoPorNombre: evento.reportadoPorNombre,
             titulo: evento.titulo,
             prioridad: evento.prioridad,
           })) ?? "",
@@ -171,6 +171,10 @@ async function renderizarMensajesEvento(evento: EventoWebhook): Promise<Record<s
       return {
         mensajeTecnico:
           (await renderizarPlantilla("TICKET_ASIGNADO_TECNICO", {
+            // Resuelto acá (no en la plantilla) porque es un emoji+verbo condicionado a un
+            // booleano, no un dato plano del ticket — una plantilla de texto no debería
+            // tener que saber evaluar esa condición.
+            accion: evento.esReasignacion ? "🔄 Te reasignaron" : "🆕 Te asignaron",
             numeroTicket: evento.numeroTicket,
             clienteNombre: evento.clienteNombre,
             titulo: evento.titulo,
@@ -182,23 +186,37 @@ async function renderizarMensajesEvento(evento: EventoWebhook): Promise<Record<s
             tecnicoNombre: evento.tecnicoNombre,
           })) ?? "",
       };
-    case "TICKET_CAMBIO_ESTADO":
-      return {
-        mensaje:
-          (await renderizarPlantilla("TICKET_CAMBIO_ESTADO", {
-            numeroTicket: evento.numeroTicket,
-            estadoNuevo: evento.estadoNuevo,
-          })) ?? "",
-      };
+    case "TICKET_CAMBIO_ESTADO": {
+      // Son los dos únicos estadoNuevo que hoy disparan un aviso en el workflow de n8n
+      // (ver IF ESPERANDO_VALIDACION / IF CANCELADO) — el resto de las transiciones
+      // (ABIERTO, ASIGNADO, EN_DIAGNOSTICO, etc.) no tienen aviso, ni plantilla.
+      if (evento.estadoNuevo === "ESPERANDO_VALIDACION") {
+        return {
+          mensaje: (await renderizarPlantilla("TICKET_LISTO_VALIDACION", { numeroTicket: evento.numeroTicket })) ?? "",
+        };
+      }
+      if (evento.estadoNuevo === "CANCELADO") {
+        return {
+          mensaje:
+            (await renderizarPlantilla("TICKET_CANCELADO", {
+              numeroTicket: evento.numeroTicket,
+              reportadoPorNombre: evento.reportadoPorNombre,
+              motivo: evento.motivo ?? "no especificado",
+            })) ?? "",
+        };
+      }
+      return {};
+    }
     case "SLA_EN_RIESGO":
       return {
         mensaje:
           (await renderizarPlantilla("SLA_EN_RIESGO", {
             numeroTicket: evento.numeroTicket,
             clienteNombre: evento.clienteNombre,
-            titulo: evento.titulo,
             prioridad: evento.prioridad,
-            estadoSla: evento.estadoSla,
+            estadoSla: evento.estadoSla === "vencido" ? "VENCIDO" : "en riesgo",
+            tecnicoAsignadoNombre: evento.tecnicoAsignadoNombre ?? "SIN ASIGNAR",
+            minutosRestantes: String(evento.minutosRestantes),
           })) ?? "",
       };
     case "CONTACTO_CREADO":
