@@ -2,8 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { getSesionActual } from "@/server/auth/session";
 import { rolUsuarioSchema, estadoUsuarioSchema } from "@/lib/zod/usuario.schema";
 import { UsuarioFormModal } from "@/components/admin/usuario-form-modal";
-import { UsuarioEstadoToggle } from "@/components/admin/usuario-estado-toggle";
-import { ResetearPasswordButton } from "@/components/admin/resetear-password-button";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { TableScroll } from "@/components/ui/table-scroll";
 
@@ -135,7 +133,7 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
                 </td>
                 <td className="px-3 py-2 text-gray-500">{u.ultimoAccesoAt ? FORMATO_FECHA.format(u.ultimoAccesoAt) : "Nunca"}</td>
                 <td className="px-3 py-2">
-                  <div className="flex items-center justify-end gap-3">
+                  <div className="flex items-center justify-end">
                     <UsuarioFormModal
                       clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
                       especialidades={especialidades.map((e) => ({ id: e.id, nombre: e.nombre }))}
@@ -146,10 +144,11 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
                         rol: u.rol,
                         clienteId: u.clienteId,
                         especialidadIds: u.especialidades.map((ue) => ue.especialidadId),
+                        estado: u.estado,
+                        telegramChatId: u.telegramChatId,
+                        whatsappTelefono: u.whatsappTelefono,
                       }}
                     />
-                    <ResetearPasswordButton id={u.id} nombre={u.nombre} />
-                    <UsuarioEstadoToggle id={u.id} estado={u.estado} />
                   </div>
                 </td>
               </tr>

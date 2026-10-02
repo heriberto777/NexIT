@@ -14,11 +14,23 @@ export async function editarUsuario(input: EditarUsuarioInput) {
     throw new Error(`Tu rol (${usuario.rol}) no puede editar usuarios`);
   }
 
-  const { id, nombre, email, rol, clienteId, especialidadIds } = editarUsuarioSchema.parse(input);
+  const { id, nombre, email, rol, clienteId, especialidadIds, telegramChatId, whatsappTelefono } = editarUsuarioSchema.parse(input);
 
   const conFlictoEmail = await prisma.usuario.findFirst({ where: { email, NOT: { id } } });
   if (conFlictoEmail) {
     throw new Error("Ya existe otro usuario con ese correo");
+  }
+  if (telegramChatId) {
+    const conflictoTelegram = await prisma.usuario.findFirst({ where: { telegramChatId, NOT: { id } } });
+    if (conflictoTelegram) {
+      throw new Error(`Ese Telegram chat id ya está vinculado a ${conflictoTelegram.nombre}`);
+    }
+  }
+  if (whatsappTelefono) {
+    const conflictoWhatsapp = await prisma.usuario.findFirst({ where: { whatsappTelefono, NOT: { id } } });
+    if (conflictoWhatsapp) {
+      throw new Error(`Ese teléfono de WhatsApp ya está vinculado a ${conflictoWhatsapp.nombre}`);
+    }
   }
 
   // deleteMany + create (no un simple `set`, que no existe para una tabla de unión
@@ -37,6 +49,11 @@ export async function editarUsuario(input: EditarUsuarioInput) {
           rol === "TECNICO" && especialidadIds.length > 0
             ? { create: especialidadIds.map((especialidadId) => ({ especialidadId })) }
             : undefined,
+        // ?? null (no undefined): un campo dejado en blanco en el modal debe desvincular
+        // el canal, no dejar el valor anterior intacto — el formulario siempre manda el
+        // estado completo del campo, nunca un patch parcial.
+        telegramChatId: telegramChatId ?? null,
+        whatsappTelefono: whatsappTelefono ?? null,
       },
     });
   });

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { optionalCuid } from "@/lib/zod/shared";
+import { optionalCuid, optionalTexto } from "@/lib/zod/shared";
 
 export const rolUsuarioSchema = z.enum(["ADMIN", "COORDINADOR", "TECNICO", "CLIENTE"]);
 export const estadoUsuarioSchema = z.enum(["ACTIVO", "INACTIVO"]);
@@ -31,6 +31,11 @@ export const editarUsuarioSchema = z
     rol: rolUsuarioSchema,
     clienteId: optionalCuid(),
     especialidadIds: z.array(z.string().min(1)).default([]),
+    // Solo editables desde Admin — normalmente un usuario los vincula él mismo desde
+    // /perfil con un código de verificación (vinculacion-identidad.service.ts); esto es
+    // para corregir/forzar el vínculo a mano cuando ese flujo no es viable.
+    telegramChatId: optionalTexto(50),
+    whatsappTelefono: optionalTexto(20),
   })
   .refine((data) => (data.rol === "CLIENTE" ? Boolean(data.clienteId) : true), {
     message: "Selecciona la empresa del cliente",

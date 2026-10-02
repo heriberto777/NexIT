@@ -10,3 +10,8 @@ import { z } from "zod";
 // le pide explícitamente "sucursalId: '...' o null" cuando no lo sabe, y sin esto Zod
 // rechaza ese null literal con "Expected string, received null".
 export const optionalCuid = () => z.preprocess((v) => (v === "" || v === null ? undefined : v), z.string().cuid().optional());
+
+// Mismo motivo que optionalCuid(), para un campo de texto libre opcional (ej.
+// telegramChatId/whatsappTelefono editados a mano por Admin): un <input> vacío manda
+// "", no debe fallar un .max() ni terminar guardándose como "" en vez de null.
+export const optionalTexto = (max: number) => z.preprocess((v) => (v === "" || v === null ? undefined : v), z.string().trim().max(max).optional());
