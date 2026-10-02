@@ -6,6 +6,7 @@ import type { TicketEjecucionData, ChecklistItemPlano, RepuestoPlano, EvidenciaP
 import type { DiagnosticoInput, GuardarChecklistInput } from "@/lib/zod/checklist.schema";
 import type { RegistrarRepuestoInput } from "@/lib/zod/evidencia.schema";
 import type { CapturarFirmaInput } from "@/lib/zod/firma.schema";
+import type { ActionResult } from "@/server/actions/action-result";
 import { iniciarAtencion } from "@/server/actions/tickets/ejecucion/iniciar-atencion";
 import { guardarDiagnostico } from "@/server/actions/tickets/ejecucion/guardar-diagnostico";
 import { guardarChecklist } from "@/server/actions/tickets/ejecucion/guardar-checklist";
@@ -67,15 +68,15 @@ export function ExecutionWizard({ ticket, checklistItems, repuestosDisponibles, 
   const fotosAntes = evidencias.filter((e) => e.tipo === "FOTO_ANTES").length;
   const fotosDespues = evidencias.filter((e) => e.tipo === "FOTO_DESPUES").length;
 
-  function runAction<T>(action: () => Promise<T>, onSuccess: (result: T) => void) {
+  function runAction<T>(action: () => Promise<ActionResult<T>>, onSuccess: (result: T) => void) {
     setError(null);
     startTransition(async () => {
-      try {
-        const result = await action();
-        onSuccess(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      const resultado = await action();
+      if (!resultado.ok) {
+        setError(resultado.error);
+        return;
       }
+      onSuccess(resultado.data);
     });
   }
 
