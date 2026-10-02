@@ -2,6 +2,7 @@ import { getSesionActual } from "@/server/auth/session";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { storageService } from "@/server/services/storage.service";
 import { prisma } from "@/lib/prisma";
+import { PLANTILLAS } from "@/server/services/plantilla-notificacion.service";
 import { ConfiguracionTabs } from "@/components/admin/configuracion/configuracion-tabs";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function ConfiguracionPage() {
 
   const allowDataReset = process.env.ALLOW_DATA_RESET === "true";
 
-  const [config, categoriasRaw, especialidadesRaw, conteoDatosPrueba] = await Promise.all([
+  const [config, categoriasRaw, especialidadesRaw, plantillasPersonalizadas, conteoDatosPrueba] = await Promise.all([
     obtenerConfiguracion(),
     prisma.categoriaActivo.findMany({
       include: { _count: { select: { activos: true, checklistTemplates: true } } },
@@ -29,6 +30,7 @@ export default async function ConfiguracionPage() {
       include: { _count: { select: { usuarios: true } } },
       orderBy: { nombre: "asc" },
     }),
+    prisma.plantillaNotificacion.findMany(),
     allowDataReset
       ? Promise.all([
           prisma.ticket.count(),
@@ -93,6 +95,17 @@ export default async function ConfiguracionPage() {
           checklistTemplates: c._count.checklistTemplates,
         }))}
         especialidades={especialidadesRaw.map((e) => ({ id: e.id, nombre: e.nombre, usuarios: e._count.usuarios }))}
+        plantillas={PLANTILLAS.map((p) => {
+          const override = plantillasPersonalizadas.find((pp) => pp.clave === p.clave);
+          return {
+            clave: p.clave,
+            nombre: p.nombre,
+            descripcion: p.descripcion,
+            placeholders: p.placeholders,
+            cuerpoPorDefecto: p.cuerpoPorDefecto,
+            cuerpoPersonalizado: override?.cuerpo ?? null,
+          };
+        })}
         conteoDatosPrueba={conteoDatosPrueba}
       />
     </div>

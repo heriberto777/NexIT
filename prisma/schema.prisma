@@ -214,6 +214,21 @@ model ConfiguracionSistema {
   @@map("configuracion_sistema")
 }
 
+// Override del cuerpo de un mensaje que hoy viene "quemado" en el JSON de un workflow
+// de n8n (ver src/server/services/plantilla-notificacion.service.ts para el catálogo
+// fijo de `clave`s válidas y su texto por defecto). Una fila ausente para una `clave`
+// significa "usar el texto por defecto" — nunca se borra el catálogo, solo se
+// sobreescribe. El texto renderizado viaja en el payload del webhook (`data.mensaje`)
+// para que n8n lo relaye tal cual, en vez de tener su propia copia del texto.
+model PlantillaNotificacion {
+  id            String   @id @default(cuid())
+  clave         String   @unique
+  cuerpo        String
+  actualizadoEn DateTime @updatedAt
+
+  @@map("plantillas_notificacion")
+}
+
 // ---------- Multi-tenant: clientes y sucursales ----------
 
 model Cliente {

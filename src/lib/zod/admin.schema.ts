@@ -112,3 +112,16 @@ export const editarSistemaSoftwareSchema = z.object({
   estado: z.enum(["ACTIVO", "INACTIVO"]),
 });
 export type EditarSistemaSoftwareInput = z.infer<typeof editarSistemaSoftwareSchema>;
+
+// `clave` no es .cuid(): es una de las claves fijas del catálogo PLANTILLAS (ej.
+// "TICKET_CREADO"), no un id generado — ver plantilla-notificacion.service.ts.
+export const guardarPlantillaNotificacionSchema = z.object({
+  clave: z.string().trim().min(1),
+  cuerpo: z.string().trim().min(1, "El mensaje no puede quedar vacío").max(2000),
+});
+export type GuardarPlantillaNotificacionInput = z.infer<typeof guardarPlantillaNotificacionSchema>;
+
+export const restablecerPlantillaNotificacionSchema = z.object({
+  clave: z.string().trim().min(1),
+});
+export type RestablecerPlantillaNotificacionInput = z.infer<typeof restablecerPlantillaNotificacionSchema>;

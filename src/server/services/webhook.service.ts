@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { registrarError } from "@/server/services/error-log.service";
+import { renderizarPlantilla } from "@/server/services/plantilla-notificacion.service";
 
 export type EventoWebhook =
   | {
@@ -147,6 +148,73 @@ async function postConTimeout(url: string, body: string, headers: Record<string,
   }
 }
 
+// Arma el/los mensaje(s) ya renderizados de ESTE evento (placeholder de la plantilla
+// personalizada, o el texto por defecto si nadie la tocó) — viajan en `data.mensaje`
+// (o `data.mensajeTecnico`/`data.mensajeCliente` cuando el evento tiene dos
+// destinatarios con texto distinto) para que el workflow de n8n solo tenga que
+// relayarlos (`{{$json.data.mensaje}}`), no tener su propia copia del texto. Ningún
+// workflow existente los usa todavía — ver conversación de diseño sobre
+// PlantillaNotificacion — así que esto no cambia nada hasta que se actualicen a mano.
+async function renderizarMensajesEvento(evento: EventoWebhook): Promise<Record<string, string>> {
+  switch (evento.tipo) {
+    case "TICKET_CREADO":
+      return {
+        mensaje:
+          (await renderizarPlantilla("TICKET_CREADO", {
+            numeroTicket: evento.numeroTicket,
+            clienteNombre: evento.clienteNombre,
+            titulo: evento.titulo,
+            prioridad: evento.prioridad,
+          })) ?? "",
+      };
+    case "TICKET_ASIGNADO":
+      return {
+        mensajeTecnico:
+          (await renderizarPlantilla("TICKET_ASIGNADO_TECNICO", {
+            numeroTicket: evento.numeroTicket,
+            clienteNombre: evento.clienteNombre,
+            titulo: evento.titulo,
+            prioridad: evento.prioridad,
+          })) ?? "",
+        mensajeCliente:
+          (await renderizarPlantilla("TICKET_ASIGNADO_CLIENTE", {
+            numeroTicket: evento.numeroTicket,
+            tecnicoNombre: evento.tecnicoNombre,
+          })) ?? "",
+      };
+    case "TICKET_CAMBIO_ESTADO":
+      return {
+        mensaje:
+          (await renderizarPlantilla("TICKET_CAMBIO_ESTADO", {
+            numeroTicket: evento.numeroTicket,
+            estadoNuevo: evento.estadoNuevo,
+          })) ?? "",
+      };
+    case "SLA_EN_RIESGO":
+      return {
+        mensaje:
+          (await renderizarPlantilla("SLA_EN_RIESGO", {
+            numeroTicket: evento.numeroTicket,
+            clienteNombre: evento.clienteNombre,
+            titulo: evento.titulo,
+            prioridad: evento.prioridad,
+            estadoSla: evento.estadoSla,
+          })) ?? "",
+      };
+    case "CONTACTO_CREADO":
+      return {
+        mensaje:
+          (await renderizarPlantilla("CONTACTO_CREADO", {
+            nombre: evento.nombre,
+            clienteNombre: evento.clienteNombre,
+          })) ?? "",
+      };
+    case "CONTACTO_NO_IDENTIFICADO":
+      // Es un aviso interno al staff, no al contacto — sin plantilla en esta primera etapa.
+      return {};
+  }
+}
+
 async function enviarWebhook(evento: EventoWebhook): Promise<void> {
   // obtenerConfiguracion() ya resuelve BD -> .env -> defaults fijos, en ese orden — no
   // hay que repetir esa cadena de fallback aquí.
@@ -154,10 +222,16 @@ async function enviarWebhook(evento: EventoWebhook): Promise<void> {
   if (!config.webhooksHabilitados || !config.webhookUrl) return;
 
   const { tipo, ...data } = evento;
+  const mensajes = await renderizarMensajesEvento(evento);
   // empresaNombre al nivel raíz (no dentro de `data`) para que cualquier nodo de n8n lo
   // lea con {{$json.empresaNombre}} sin importar el tipo de evento — así los mensajes de
   // bienvenida/alertas dejan de tener "NexIT" fijo en el texto cuando se renombra la empresa.
-  const body = JSON.stringify({ evento: tipo, timestamp: new Date().toISOString(), empresaNombre: config.empresaNombre, data });
+  const body = JSON.stringify({
+    evento: tipo,
+    timestamp: new Date().toISOString(),
+    empresaNombre: config.empresaNombre,
+    data: { ...data, ...mensajes },
+  });
   const headers = construirHeaders(body, config.webhookSecret);
 
   const res = await postConTimeout(config.webhookUrl, body, headers);
