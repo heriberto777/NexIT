@@ -60,3 +60,13 @@ export const guardarIaSchema = z
     path: ["iaBaseUrl"],
   });
 export type GuardarIaInput = z.infer<typeof guardarIaSchema>;
+
+// Para "Cargar modelos": manda lo que el admin tiene tipeado todavía sin guardar — a
+// diferencia de guardarIaSchema, acá iaApiKey puede venir vacío a propósito (el admin
+// dejó el campo en blanco para reusar la key ya guardada, mismo criterio que smtpPass).
+export const listarModelosIaSchema = z.object({
+  iaProveedor: iaProveedorSchema,
+  iaApiKey: z.string().trim().max(300).optional().or(z.literal("")),
+  iaBaseUrl: z.string().trim().url("URL inválida").optional().or(z.literal("")),
+});
+export type ListarModelosIaInput = z.infer<typeof listarModelosIaSchema>;

@@ -114,6 +114,65 @@ export async function generarRespuestaIA(systemPrompt: string, historial: Mensaj
   throw new Error(`Proveedor de IA desconocido: "${config.iaProveedor}".`);
 }
 
+export interface ModeloIA {
+  id: string;
+  nombre: string;
+}
+
+async function listarModelosAnthropic(apiKey: string): Promise<ModeloIA[]> {
+  const res = await fetchConTimeout("https://api.anthropic.com/v1/models?limit=100", {
+    method: "GET",
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+  });
+  if (!res.ok) {
+    const detalle = await res.text().catch(() => "");
+    throw new Error(`No se pudo listar modelos (${res.status}): ${detalle ? extraerMensajeError(detalle) : res.statusText}`);
+  }
+  const data = (await res.json()) as { data?: { id: string; display_name?: string }[] };
+  return (data.data ?? []).map((m) => ({ id: m.id, nombre: m.display_name ?? m.id }));
+}
+
+// Mismo endpoint /models tanto para OpenAI real como para LOCAL — ambos ya comparten la
+// API de chat compatible, y la mayoría de los runtimes locales (Ollama, LM Studio,
+// vLLM) también exponen el listado de modelos cargados en esa misma forma.
+async function listarModelosCompatibleOpenAI(baseUrl: string, apiKey: string | null): Promise<ModeloIA[]> {
+  const headers: Record<string, string> = {};
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+  const res = await fetchConTimeout(`${baseUrl.replace(/\/+$/, "")}/models`, { method: "GET", headers });
+  if (!res.ok) {
+    const detalle = await res.text().catch(() => "");
+    throw new Error(`No se pudo listar modelos (${res.status}): ${detalle ? extraerMensajeError(detalle) : res.statusText}`);
+  }
+  const data = (await res.json()) as { data?: { id: string }[] };
+  return (data.data ?? []).map((m) => ({ id: m.id, nombre: m.id })).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+export interface ListarModelosInput {
+  iaProveedor: "ANTHROPIC" | "OPENAI" | "LOCAL";
+  iaApiKey: string | null;
+  iaBaseUrl: string | null;
+}
+
+// La usa el botón "Cargar modelos" de /admin/configuracion — recibe lo que el admin
+// tiene tipeado en el formulario (todavía sin guardar), no lo ya guardado en
+// ConfiguracionSistema, para poder probar una key nueva antes de confirmarla.
+export async function listarModelosIA({ iaProveedor, iaApiKey, iaBaseUrl }: ListarModelosInput): Promise<ModeloIA[]> {
+  if (iaProveedor === "ANTHROPIC") {
+    if (!iaApiKey) throw new Error("Ingresá la API key de Anthropic primero.");
+    return listarModelosAnthropic(iaApiKey);
+  }
+  if (iaProveedor === "OPENAI") {
+    if (!iaApiKey) throw new Error("Ingresá la API key de OpenAI primero.");
+    return listarModelosCompatibleOpenAI(iaBaseUrl || "https://api.openai.com/v1", iaApiKey);
+  }
+  if (iaProveedor === "LOCAL") {
+    if (!iaBaseUrl) throw new Error("Ingresá la URL del servidor local primero.");
+    return listarModelosCompatibleOpenAI(iaBaseUrl, iaApiKey);
+  }
+  throw new Error(`Proveedor de IA desconocido: "${iaProveedor}".`);
+}
+
 export interface ResultadoPruebaIA {
   ok: boolean;
   mensaje: string;

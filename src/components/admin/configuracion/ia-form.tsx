@@ -7,7 +7,9 @@ import { useRouter } from "next/navigation";
 import { guardarIaSchema, type GuardarIaInput } from "@/lib/zod/configuracion.schema";
 import { guardarIa } from "@/server/actions/admin/configuracion/guardar-ia";
 import { probarIaAction } from "@/server/actions/admin/configuracion/probar-integraciones";
+import { listarModelosIaAction } from "@/server/actions/admin/configuracion/listar-modelos-ia";
 import { Button } from "@/components/ui/button";
+import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
 
 export interface IaValues {
   iaProveedor: "ANTHROPIC" | "OPENAI" | "LOCAL";
@@ -29,11 +31,16 @@ export function IaForm({ valores }: { valores: IaValues }) {
   const [guardado, setGuardado] = useState(false);
   const [isPendingPrueba, startPrueba] = useTransition();
   const [resultadoPrueba, setResultadoPrueba] = useState<{ ok: boolean; mensaje: string } | null>(null);
+  const [modelos, setModelos] = useState<{ id: string; nombre: string }[]>([]);
+  const [isPendingModelos, startModelos] = useTransition();
+  const [errorModelos, setErrorModelos] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<GuardarIaInput>({
     resolver: zodResolver(guardarIaSchema),
@@ -41,6 +48,32 @@ export function IaForm({ valores }: { valores: IaValues }) {
   });
 
   const proveedor = watch("iaProveedor");
+  const modeloActual = watch("iaModelo");
+
+  function cargarModelos() {
+    setErrorModelos(null);
+    startModelos(async () => {
+      const resultado = await listarModelosIaAction({
+        iaProveedor: proveedor,
+        iaApiKey: getValues("iaApiKey"),
+        iaBaseUrl: getValues("iaBaseUrl"),
+      });
+      if (!resultado.ok) {
+        setErrorModelos(resultado.error);
+        setModelos([]);
+        return;
+      }
+      setModelos(resultado.data);
+    });
+  }
+
+  // Si el modelo ya guardado no viene en la lista recién cargada (ej. se escribió a
+  // mano antes, o el proveedor lo descontinuó), lo agregamos igual como opción — nunca
+  // se pierde silenciosamente lo que ya estaba elegido.
+  const opcionesModelo =
+    modeloActual && !modelos.some((m) => m.id === modeloActual)
+      ? [{ id: modeloActual, nombre: `${modeloActual} (actual)` }, ...modelos]
+      : modelos;
 
   async function onSubmit(values: GuardarIaInput) {
     setError(null);
@@ -83,7 +116,17 @@ export function IaForm({ valores }: { valores: IaValues }) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Proveedor</label>
-        <select {...register("iaProveedor")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <select
+          {...register("iaProveedor", {
+            onChange: () => {
+              // La lista de modelos es específica del proveedor — cambiar de proveedor
+              // sin limpiarla dejaría ver modelos de Anthropic con OpenAI seleccionado.
+              setModelos([]);
+              setErrorModelos(null);
+            },
+          })}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        >
           <option value="ANTHROPIC">Anthropic (Claude)</option>
           <option value="OPENAI">OpenAI</option>
           <option value="LOCAL">Modelo local (Ollama, LM Studio, etc.)</option>
@@ -104,7 +147,20 @@ export function IaForm({ valores }: { valores: IaValues }) {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Modelo</label>
-          <input {...register("iaModelo")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder={MODELO_PLACEHOLDER[proveedor]} />
+          {opcionesModelo.length > 0 ? (
+            <ComboboxBuscable
+              value={modeloActual ?? ""}
+              onChange={(v) => setValue("iaModelo", v, { shouldValidate: true })}
+              placeholder="Selecciona un modelo"
+              options={opcionesModelo.map((m) => ({ value: m.id, label: m.nombre }))}
+            />
+          ) : (
+            <input {...register("iaModelo")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder={MODELO_PLACEHOLDER[proveedor]} />
+          )}
+          <button type="button" onClick={cargarModelos} disabled={isPendingModelos} className="mt-1 text-xs text-blue-600 underline disabled:opacity-50">
+            {isPendingModelos ? "Cargando..." : "Cargar modelos disponibles"}
+          </button>
+          {errorModelos && <p className="mt-1 text-xs text-red-600">{errorModelos}</p>}
           {errors.iaModelo && <p className="mt-1 text-xs text-red-600">{errors.iaModelo.message}</p>}
         </div>
       </div>
