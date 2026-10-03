@@ -131,6 +131,19 @@
     },
     {
       "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "execute-workflow-trigger-tecnico",
+      "name": "Execute Workflow Trigger (router)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        460
+      ]
+    },
+    {
+      "parameters": {
         "method": "GET",
         "url": "https://nexit.tuempresa.com/api/n8n/tecnico/contexto",
         "sendQuery": true,
@@ -503,6 +516,30 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.motivo}}",
+              "rightValue": "ROL_INCORRECTO",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-rol-incorrecto-tecnico",
+      "name": "IF rol incorrecto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        220
+      ]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://nexit.tuempresa.com/api/n8n/vinculacion-identidad/mensaje",
         "sendHeaders": true,
@@ -523,8 +560,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        880,
-        220
+        1100,
+        280
       ]
     },
     {
@@ -597,6 +634,17 @@
         ]
       ]
     },
+    "Execute Workflow Trigger (router)": {
+      "main": [
+        [
+          {
+            "node": "Contexto técnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Normalizar Telegram": {
       "main": [
         [
@@ -635,6 +683,24 @@
         [
           {
             "node": "IA: interpretar mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF rol incorrecto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF rol incorrecto": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
             "type": "main",
             "index": 0
           }

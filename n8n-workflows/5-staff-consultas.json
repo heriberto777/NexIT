@@ -107,6 +107,19 @@
     },
     {
       "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "execute-workflow-trigger-staff",
+      "name": "Execute Workflow Trigger (router)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        460
+      ]
+    },
+    {
+      "parameters": {
         "method": "GET",
         "url": "https://nexit.tuempresa.com/api/n8n/staff/verificar",
         "sendQuery": true,
@@ -308,6 +321,17 @@
         [
           {
             "node": "Normalizar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger (router)": {
+      "main": [
+        [
+          {
+            "node": "Verificar staff",
             "type": "main",
             "index": 0
           }

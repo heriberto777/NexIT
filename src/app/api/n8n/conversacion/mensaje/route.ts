@@ -49,7 +49,25 @@ export async function POST(request: Request) {
       })
     : null;
 
-  if (!usuario || usuario.rol !== "CLIENTE" || !usuario.cliente || usuario.estado !== "ACTIVO") {
+  if (usuarioBase && usuarioBase.rol !== "CLIENTE") {
+    // Encontramos a alguien, pero este canal es para clientes — no es un caso de "no
+    // identificado" (nunca va a resolverse reintentando la vinculación: el rol no va a
+    // cambiar por reescribir el correo). El workflow de n8n debe cortar acá con este
+    // mensaje en vez de volver a llamar a POST /vinculacion-identidad/mensaje, que
+    // re-vincularía el mismo canal sin que el chequeo de rol de abajo vaya a pasar
+    // nunca — eso era justo el loop infinito reportado (vincula, falla el rol, se
+    // repite desde cero en cada mensaje porque no queda ningún registro de que ya se
+    // intentó).
+    const { empresaNombre } = await obtenerConfiguracion();
+    return responder({
+      encontrado: false,
+      motivo: "ROL_INCORRECTO",
+      mensaje: `Tu cuenta en ${empresaNombre} es de ${usuarioBase.rol.toLowerCase()}, no de cliente — este canal es para reportar o seguir problemas como cliente. Si necesitás otra cosa, escribí al canal correspondiente a tu rol.`,
+      texto,
+    });
+  }
+
+  if (!usuario || !usuario.cliente || usuario.estado !== "ACTIVO") {
     // No hay con qué cliente/sede asociarlo de forma segura — en vez de que la IA
     // intente adivinar o listarle todos los clientes al que escribe, el workflow de
     // n8n debe llamar a POST /vinculacion-identidad/mensaje primero (le pide su correo
@@ -59,7 +77,7 @@ export async function POST(request: Request) {
     // (ver contacto-pendiente.service.ts). `texto` viaja de vuelta en la respuesta
     // (mismo motivo que en contextoTecnicoSchema): ese próximo paso del workflow ya no
     // tiene el mensaje original disponible, porque esta misma llamada pisó $json.
-    return responder({ encontrado: false, texto });
+    return responder({ encontrado: false, motivo: "NO_ENCONTRADO", texto });
   }
 
   const limiteAbandono = new Date(Date.now() - HORAS_ABANDONO * 60 * 60 * 1000);

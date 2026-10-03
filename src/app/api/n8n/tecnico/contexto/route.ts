@@ -40,10 +40,26 @@ export async function GET(request: Request) {
   // vinculacion-identidad.service.ts).
   const usuario = await resolverUsuarioPorChatId(canal, identificador);
 
-  if (!usuario || usuario.rol !== "TECNICO" || usuario.estado !== "ACTIVO") {
+  if (usuario && usuario.rol !== "TECNICO") {
+    // Encontramos a alguien, pero con otro rol — no es un caso de "no identificado"
+    // (reintentar la vinculación nunca va a cambiarle el rol a esta persona). El
+    // workflow de n8n debe cortar acá con este mensaje en vez de volver a llamar a
+    // POST /vinculacion-identidad/mensaje: ese loop (vincula → sigue fallando el rol →
+    // sin registro de intento previo, vuelve a pedir el correo desde cero) fue un bug
+    // real reportado con un Admin probando este flujo.
     const { empresaNombre } = await obtenerConfiguracion();
     return responder({
       autorizado: false,
+      motivo: "ROL_INCORRECTO",
+      mensaje: `Tu cuenta en ${empresaNombre} es de ${usuario.rol.toLowerCase()}, no de técnico — este canal es solo para seguimiento de tickets asignados a técnicos. Si necesitás otra cosa, escribí al canal correspondiente a tu rol.`,
+    });
+  }
+
+  if (!usuario || usuario.estado !== "ACTIVO") {
+    const { empresaNombre } = await obtenerConfiguracion();
+    return responder({
+      autorizado: false,
+      motivo: "NO_ENCONTRADO",
       mensaje: `No encontramos tu número vinculado a ${empresaNombre} como técnico. Pedile al administrador que lo configure en tu perfil.`,
     });
   }

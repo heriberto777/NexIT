@@ -581,7 +581,9 @@ del Webhook node en tu versión de n8n, y configurar `WEBHOOK_SECRET` /
 > Los JSON de abajo también están como archivos sueltos en
 > [`n8n-workflows/`](./n8n-workflows/) — en n8n, **Workflows → Import from File** y
 > subís directo `1-eventos-webhook.json` / `2-cron-sla.json` /
-> `3-asistente-ia-telegram-whatsapp.json`, sin copiar/pegar.
+> `3-asistente-ia-telegram-whatsapp.json`, sin copiar/pegar. También está
+> `0-router-canal-unico.json` (ver §10) para quien quiera compartir un solo
+> bot/número entre cliente, técnico y staff en vez de uno por flujo.
 
 ### Workflow 1 — Router de eventos
 
@@ -1986,15 +1988,36 @@ cliente (sucursales y sus activos, y sus sistemas de software — ver
   "identificador": "999888777"
 }
 
-// 200 — no vinculado
-{ "encontrado": false, "texto": "Hola", "canal": "TELEGRAM", "identificador": "000000000" }
+// 200 — no vinculado a nadie
+{ "encontrado": false, "motivo": "NO_ENCONTRADO", "texto": "Hola", "canal": "TELEGRAM", "identificador": "000000000" }
+
+// 200 — vinculado, pero a una cuenta que no es CLIENTE
+{
+  "encontrado": false,
+  "motivo": "ROL_INCORRECTO",
+  "mensaje": "Tu cuenta en NexIT Soporte Técnico es de técnico, no de cliente — este canal es para reportar o seguir problemas como cliente. Si necesitás otra cosa, escribí al canal correspondiente a tu rol.",
+  "texto": "hice check-in del TCK-0002",
+  "canal": "WHATSAPP",
+  "identificador": "+18095550001"
+}
 ```
 
-> **Cuando no se encuentra**, no hay forma segura de saber a qué cliente/sede pertenece
-> quien escribe — listarle todos los clientes de NexIT para que elija sería un problema
-> de confusión (y de privacidad entre clientes distintos). Este endpoint ya NO le
-> responde nada al contacto directamente ni dispara ningún evento por su cuenta — el
-> workflow de n8n debe, en la rama `encontrado == false`, llamar a
+> **`motivo` distingue dos situaciones que antes eran indistinguibles y causaban un
+> loop infinito real**: `"NO_ENCONTRADO"` (nadie con ese chat/teléfono — el workflow
+> debe seguir con vinculación, como siempre) y `"ROL_INCORRECTO"` (SÍ hay un `Usuario`
+> con ese canal, pero no es `CLIENTE` — ej. un técnico o un admin escribiéndole a este
+> bot). En el segundo caso **el workflow NO debe llamar a
+> `vinculacion-identidad/mensaje`**: reintentar la vinculación nunca le va a cambiar el
+> rol a esa persona, así que solo repetiría la pregunta del correo para siempre (es
+> justo el bug que se corrigió — ver §6.e, nodo "IF rol incorrecto"). Cuando es
+> `ROL_INCORRECTO`, la respuesta ya trae `mensaje` listo para mostrar tal cual; cuando
+> es `NO_ENCONTRADO` no se arma mensaje — ahí sigue el flujo de siempre.
+>
+> **Cuando `motivo` es `NO_ENCONTRADO`**, no hay forma segura de saber a qué
+> cliente/sede pertenece quien escribe — listarle todos los clientes de NexIT para que
+> elija sería un problema de confusión (y de privacidad entre clientes distintos). Este
+> endpoint ya NO le responde nada al contacto directamente ni dispara ningún evento por
+> su cuenta — el workflow de n8n debe, en esa rama, llamar a
 > **`POST /api/n8n/contacto-pendiente/mensaje`** (mismo body `{ canal, identificador,
 > texto }`, mismo `WEBHOOK_SECRET`) para seguir el flujo de recolección de datos.
 > `texto` viaja de vuelta en la respuesta (mismo motivo que en `contextoTecnicoSchema`):
@@ -2130,10 +2153,12 @@ está pensado como punto de partida, no como texto final.
 ```
 Telegram Trigger ──→ Normalizar Telegram ──┐
                                              ├─→ POST conversacion/mensaje → IF encontrado
-Webhook WhatsApp (Twilio) ──→ Normalizar WhatsApp ─┘                         ├─ false → POST vinculación identidad → IF continuar
-                                                                             │            ├─ true  → POST contacto-pendiente/mensaje
-                                                                             │            │            → Switch por canal → responder
-                                                                             │            └─ false → Switch por canal → responder
+Webhook WhatsApp (Twilio) ──→ Normalizar WhatsApp ─┘                         ├─ false → IF rol incorrecto (motivo == "ROL_INCORRECTO")
+                                                                             │            ├─ true  → Switch por canal → responder
+                                                                             │            └─ false → POST vinculación identidad → IF continuar
+                                                                             │                         ├─ true  → POST contacto-pendiente/mensaje
+                                                                             │                         │            → Switch por canal → responder
+                                                                             │                         └─ false → Switch por canal → responder
                                                                              └─ true  → IA: decidir siguiente paso
                                                                                           → POST conversacion/turno
                                                                                           → Switch por canal → responder
@@ -2690,14 +2715,25 @@ vuelta para que el paso de IA los tenga disponibles después de esta llamada (mi
 motivo que `texto` en `contexto-cliente`: un HTTP Request de n8n reemplaza `$json` con
 la respuesta).
 
-Si `autorizado: false`, el workflow debe llamar a
+Si `autorizado: false`, el campo `motivo` dice por qué: `"ROL_INCORRECTO"` (hay un
+`Usuario` con ese chat/teléfono, pero no es `TECNICO` — ej. un Admin/Coordinador
+escribiéndole a este bot) o `"NO_ENCONTRADO"` (nadie con ese canal vinculado). **Solo
+en `NO_ENCONTRADO`** el workflow debe llamar a
 **`POST /api/n8n/vinculacion-identidad/mensaje`** (mismo endpoint que usa el flujo de
 clientes, ver §6.c) antes de rendirse — si esa llamada responde `continuar: true`
 (el correo que dio no es de nadie), recién ahí se muestra el `mensaje` original de
 "no encontramos tu número". A diferencia del flujo de clientes, acá no hay
 `contacto-pendiente` de respaldo — un técnico no se "da de alta" por chat.
 
+> **En `ROL_INCORRECTO` el workflow NO debe llamar a vinculación** — ese era
+> exactamente el bug real reportado: un Admin probando este flujo quedaba en loop
+> infinito (la vinculación "funciona" porque su correo existe, pero el chequeo de rol
+> de abajo nunca va a pasar, y al no quedar registro de que ya se intentó, cada
+> mensaje siguiente volvía a pedir el correo desde cero). `mensaje` ya viene listo
+> para mostrar tal cual en este caso — ver §7.c, nodo "IF rol incorrecto".
+
 ```json
+// 200 — autorizado
 {
   "autorizado": true,
   "usuarioNombre": "María Gómez",
@@ -2707,6 +2743,19 @@ clientes, ver §6.c) antes de rendirse — si esa llamada responde `continuar: t
   "canal": "TELEGRAM",
   "identificador": "555000111",
   "texto": "...",
+  "tieneFoto": "false",
+  "fileId": "",
+  "mediaUrl": ""
+}
+
+// 200 — rol incorrecto (ej. un Admin probando este canal)
+{
+  "autorizado": false,
+  "motivo": "ROL_INCORRECTO",
+  "mensaje": "Tu cuenta en NexIT Soporte Técnico es de admin, no de técnico — este canal es solo para seguimiento de tickets asignados a técnicos. Si necesitás otra cosa, escribí al canal correspondiente a tu rol.",
+  "canal": "WHATSAPP",
+  "identificador": "+18095550099",
+  "texto": "hice check-in del TCK-0002",
   "tieneFoto": "false",
   "fileId": "",
   "mediaUrl": ""
@@ -2740,18 +2789,23 @@ identificador }` (y `error` cuando `ok: false`) — mismo contrato que
 ### b) Prerrequisitos
 
 Los mismos del §6 (bot de Telegram, cuenta de Twilio con WhatsApp Sandbox, API key de
-IA) — podés reusar el mismo bot/número que ya configuraste para el flujo de clientes,
-o crear uno separado si preferís mantenerlos distintos.
+IA). Si vas a usar un bot/número **separado** del de clientes, no hay nada más que
+hacer. Si en cambio querés que cliente/técnico/staff compartan **un solo** bot/número,
+no actives el `Telegram Trigger`/`Webhook` propios de este workflow — un mismo bot
+solo puede tener un webhook activo a la vez, así que activar los dos a la vez hace que
+uno le pise el webhook al otro silenciosamente. Para ese caso, ver §10.
 
 ### c) Diagrama
 
 ```
 Telegram Trigger ──→ Normalizar Telegram ──┐
                                              ├─→ GET tecnico/contexto → IF autorizado
-Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘                 ├─ false → POST vinculación identidad → IF continuar
-                                                                          │            ├─ true  → Restaurar mensaje no autorizado
-                                                                          │            │            → Switch por canal → responder
-                                                                          │            └─ false → Switch por canal → responder
+Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘                 ├─ false → IF rol incorrecto (motivo == "ROL_INCORRECTO")
+                                                                          │            ├─ true  → Switch por canal → responder
+                                                                          │            └─ false → POST vinculación identidad → IF continuar
+                                                                          │                         ├─ true  → Restaurar mensaje no autorizado
+                                                                          │                         │            → Switch por canal → responder
+                                                                          │                         └─ false → Switch por canal → responder
                                                                           └─ true  → IA: interpretar mensaje
                                                                                        (clasifica intención y, si
                                                                                        tieneFoto=true, descarga y
@@ -4467,3 +4521,111 @@ Schedule Trigger (7am) → GET resumen-diario
   }
 }
 ```
+
+## 10. Compartir un solo bot/número entre cliente, técnico y staff (opcional)
+
+Los §6, §7 y §8 están pensados, por defecto, para que cada flujo tenga **su propio**
+bot de Telegram / número de WhatsApp. Eso es intencional y sigue siendo la opción más
+simple si no te importa tener 3 bots/números distintos. Pero un bot de Telegram (o un
+número de WhatsApp vía Twilio) **solo puede tener un webhook activo a la vez** — si
+activás los 3 workflows con el mismo bot/número, el último que actives le "roba" el
+webhook a los otros dos, que dejan de recibir mensajes sin ningún error visible. Esta
+sección es para quien quiere que **un solo** bot/número atienda a los tres roles.
+
+### a) El problema de fondo
+
+`conversacion/mensaje` (§6), `tecnico/contexto` (§7) y `staff/verificar` (§8) cada uno
+**asume de antemano** qué rol va a encontrar, y trata cualquier otro rol como si no
+existiera. No hay, en esos tres, ningún paso que primero resuelva "¿quién es esta
+persona y qué rol tiene?" antes de decidir a qué flujo de negocio mandarla — por eso no
+alcanza con "apuntar los tres workflows al mismo bot": haría falta que los tres estén
+escuchando el mismo webhook a la vez, cosa que Telegram/Twilio no permiten.
+
+### b) Endpoint
+
+**`GET /api/n8n/identidad/resolver?canal=&identificador=&texto=`**
+
+A diferencia de `conversacion/mensaje`/`tecnico/contexto`/`staff/verificar`, este
+endpoint **no asume ningún rol** — solo dice quién es (si es alguien) y qué rol tiene,
+para que el workflow arme un `Switch` antes de invocar el flujo de negocio
+correspondiente. `texto` es puro passthrough (mismo motivo de siempre: la próxima
+llamada ya pisó `$json`).
+
+```json
+// 200 — encontrado
+{ "encontrado": true, "rol": "TECNICO", "usuarioNombre": "María Gómez", "canal": "TELEGRAM", "identificador": "555000111", "texto": "hice check-in del TCK-0002" }
+
+// 200 — no encontrado
+{ "encontrado": false, "rol": null, "motivo": "NO_ENCONTRADO", "canal": "WHATSAPP", "identificador": "+18095551234", "texto": "Hola" }
+
+// 200 — encontrado pero inactivo
+{ "encontrado": false, "rol": null, "motivo": "INACTIVO", "canal": "TELEGRAM", "identificador": "555000222", "texto": "Hola" }
+```
+
+`rol` es uno de `"CLIENTE" | "TECNICO" | "COORDINADOR" | "ADMIN"` cuando
+`encontrado: true`. Los tres endpoints de rol específico (`conversacion/mensaje`,
+`tecnico/contexto`, `staff/verificar`) siguen haciendo su propia verificación completa
+cuando el `Switch` los invoque — la query extra es un costo aceptable a cambio de no
+duplicar sus reglas de negocio acá (sucursales/activos para cliente, tickets activos
+para técnico, etc.).
+
+### c) Diagrama
+
+```
+Telegram Trigger ──→ Normalizar Telegram ──┐
+                                             ├─→ GET identidad/resolver → IF identidad encontrada
+Webhook WhatsApp (Twilio) ──→ Normalizar WhatsApp ─┘                      ├─ true  → Switch por rol
+                                                                          │            ├─ CLIENTE      → Execute Workflow → workflow §6
+                                                                          │            ├─ TECNICO      → Execute Workflow → workflow §7
+                                                                          │            ├─ ADMIN        → Execute Workflow → workflow §8
+                                                                          │            └─ COORDINADOR  → Execute Workflow → workflow §8
+                                                                          └─ false → POST vinculación identidad → IF continuar
+                                                                                       ├─ true  → POST contacto-pendiente/mensaje
+                                                                                       │            → Switch por canal → responder
+                                                                                       └─ false → Switch por canal → responder
+```
+
+El `Switch por rol` bifurca a los workflows de §6/§7/§8 **tal cual existen hoy**, vía
+un nodo **Execute Workflow** — no hace falta reescribir su lógica de negocio. Cada uno
+de esos 3 workflows ya termina enviando la respuesta por el canal correcto (su propio
+`Switch por canal` → Telegram/Twilio), así que el router no necesita repetir ese paso
+para esas tres ramas — solo lo necesita para su propio fallback de "no encontrado"
+(vinculación / contacto pendiente), que no es parte de ningún sub-flujo.
+
+### d) Cómo migrar sin perder la opción de volver atrás
+
+Los workflows de §6/§7/§8 ya traen (de forma aditiva, sin tocar su `Telegram
+Trigger`/`Webhook` propios) un nodo **`Execute Workflow Trigger (router)`** como punto
+de entrada alternativo, conectado directo a su primer nodo real (`Guardar mensaje` /
+`Contexto técnico` / `Verificar staff`). Para pasar a un solo bot/número:
+
+1. Importá `n8n-workflows/0-router-canal-unico.json`.
+2. En los nodos **Execute Workflow — Cliente/Técnico/Staff** del router, elegí (con el
+   selector de n8n) el workflow real que importaste para §6/§7/§8 — el placeholder
+   `REEMPLAZAR` es solo un punto de partida, cada instancia de n8n le asigna su propio
+   ID interno al importar.
+3. **Desactivá** los nodos `Telegram Trigger`/`Webhook WhatsApp` propios de §6/§7/§8
+   (o directamente desactivá esos 3 workflows como automatizaciones independientes,
+   dejándolos solo invocables vía Execute Workflow).
+4. Activá el workflow 0 — es el único que necesita el bot de Telegram / número de
+   WhatsApp compartido configurado en sus credenciales.
+
+Si en algún momento preferís volver a bots separados, revertí el paso 3 (reactivá los
+Triggers propios) y desactivá el workflow 0 — nada de esto borra ni reemplaza la
+configuración original de §6/§7/§8.
+
+### e) Fuera de alcance
+
+Instagram como cuarto canal no está soportado — `canalChatSchema` (ver
+`src/lib/zod/n8n.schema.ts`) solo acepta `"TELEGRAM" | "WHATSAPP"`, y `Usuario` no
+tiene una columna para un identificador de Instagram (`resolverUsuarioPorChatId()`
+solo sabe resolver esos dos). Sumar un tercer canal real requeriría cambios de schema,
+no solo de workflow.
+
+### f) JSON importable
+
+[`n8n-workflows/0-router-canal-unico.json`](./n8n-workflows/0-router-canal-unico.json)
+— después de importarlo, además de lo del punto d), revisá el nombre exacto del campo
+de body crudo del Webhook node en tu versión de n8n (igual que en §5) y configurá
+`WEBHOOK_SECRET` como variable de entorno si todavía no lo hiciste para los otros
+workflows.

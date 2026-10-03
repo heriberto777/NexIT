@@ -1,0 +1,655 @@
+{
+  "name": "NexIT - Router de un solo bot/número (cliente/técnico/staff)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ]
+      },
+      "id": "telegram-trigger-router",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        -160
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nexit-router-whatsapp-in",
+        "responseMode": "onReceived"
+      },
+      "id": "webhook-whatsapp-router",
+      "name": "Webhook WhatsApp (Twilio)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "canal",
+              "value": "TELEGRAM",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "identificador",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "texto",
+              "value": "={{ $json.message.text || $json.message.caption || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tieneFoto",
+              "value": "={{ $json.message.photo ? 'true' : 'false' }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "fileId",
+              "value": "={{ $json.message.photo ? $json.message.photo[$json.message.photo.length - 1].file_id : '' }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "normalizar-telegram-router",
+      "name": "Normalizar Telegram",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "canal",
+              "value": "WHATSAPP",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "identificador",
+              "value": "={{ $json.body.From.replace('whatsapp:', '') }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "texto",
+              "value": "={{ $json.body.Body || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "tieneFoto",
+              "value": "={{ $json.body.NumMedia && $json.body.NumMedia !== '0' ? 'true' : 'false' }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "mediaUrl",
+              "value": "={{ $json.body.MediaUrl0 || '' }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "normalizar-whatsapp-router",
+      "name": "Normalizar WhatsApp",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://nexit.tuempresa.com/api/n8n/identidad/resolver",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "canal",
+              "value": "={{ $json.canal }}"
+            },
+            {
+              "name": "identificador",
+              "value": "={{ $json.identificador }}"
+            },
+            {
+              "name": "texto",
+              "value": "={{ $json.texto }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        }
+      },
+      "id": "get-identidad-resolver",
+      "name": "GET identidad/resolver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.encontrado}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-identidad-encontrada-router",
+      "name": "IF identidad encontrada",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.rol}}",
+                    "rightValue": "CLIENTE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.rol}}",
+                    "rightValue": "TECNICO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.rol}}",
+                    "rightValue": "ADMIN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.rol}}",
+                    "rightValue": "COORDINADOR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "switch-rol-router",
+      "name": "Switch por rol",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        880,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR",
+          "mode": "list",
+          "cachedResultName": "NexIT - Asistente IA conversacional (Telegram/WhatsApp)"
+        },
+        "options": {}
+      },
+      "id": "execute-workflow-cliente-router",
+      "name": "Execute Workflow — Cliente",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR",
+          "mode": "list",
+          "cachedResultName": "NexIT - Técnico seguimiento de tickets"
+        },
+        "options": {}
+      },
+      "id": "execute-workflow-tecnico-router",
+      "name": "Execute Workflow — Técnico",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "REEMPLAZAR",
+          "mode": "list",
+          "cachedResultName": "NexIT - Staff consultas por chat"
+        },
+        "options": {}
+      },
+      "id": "execute-workflow-staff-router",
+      "name": "Execute Workflow — Staff",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/vinculacion-identidad/mensaje",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
+      },
+      "id": "post-vinculacion-identidad-router",
+      "name": "POST vinculación identidad",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json.continuar}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-vinculacion-continuar-router",
+      "name": "IF vinculación — continuar a contacto pendiente",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nexit.tuempresa.com/api/n8n/contacto-pendiente/mensaje",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ canal: $json.canal, identificador: $json.identificador, texto: $json.texto }) }}"
+      },
+      "id": "post-contacto-pendiente-router",
+      "name": "POST contacto-pendiente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.canal}}",
+                    "rightValue": "TELEGRAM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.canal}}",
+                    "rightValue": "WHATSAPP",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "switch-canal-router",
+      "name": "Switch por canal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1540,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.identificador }}",
+        "text": "={{ $json.mensaje }}"
+      },
+      "id": "telegram-responder-router",
+      "name": "Telegram - Responder",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        160
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "=whatsapp:{{ $json.identificador }}",
+        "message": "={{ $json.mensaje }}"
+      },
+      "id": "twilio-responder-router",
+      "name": "Twilio - Responder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        280
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REEMPLAZAR",
+          "name": "NexIT Twilio"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook WhatsApp (Twilio)": {
+      "main": [
+        [
+          {
+            "node": "Normalizar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Telegram": {
+      "main": [
+        [
+          {
+            "node": "GET identidad/resolver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "GET identidad/resolver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET identidad/resolver": {
+      "main": [
+        [
+          {
+            "node": "IF identidad encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF identidad encontrada": {
+      "main": [
+        [
+          {
+            "node": "Switch por rol",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST vinculación identidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch por rol": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow — Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Workflow — Técnico",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Workflow — Staff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Workflow — Staff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST vinculación identidad": {
+      "main": [
+        [
+          {
+            "node": "IF vinculación — continuar a contacto pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF vinculación — continuar a contacto pendiente": {
+      "main": [
+        [
+          {
+            "node": "POST contacto-pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST contacto-pendiente": {
+      "main": [
+        [
+          {
+            "node": "Switch por canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch por canal": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Responder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Twilio - Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

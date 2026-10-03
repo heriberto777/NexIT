@@ -18,6 +18,18 @@ export const contextoClienteSchema = z.object({
 });
 export type ContextoClienteInput = z.infer<typeof contextoClienteSchema>;
 
+// Para el router de un solo bot/número compartido entre cliente/técnico/staff (ver
+// N8N_INTEGRATION.md §10): resuelve identidad SIN asumir ningún rol de antemano, a
+// diferencia de contextoClienteSchema/contextoTecnicoSchema/verificarStaffSchema, que
+// cada uno espera un rol específico. El workflow usa la respuesta para un Switch por
+// rol antes de invocar el sub-flujo correspondiente.
+export const resolverIdentidadSchema = z.object({
+  canal: canalChatSchema,
+  identificador: z.string().trim().min(1, "Requerido"),
+  texto: z.string().trim().max(4000).optional(),
+});
+export type ResolverIdentidadInput = z.infer<typeof resolverIdentidadSchema>;
+
 // El agente de IA en n8n manda estos campos ya extraídos del mensaje libre del
 // cliente — categoriaSoporte/tipo/prioridad tienen default porque un mensaje de chat
 // casual ("no prende el switch") casi nunca los menciona explícitamente.
