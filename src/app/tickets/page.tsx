@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { EstadoTicket, Prioridad } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSesionActual } from "@/server/auth/session";
 import { estadoTicketSchema, prioridadSchema } from "@/lib/zod/ticket.schema";
@@ -15,8 +16,40 @@ import { tieneAccesoAlTicket } from "@/server/services/ticket-acceso.service";
 
 export const dynamic = "force-dynamic";
 
+const ETIQUETA_ESTADO: Record<string, string> = {
+  ABIERTO: "Abierto",
+  ASIGNADO: "Asignado",
+  EN_DIAGNOSTICO: "En diagnóstico",
+  ESPERANDO_REPUESTO: "Esperando repuesto",
+  EN_EJECUCION: "En ejecución",
+  ESPERANDO_VALIDACION: "Esperando validación",
+  RESUELTO: "Resuelto",
+  REABIERTO: "Reabierto",
+  CERRADO: "Cerrado",
+  CANCELADO: "Cancelado",
+};
+
+const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function comoArreglo(valor: string | string[] | undefined): string[] {
+  if (!valor) return [];
+  return Array.isArray(valor) ? valor : [valor];
+}
+
 interface PageProps {
-  searchParams: Promise<{ estado?: string; prioridad?: string; clienteId?: string; asignadoAMi?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    estado?: string | string[];
+    prioridad?: string;
+    clienteId?: string;
+    tecnicoId?: string;
+    desde?: string;
+    hasta?: string;
+    asignadoAMi?: string;
+    sinAsignar?: string;
+    soloActivos?: string;
+    slaEstado?: string;
+  }>;
 }
 
 export default async function TicketsPage({ searchParams }: PageProps) {
@@ -24,74 +57,133 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   const esTecnico = sesion?.rol === "TECNICO";
 
   const params = await searchParams;
-  const estado = estadoTicketSchema.safeParse(params.estado).success ? params.estado : undefined;
-  const prioridad = prioridadSchema.safeParse(params.prioridad).success ? params.prioridad : undefined;
-  // El filtro de cliente no se ofrece al técnico (ver más abajo), así que tampoco se
-  // respeta si llega por querystring — evita que "vea todo" armando la URL a mano.
+  const q = params.q?.trim() || undefined;
+  const estados = comoArreglo(params.estado).filter((e) => estadoTicketSchema.safeParse(e).success) as EstadoTicket[];
+  const prioridad = prioridadSchema.safeParse(params.prioridad).success ? (params.prioridad as Prioridad) : undefined;
+  // El filtro de cliente/técnico no se ofrece al técnico (ya ve solo lo suyo), así que
+  // tampoco se respeta si llega por querystring — evita que "vea todo" armando la URL a mano.
   const clienteId = !esTecnico ? params.clienteId || undefined : undefined;
-  // Ahora que un Admin/Coordinador también puede terminar como tecnicoAsignadoId de un
-  // ticket (ver asignar-tecnico.ts), este filtro les da un atajo a "lo mío" sin perder
-  // la vista general que siguen teniendo por defecto. El técnico ya ve solo lo suyo, así
-  // que para él este parámetro no aplica.
-  const asignadoAMi = !esTecnico && params.asignadoAMi === "1";
+  const tecnicoId = !esTecnico ? params.tecnicoId || undefined : undefined;
+  const desde = params.desde && FECHA_REGEX.test(params.desde) ? params.desde : undefined;
+  const hasta = params.hasta && FECHA_REGEX.test(params.hasta) ? params.hasta : undefined;
 
-  const whereBase = { estado: estado as never, prioridad: prioridad as never, clienteId };
-  // "Lo mío" ahora es responsable O colaborador (ver TicketColaborador /
-  // ticket-acceso.service.ts) — un colaborador necesita poder ENCONTRAR el ticket acá
-  // para poder abrirlo, no solo que el wizard lo deje entrar si ya tiene la URL.
+  // Toggles tipo "Asignados a mí" — no afectan la query base ni los conteos de las
+  // demás tarjetas, solo restringen qué se muestra en la tabla/tarjetas de abajo
+  // (igual criterio que ya tenía "asignadoAMi", extendido a las demás tarjetas).
+  const asignadoAMi = !esTecnico && params.asignadoAMi === "1";
+  const sinAsignar = params.sinAsignar === "1";
+  const soloActivos = params.soloActivos === "1";
+  const slaEstado = params.slaEstado === "en_riesgo" || params.slaEstado === "vencido" ? params.slaEstado : undefined;
+
+  // "Lo mío" = responsable O colaborador (ver TicketColaborador / ticket-acceso.service.ts).
   const filtroMio = sesion ? { OR: [{ tecnicoAsignadoId: sesion.id }, { colaboradores: { some: { usuarioId: sesion.id } } }] } : {};
 
-  const [tickets, asignadosAMiCount, clientes, config] = await Promise.all([
+  const baseWhere = {
+    ...(estados.length > 0 ? { estado: { in: estados } } : {}),
+    ...(prioridad ? { prioridad } : {}),
+    ...(clienteId ? { clienteId } : {}),
+    ...(tecnicoId ? { tecnicoAsignadoId: tecnicoId } : {}),
+    ...(q
+      ? {
+          OR: [
+            { numeroTicket: { contains: q, mode: "insensitive" as const } },
+            { titulo: { contains: q, mode: "insensitive" as const } },
+            { cliente: { nombre: { contains: q, mode: "insensitive" as const } } },
+          ],
+        }
+      : {}),
+    ...(desde || hasta
+      ? {
+          fechaCreacion: {
+            ...(desde ? { gte: new Date(`${desde}T00:00:00`) } : {}),
+            ...(hasta ? { lte: new Date(`${hasta}T23:59:59.999`) } : {}),
+          },
+        }
+      : {}),
+    // El técnico SIEMPRE ve solo lo suyo — a diferencia de los demás toggles, esto no
+    // es opcional ni combinable, es la regla de acceso del rol.
+    ...(esTecnico ? filtroMio : {}),
+  };
+
+  const [ticketsBase, clientes, tecnicos, config] = await Promise.all([
     prisma.ticket.findMany({
-      where: {
-        ...whereBase,
-        ...(esTecnico || asignadoAMi ? filtroMio : {}),
-      },
+      where: baseWhere,
       include: { cliente: true, sucursal: true, tecnicoAsignado: true, sla: true, colaboradores: { select: { usuarioId: true } } },
       orderBy: { fechaCreacion: "desc" },
     }),
-    !esTecnico && sesion ? prisma.ticket.count({ where: { ...whereBase, ...filtroMio } }) : Promise.resolve(0),
     esTecnico ? Promise.resolve([]) : prisma.cliente.findMany({ orderBy: { nombre: "asc" } }),
+    esTecnico
+      ? Promise.resolve([])
+      : prisma.usuario.findMany({ where: { rol: { in: ["TECNICO", "COORDINADOR", "ADMIN"] }, estado: "ACTIVO" }, orderBy: { nombre: "asc" } }),
     obtenerConfiguracion(),
   ]);
 
   const FORMATO_FECHA = new Intl.DateTimeFormat(config.localeFecha, { dateStyle: "short" });
   const defaultsHoras = slaHorasPorPrioridad(config);
-  const conSla = tickets.map((t) => ({ ...t, estadoSla: calcularEstadoSla(t, defaultsHoras) }));
-  // "Total" refleja todo lo que coincide con los filtros (igual que la tabla de abajo,
-  // incluidos cancelados/resueltos/cerrados). "Activos" excluye esos estados terminales
-  // para que no se confunda con "trabajo pendiente" — antes "Sin asignar" tampoco
-  // excluía terminales, así que un ticket CANCELADO sin técnico contaba como si
-  // necesitara asignación.
-  const activos = tickets.filter((t) => !ESTADOS_TERMINALES.has(t.estado));
+  const conSlaBase = ticketsBase.map((t) => ({ ...t, estadoSla: calcularEstadoSla(t, defaultsHoras) }));
+
+  // Los números de las tarjetas siempre reflejan lo que coincide con los filtros de
+  // búsqueda (q/estado/prioridad/cliente/técnico/fecha) — nunca se recalculan según qué
+  // toggle esté activo, para que el conteo no "desaparezca" al hacer clic en su propia
+  // tarjeta (mismo criterio que ya tenía "Asignados a mí").
+  const activosBase = conSlaBase.filter((t) => !ESTADOS_TERMINALES.has(t.estado));
   const kpis = {
-    total: tickets.length,
-    activos: activos.length,
-    sinAsignar: activos.filter((t) => !t.tecnicoAsignadoId).length,
-    asignadosAMi: asignadosAMiCount,
-    slaEnRiesgo: conSla.filter((t) => t.estadoSla === "en_riesgo").length,
-    slaVencido: conSla.filter((t) => t.estadoSla === "vencido").length,
+    total: conSlaBase.length,
+    activos: activosBase.length,
+    sinAsignar: activosBase.filter((t) => !t.tecnicoAsignadoId).length,
+    asignadosAMi: sesion ? conSlaBase.filter((t) => tieneAccesoAlTicket(t, sesion.id)).length : 0,
+    slaEnRiesgo: conSlaBase.filter((t) => t.estadoSla === "en_riesgo").length,
+    slaVencido: conSlaBase.filter((t) => t.estadoSla === "vencido").length,
   };
 
-  const hayFiltros = Boolean(estado || prioridad || clienteId || asignadoAMi);
+  // Acá sí se aplican los toggles, en cadena, sobre la lista que efectivamente se
+  // muestra — son combinables (ej. "Asignados a mí" + "SLA vencido" a la vez).
+  let conSla = conSlaBase;
+  if (soloActivos) conSla = conSla.filter((t) => !ESTADOS_TERMINALES.has(t.estado));
+  if (sinAsignar) conSla = conSla.filter((t) => !t.tecnicoAsignadoId && !ESTADOS_TERMINALES.has(t.estado));
+  if (asignadoAMi && sesion) conSla = conSla.filter((t) => tieneAccesoAlTicket(t, sesion.id));
+  if (slaEstado) conSla = conSla.filter((t) => t.estadoSla === slaEstado);
+
+  const hayFiltros = Boolean(
+    q || estados.length > 0 || prioridad || clienteId || tecnicoId || desde || hasta || asignadoAMi || sinAsignar || soloActivos || slaEstado,
+  );
 
   // La columna de acción aparece para el técnico (siempre ve solo lo suyo) y también
   // para un Admin/Coordinador que tenga al menos un ticket de esta lista asignado a sí
   // mismo (como responsable o colaborador) — evita una columna vacía para quien nunca
   // se autoasigna nada.
-  const mostrarColumnaAccion = esTecnico || (sesion && tickets.some((t) => tieneAccesoAlTicket(t, sesion.id)));
+  const mostrarColumnaAccion = esTecnico || (sesion && conSla.some((t) => tieneAccesoAlTicket(t, sesion.id)));
 
-  // Preserva Estado/Prioridad/Cliente al alternar "Asignados a mí" — un simple toggle,
-  // no un formulario propio, para que sea un botón de un clic.
-  const hrefAsignadoAMi = (() => {
+  // Preserva los filtros de búsqueda (no los toggles) al construir el link de cada
+  // tarjeta — cada tarjeta decide por separado si prende/apaga SU propio toggle,
+  // conservando el estado de las demás (son combinables entre sí).
+  function construirQueryBase(): URLSearchParams {
     const sp = new URLSearchParams();
-    if (estado) sp.set("estado", estado);
+    if (q) sp.set("q", q);
+    for (const e of estados) sp.append("estado", e);
     if (prioridad) sp.set("prioridad", prioridad);
     if (clienteId) sp.set("clienteId", clienteId);
-    if (!asignadoAMi) sp.set("asignadoAMi", "1");
+    if (tecnicoId) sp.set("tecnicoId", tecnicoId);
+    if (desde) sp.set("desde", desde);
+    if (hasta) sp.set("hasta", hasta);
+    return sp;
+  }
+
+  function hrefToggle(cambios: {
+    asignadoAMi?: boolean;
+    sinAsignar?: boolean;
+    soloActivos?: boolean;
+    slaEstado?: "en_riesgo" | "vencido";
+  }): string {
+    const sp = construirQueryBase();
+    const nuevo = { asignadoAMi, sinAsignar, soloActivos, slaEstado, ...cambios };
+    if (nuevo.asignadoAMi) sp.set("asignadoAMi", "1");
+    if (nuevo.sinAsignar) sp.set("sinAsignar", "1");
+    if (nuevo.soloActivos) sp.set("soloActivos", "1");
+    if (nuevo.slaEstado) sp.set("slaEstado", nuevo.slaEstado);
     const qs = sp.toString();
     return qs ? `/tickets?${qs}` : "/tickets";
-  })();
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 bg-gray-50 px-4 py-6">
@@ -104,57 +196,103 @@ export default async function TicketsPage({ searchParams }: PageProps) {
 
       <div className={`grid grid-cols-2 gap-3 ${esTecnico ? "sm:grid-cols-4" : "sm:grid-cols-3 lg:grid-cols-6"}`}>
         <KpiCard label="Total" value={kpis.total} />
-        <KpiCard label="Activos" value={kpis.activos} />
-        {!esTecnico && <KpiCard label="Sin asignar" value={kpis.sinAsignar} />}
+        <KpiCard label="Activos" value={kpis.activos} href={hrefToggle({ soloActivos: !soloActivos })} activo={soloActivos} />
         {!esTecnico && (
-          <KpiCard label="Asignados a mí" value={kpis.asignadosAMi} href={hrefAsignadoAMi} activo={asignadoAMi} />
+          <KpiCard label="Sin asignar" value={kpis.sinAsignar} href={hrefToggle({ sinAsignar: !sinAsignar })} activo={sinAsignar} />
         )}
-        <KpiCard label="SLA en riesgo" value={kpis.slaEnRiesgo} tone="amber" />
-        <KpiCard label="SLA vencido" value={kpis.slaVencido} tone="red" />
+        {!esTecnico && (
+          <KpiCard label="Asignados a mí" value={kpis.asignadosAMi} href={hrefToggle({ asignadoAMi: !asignadoAMi })} activo={asignadoAMi} />
+        )}
+        <KpiCard
+          label="SLA en riesgo"
+          value={kpis.slaEnRiesgo}
+          tone="amber"
+          href={hrefToggle({ slaEstado: slaEstado === "en_riesgo" ? undefined : "en_riesgo" })}
+          activo={slaEstado === "en_riesgo"}
+        />
+        <KpiCard
+          label="SLA vencido"
+          value={kpis.slaVencido}
+          tone="red"
+          href={hrefToggle({ slaEstado: slaEstado === "vencido" ? undefined : "vencido" })}
+          activo={slaEstado === "vencido"}
+        />
       </div>
 
-      <form className="flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 bg-white p-3" method="GET">
+      <form className="space-y-3 rounded-xl border border-gray-200 bg-white p-3" method="GET">
+        <input
+          type="search"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Buscar por # de ticket, asunto o cliente..."
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Estado</label>
-          <select name="estado" defaultValue={estado ?? ""} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-            <option value="">Todos</option>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Estado (podés elegir varios)</label>
+          <div className="flex flex-wrap gap-1.5">
             {estadoTicketSchema.options.map((e) => (
-              <option key={e} value={e}>
-                {e.replaceAll("_", " ")}
-              </option>
+              <label key={e} className="cursor-pointer">
+                <input type="checkbox" name="estado" value={e} defaultChecked={estados.includes(e)} className="peer sr-only" />
+                <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 peer-checked:border-blue-200 peer-checked:bg-blue-50 peer-checked:text-blue-700">
+                  {ETIQUETA_ESTADO[e] ?? e}
+                </span>
+              </label>
             ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Prioridad</label>
-          <select name="prioridad" defaultValue={prioridad ?? ""} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-            <option value="">Todas</option>
-            {prioridadSchema.options.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </div>
-        {!esTecnico && (
-          <div className="w-48">
-            <label className="mb-1 block text-xs font-medium text-gray-600">Cliente</label>
-            <ComboboxBuscable
-              name="clienteId"
-              defaultValue={clienteId ?? ""}
-              placeholder="Todos"
-              options={[{ value: "", label: "Todos" }, ...clientes.map((c) => ({ value: c.id, label: c.nombre }))]}
-            />
           </div>
-        )}
-        <button type="submit" className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
-          Filtrar
-        </button>
-        {hayFiltros && (
-          <Link href="/tickets" className="text-sm text-gray-500 underline">
-            Limpiar filtros
-          </Link>
-        )}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Prioridad</label>
+            <select name="prioridad" defaultValue={prioridad ?? ""} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+              <option value="">Todas</option>
+              {prioridadSchema.options.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+          {!esTecnico && (
+            <div className="w-48">
+              <label className="mb-1 block text-xs font-medium text-gray-600">Cliente</label>
+              <ComboboxBuscable
+                name="clienteId"
+                defaultValue={clienteId ?? ""}
+                placeholder="Todos"
+                options={[{ value: "", label: "Todos" }, ...clientes.map((c) => ({ value: c.id, label: c.nombre }))]}
+              />
+            </div>
+          )}
+          {!esTecnico && (
+            <div className="w-48">
+              <label className="mb-1 block text-xs font-medium text-gray-600">Técnico</label>
+              <ComboboxBuscable
+                name="tecnicoId"
+                defaultValue={tecnicoId ?? ""}
+                placeholder="Todos"
+                options={[{ value: "", label: "Todos" }, ...tecnicos.map((t) => ({ value: t.id, label: t.nombre }))]}
+              />
+            </div>
+          )}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Desde</label>
+            <input type="date" name="desde" defaultValue={desde ?? ""} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Hasta</label>
+            <input type="date" name="hasta" defaultValue={hasta ?? ""} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+          </div>
+          <button type="submit" className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
+            Filtrar
+          </button>
+          {hayFiltros && (
+            <Link href="/tickets" className="text-sm text-gray-500 underline">
+              Limpiar filtros
+            </Link>
+          )}
+        </div>
       </form>
 
       <div className="space-y-2 sm:hidden">
@@ -166,7 +304,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
             esMio={Boolean(sesion && tieneAccesoAlTicket(t, sesion.id))}
           />
         ))}
-        {tickets.length === 0 && (
+        {conSla.length === 0 && (
           <p className="rounded-xl border border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-400">
             {esTecnico ? "No tienes tickets asignados por ahora." : "No hay tickets que coincidan con los filtros."}
           </p>
@@ -231,7 +369,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
                 )}
               </tr>
             ))}
-            {tickets.length === 0 && (
+            {conSla.length === 0 && (
               <tr>
                 <td colSpan={mostrarColumnaAccion ? 8 : 7} className="px-3 py-8 text-center text-sm text-gray-400">
                   {esTecnico ? "No tienes tickets asignados por ahora." : "No hay tickets que coincidan con los filtros."}
