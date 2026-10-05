@@ -87,6 +87,14 @@ enum CategoriaSoporte {
   SOFTWARE_SISTEMA
   HARDWARE
   INFRAESTRUCTURA
+  // Agregadas porque "Hardware/Equipos" e "Infraestructura/Redes" eran las únicas 2
+  // opciones de la rama "Equipo" en los wizards de creación — demasiado amplias para
+  // reportes reales de un service desk (ej. un problema eléctrico o de impresión
+  // terminaba clasificado como "Hardware" genérico).
+  ELECTRICO_ENERGIA
+  CLIMATIZACION
+  IMPRESION
+  SEGURIDAD_FISICA
 }
 
 enum EstadoSistemaSoftware {

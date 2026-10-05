@@ -56,6 +56,10 @@ const TIPOS = [
 const TIPOS_EQUIPO = [
   { value: "HARDWARE", label: "Hardware / Equipos" },
   { value: "INFRAESTRUCTURA", label: "Infraestructura / Redes" },
+  { value: "ELECTRICO_ENERGIA", label: "Eléctrico / Energía (UPS, plantas, tableros)" },
+  { value: "CLIMATIZACION", label: "Climatización (A/C de sala de servidores)" },
+  { value: "IMPRESION", label: "Impresión (impresoras, escáneres, consumibles)" },
+  { value: "SEGURIDAD_FISICA", label: "Seguridad física (cámaras, control de acceso)" },
 ] as const;
 
 const SISTEMAS_GENERICOS = [

@@ -2134,8 +2134,13 @@ clave del prompt:
 `/portal/tickets/nuevo`): el prompt le pide al modelo clasificar el problema sin
 preguntárselo explícitamente al cliente —
 
-- Equipo físico de la lista de activos → `categoriaSoporte: "HARDWARE"` (el equipo
-  falló) o `"INFRAESTRUCTURA"` (red/cableado), con `activoId` si lo identifica.
+- UPS, planta eléctrica, tablero → `categoriaSoporte: "ELECTRICO_ENERGIA"`.
+- Aire acondicionado de sala de servidores/racks → `categoriaSoporte: "CLIMATIZACION"`.
+- Impresora, escáner, consumibles → `categoriaSoporte: "IMPRESION"`.
+- Cámara, control de acceso, alarma → `categoriaSoporte: "SEGURIDAD_FISICA"`.
+- Switch, PC, servidor u otro equipo físico que no encaja en ninguna categoría
+  específica de arriba → `categoriaSoporte: "HARDWARE"` (el equipo falló) o
+  `"INFRAESTRUCTURA"` (red/cableado), con `activoId` si lo identifica.
 - Un sistema de la lista `sistemasSoftware` del cliente → `categoriaSoporte:
   "SOFTWARE_TERCEROS"` + `sistemaSoftwareId`.
 - "El sistema operativo", "Windows", "Office", etc. (genérico, no es un activo ni un

@@ -8,6 +8,10 @@ export const categoriaSoporteSchema = z.enum([
   "SOFTWARE_SISTEMA",
   "HARDWARE",
   "INFRAESTRUCTURA",
+  "ELECTRICO_ENERGIA",
+  "CLIMATIZACION",
+  "IMPRESION",
+  "SEGURIDAD_FISICA",
 ]);
 export const prioridadSchema = z.enum(["CRITICA", "ALTA", "MEDIA", "BAJA"]);
 export const estadoTicketSchema = z.enum([
