@@ -3,13 +3,8 @@ import { getSesionActual } from "@/server/auth/session";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
 import { NotificationBell } from "@/components/layout/notification-bell";
-import { navParaRol } from "@/lib/utils/nav-admin";
+import { NAV_TECNICO, navParaRol } from "@/lib/utils/nav-admin";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
-
-const NAV_TECNICO = [
-  { href: "/tickets", label: "Tickets" },
-  { href: "/perfil", label: "Perfil" },
-];
 
 // /tickets es la pantalla de aterrizaje del técnico (su "home") y también el listado
 // que Admin/Coordinador visitan desde su propio nav — sin este layout quedaban sin

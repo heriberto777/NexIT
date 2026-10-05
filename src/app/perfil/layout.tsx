@@ -4,13 +4,8 @@ import { getSesionActual } from "@/server/auth/session";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
 import { NotificationBell } from "@/components/layout/notification-bell";
-import { navParaRol } from "@/lib/utils/nav-admin";
+import { NAV_CLIENTE, NAV_TECNICO, navParaRol } from "@/lib/utils/nav-admin";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
-
-const NAV_TECNICO = [
-  { href: "/tickets", label: "Tickets" },
-  { href: "/perfil", label: "Perfil" },
-];
 
 // /perfil es accesible para los 4 roles y no vive bajo /admin, /tickets ni /portal, así
 // que necesita su propio layout que reconstruya el mismo nav que el usuario ve en su
@@ -22,15 +17,7 @@ export default async function PerfilLayout({ children }: { children: ReactNode }
     const cliente = sesion.clienteId ? await prisma.cliente.findUnique({ where: { id: sesion.clienteId } }) : null;
     return (
       <div className="min-h-screen bg-gray-50">
-        <MainNav
-          brand={cliente?.nombre ?? "Portal"}
-          brandHref="/portal"
-          links={[
-            { href: "/portal", label: "Inicio" },
-            { href: "/portal/tickets", label: "Mis tickets" },
-            { href: "/perfil", label: "Perfil" },
-          ]}
-        >
+        <MainNav brand={cliente?.nombre ?? "Portal"} brandHref="/portal" links={NAV_CLIENTE}>
           <NotificationBell />
           <LogoutButton />
         </MainNav>

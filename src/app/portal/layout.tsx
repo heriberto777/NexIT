@@ -6,6 +6,7 @@ import { DevUserSwitcher } from "@/components/portal/dev-user-switcher";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { MainNav } from "@/components/layout/main-nav";
 import { NotificationBell } from "@/components/layout/notification-bell";
+import { NAV_CLIENTE } from "@/lib/utils/nav-admin";
 
 export default async function PortalLayout({ children }: { children: ReactNode }) {
   const sesion = await getSesionActual();
@@ -47,16 +48,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainNav
-        brand={cliente?.nombre ?? "Portal"}
-        brandHref="/portal"
-        links={[
-          { href: "/portal", label: "Inicio" },
-          { href: "/portal/tickets", label: "Mis tickets" },
-          { href: "/perfil", label: "Perfil" },
-          { href: "/portal/tickets/nuevo", label: "+ Reportar falla", primary: true },
-        ]}
-      >
+      <MainNav brand={cliente?.nombre ?? "Portal"} brandHref="/portal" links={NAV_CLIENTE}>
         {clientesDisponibles.length > 0 && (
           <DevUserSwitcher
             usuarios={clientesDisponibles.map((u) => ({ email: u.email, nombre: u.nombre, clienteNombre: u.cliente?.nombre ?? "—" }))}

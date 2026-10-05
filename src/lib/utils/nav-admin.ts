@@ -1,4 +1,5 @@
 import type { RolUsuario } from "@prisma/client";
+import type { NavLinkItem } from "@/components/layout/main-nav";
 
 export interface NavItem {
   href: string;
@@ -41,6 +42,7 @@ const NAV_BASE: NavEntryConfig[] = [
     label: "Clientes",
     items: [
       { href: "/admin/clientes", label: "Clientes" },
+      { href: "/admin/sedes", label: "Sedes" },
       { href: "/admin/contactos-pendientes", label: "Contactos pendientes" },
       { href: "/admin/sistemas-software", label: "Sistemas de software" },
     ],
@@ -71,6 +73,22 @@ const NAV_BASE: NavEntryConfig[] = [
 // decía "esto es solo para Admin". Filtrar acá evita el callejón sin salida. Un grupo
 // entero desaparece si nadie de sus ítems queda visible para el rol actual (hoy solo
 // pasa con "Sistema" para Coordinador).
+// Fuente única para el nav de Técnico y de Cliente — antes cada uno estaba duplicado a
+// mano en 2 layouts distintos (tickets/layout.tsx + perfil/layout.tsx para Técnico;
+// portal/layout.tsx + perfil/layout.tsx para Cliente), y las copias se desalinearon
+// (perfil/layout.tsx le faltaba "+ Reportar falla" al nav de Cliente).
+export const NAV_TECNICO: NavLinkItem[] = [
+  { href: "/tickets", label: "Tickets" },
+  { href: "/perfil", label: "Perfil" },
+];
+
+export const NAV_CLIENTE: NavLinkItem[] = [
+  { href: "/portal", label: "Inicio" },
+  { href: "/portal/tickets", label: "Mis tickets" },
+  { href: "/perfil", label: "Perfil" },
+  { href: "/portal/tickets/nuevo", label: "+ Reportar falla", primary: true },
+];
+
 export function navParaRol(rol: RolUsuario | undefined): NavEntry[] {
   const permitido = (roles?: readonly RolUsuario[]) => !roles || (rol && roles.includes(rol));
 

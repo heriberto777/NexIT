@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { prioridadSchema } from "@/lib/zod/ticket.schema";
 
 export const crearClienteSchema = z.object({
   nombre: z.string().trim().min(3, "Mínimo 3 caracteres").max(160),
@@ -33,6 +34,35 @@ export const editarSucursalSchema = z.object({
   contactoTelefono: z.string().trim().max(20).optional(),
 });
 export type EditarSucursalInput = z.infer<typeof editarSucursalSchema>;
+
+export const estadoContratoSchema = z.enum(["ACTIVO", "VENCIDO", "CANCELADO"]);
+
+export const slaContratoSchema = z.object({
+  prioridad: prioridadSchema,
+  tiempoRespuestaMin: z.coerce.number().int().min(1, "Debe ser mayor a 0"),
+  tiempoResolucionMin: z.coerce.number().int().min(1, "Debe ser mayor a 0"),
+});
+
+// fechaFin viaja como string "YYYY-MM-DD" (input type=date) u opcional — mismo criterio
+// que fechaInstalacion/fechaFinGarantia en crearActivoSchema. La conversión a Date
+// ocurre en el Server Action, no acá.
+export const crearContratoSchema = z.object({
+  clienteId: z.string().cuid(),
+  tipoContrato: z.string().trim().min(3, "Mínimo 3 caracteres").max(120),
+  fechaInicio: z.string().min(1, "Requerido"),
+  fechaFin: z.string().optional(),
+  horasIncluidas: z.coerce.number().int().min(0).optional(),
+  // Acotado a los 4 niveles de Prioridad (ver @@unique([contratoId, prioridad]) en
+  // schema.prisma) — no es una lista de longitud variable como los ítems de checklist.
+  slas: z.array(slaContratoSchema).length(4, "Definí los 4 niveles de prioridad"),
+});
+export type CrearContratoInput = z.infer<typeof crearContratoSchema>;
+
+export const cambiarEstadoContratoSchema = z.object({
+  id: z.string().cuid(),
+  estado: estadoContratoSchema,
+});
+export type CambiarEstadoContratoInput = z.infer<typeof cambiarEstadoContratoSchema>;
 
 export const crearCategoriaActivoSchema = z.object({
   nombre: z.string().trim().min(2, "Mínimo 2 caracteres").max(80),

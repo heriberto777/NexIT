@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { NuevaSucursalForm } from "@/components/admin/nueva-sucursal-form";
 import { EditarClienteForm } from "@/components/admin/editar-cliente-form";
 import { EditarSucursalRow } from "@/components/admin/editar-sucursal-form";
+import { NuevaContratoForm } from "@/components/admin/nueva-contrato-form";
+import { ContratoCard } from "@/components/admin/contrato-card";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,7 @@ export default async function ClienteDetailPage({ params }: PageProps) {
     where: { id: clienteId },
     include: {
       sucursales: { include: { _count: { select: { activos: true } } }, orderBy: { nombre: "asc" } },
+      contratos: { include: { slas: true }, orderBy: { fechaInicio: "desc" } },
       _count: { select: { tickets: true } },
     },
   });
@@ -87,6 +90,35 @@ export default async function ClienteDetailPage({ params }: PageProps) {
         </div>
 
         <NuevaSucursalForm clienteId={cliente.id} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-gray-900">Contratos</h2>
+        {cliente.contratos.map((c) => (
+          <ContratoCard
+            key={c.id}
+            contrato={{
+              id: c.id,
+              tipoContrato: c.tipoContrato,
+              fechaInicio: c.fechaInicio.toISOString(),
+              fechaFin: c.fechaFin ? c.fechaFin.toISOString() : null,
+              horasIncluidas: c.horasIncluidas,
+              estado: c.estado,
+              slas: c.slas.map((s) => ({
+                prioridad: s.prioridad,
+                tiempoRespuestaMin: s.tiempoRespuestaMin,
+                tiempoResolucionMin: s.tiempoResolucionMin,
+              })),
+            }}
+          />
+        ))}
+        {cliente.contratos.length === 0 && (
+          <p className="rounded-xl border border-gray-200 bg-white px-3 py-6 text-center text-sm text-gray-400">
+            Sin contratos registrados.
+          </p>
+        )}
+
+        <NuevaContratoForm clienteId={cliente.id} />
       </section>
     </div>
   );
