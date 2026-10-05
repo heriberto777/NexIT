@@ -2802,12 +2802,14 @@ Telegram Trigger ──→ Normalizar Telegram ──┐
                                              ├─→ GET tecnico/contexto → IF autorizado
 Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘                 ├─ false → IF rol incorrecto (motivo == "ROL_INCORRECTO")
                                                                           │            ├─ true  → Switch por canal → responder
-                                                                          │            └─ false → POST vinculación identidad → IF continuar
-                                                                          │                         ├─ true  → Restaurar mensaje no autorizado
-                                                                          │                         │            → Switch por canal → responder
-                                                                          │                         └─ false → Switch por canal → responder
+                                                                          │            └─ false → Guardar mensaje original (mensajeOriginal = mensaje)
+                                                                          │                         → POST vinculación identidad ─┐
+                                                                          │                                                        ├→ Combinar mensaje original y vinculación → IF continuar
+                                                                          │                         Guardar mensaje original ──────┘                                          ├─ true  → Restaurar mensaje no autorizado (mensaje = mensajeOriginal)
+                                                                          │                                                                                                   │            → Switch por canal → responder
+                                                                          │                                                                                                   └─ false → Switch por canal → responder
                                                                           └─ true  → IA: interpretar mensaje
-                                                                                       (clasifica intención y, si
+                                                                                       (clasifica intención, suma `tickets` a la salida, y si
                                                                                        tieneFoto=true, descarga y
                                                                                        codifica la imagen en el
                                                                                        mismo paso)
@@ -2819,6 +2821,17 @@ Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘              
                                                                                        └─ (default) → "no entendí"
                                                                                     → Switch por canal → responder
 ```
+
+> **Por qué "Guardar mensaje original" + "Combinar..." en vez de `$('Contexto técnico')`
+> directo**: ese por-nombre funcionaba perfecto mientras el workflow solo se ejecutaba
+> desde su propio Trigger — pero al poder invocarse también como sub-workflow (desde el
+> router de §10, vía `Execute Workflow Trigger`), esa referencia dejó de resolverse
+> (`Error: Referenced node doesn't exist`, visto en producción). El Merge evita
+> depender del nombre del nodo: el dato que hace falta viaja explícito por la conexión
+> en vez de "ir a buscarlo" a un nodo arbitrario de la ejecución. Mismo motivo por el
+> que "IA: interpretar mensaje" ahora reenvía `tickets` en su propia salida, en vez de
+> que "Formatear lista de tickets"/"Mensaje: no entendido" lo fueran a buscar con
+> `$('Contexto técnico')`.
 
 El nodo "IA: interpretar mensaje" consolida en un solo Code node la descarga de la
 imagen (si corresponde) y la llamada a IA — evita separar en varios nodos HTTP Request
@@ -3702,10 +3715,18 @@ recibe el mensaje de "no autorizado", nunca llega a ver estadísticas.
 Telegram Trigger ──→ Normalizar Telegram ──┐
                                              ├─→ GET staff/verificar → IF autorizado
 Webhook WhatsApp (onReceived) ──→ Normalizar WhatsApp ─┘                ├─ false → Switch por canal → responder
-                                                                         └─ true  → GET staff/resumen
-                                                                                    → Responder consulta (comando fijo o IA libre)
-                                                                                    → Switch por canal → responder
+                                                                         └─ true  → GET staff/resumen ──┐
+                                                                                                          ├→ Combinar identidad y resumen
+                                                                              IF autorizado (true) ──────┘    → Responder consulta (comando fijo o IA libre)
+                                                                                                               → Switch por canal → responder
 ```
+
+> **"Combinar identidad y resumen"**: `GET staff/resumen` reemplaza `$json` entero con
+> las métricas del dashboard — sin este paso, "Responder consulta" necesitaría ir a
+> buscar `rol`/`texto`/`empresaNombre` con `$('Verificar staff')`, una referencia por
+> nombre que deja de resolverse cuando este workflow se invoca como sub-workflow desde
+> el router de §10 (`Error: Referenced node doesn't exist`, visto en producción). El
+> Merge junta ambos sin depender de ningún nombre de nodo.
 
 ### d) JSON importable — consultas on-demand
 

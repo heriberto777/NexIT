@@ -207,7 +207,22 @@
     },
     {
       "parameters": {
-        "jsCode": "const resumen = $json;\nconst identidad = $('Verificar staff').item.json;\nconst texto = (identidad.texto || '').toLowerCase();\n\nfunction formatearAbiertos() {\n  const lineas = Object.entries(resumen.ticketsPorEstado).map(([k, v]) => `${k}: ${v}`).join('\\n');\n  return `Tickets por estado:\\n${lineas}`;\n}\nfunction formatearSla() {\n  const s = resumen.slaCumplimiento;\n  return s.resueltos === 0 ? 'Todavía no hay tickets resueltos para medir SLA.' : `Cumplimiento de SLA: ${s.pctCumplimiento}% (${s.cumplidos} de ${s.resueltos} resueltos a tiempo).`;\n}\nfunction formatearCriticos() {\n  if (!resumen.criticosSinAsignar.length) return 'No hay tickets críticos/altos sin asignar.';\n  const lineas = resumen.criticosSinAsignar.map((t) => `#${t.numeroTicket} - ${t.titulo} (${t.clienteNombre}, ${t.prioridad}, ${t.horasAbierto}h abierto)`).join('\\n');\n  return `Críticos/altos sin asignar:\\n${lineas}`;\n}\nfunction formatearCarga() {\n  if (!resumen.cargaPorTecnico.length) return 'Nadie tiene tickets activos ahora mismo.';\n  const lineas = resumen.cargaPorTecnico.map((t) => `${t.tecnico}: ${t.activos} activos, ${t.resueltosUltimos30Dias} resueltos (30d)`).join('\\n');\n  return `Carga por técnico:\\n${lineas}`;\n}\n\nlet mensaje = null;\nif (texto.includes('abiert')) mensaje = formatearAbiertos();\nelse if (texto.includes('sla')) mensaje = formatearSla();\nelse if (texto.includes('critic') || texto.includes('sin asignar')) mensaje = formatearCriticos();\nelse if (texto.includes('carga') || texto.includes('tecnico') || texto.includes('técnico')) mensaje = formatearCarga();\n\nif (!mensaje) {\n  const openaiKey = $env.OPENAI_API_KEY;\n  const prompt = `Sos un asistente que responde preguntas de un ${identidad.rol} de ${identidad.empresaNombre} sobre el estado de los tickets, usando SOLO estos datos (no inventes nada que no este aca):\\n${JSON.stringify(resumen)}\\n\\nPregunta: \"${identidad.texto}\"\\n\\nRespondé en texto plano, corto y directo, en español.`;\n  const respuesta = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.openai.com/v1/chat/completions',\n    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n    body: { model: 'gpt-4o-mini', messages: [{ role: 'system', content: prompt }] },\n    json: true,\n  });\n  mensaje = respuesta.choices[0].message.content;\n}\n\nreturn [{ json: { canal: identidad.canal, identificador: identidad.identificador, mensaje } }];"
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "merge-identidad-resumen-staff",
+      "name": "Combinar identidad y resumen",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1000,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resumen = $json;\nconst identidad = $json;\nconst texto = (identidad.texto || '').toLowerCase();\n\nfunction formatearAbiertos() {\n  const lineas = Object.entries(resumen.ticketsPorEstado).map(([k, v]) => `${k}: ${v}`).join('\\n');\n  return `Tickets por estado:\\n${lineas}`;\n}\nfunction formatearSla() {\n  const s = resumen.slaCumplimiento;\n  return s.resueltos === 0 ? 'Todavía no hay tickets resueltos para medir SLA.' : `Cumplimiento de SLA: ${s.pctCumplimiento}% (${s.cumplidos} de ${s.resueltos} resueltos a tiempo).`;\n}\nfunction formatearCriticos() {\n  if (!resumen.criticosSinAsignar.length) return 'No hay tickets críticos/altos sin asignar.';\n  const lineas = resumen.criticosSinAsignar.map((t) => `#${t.numeroTicket} - ${t.titulo} (${t.clienteNombre}, ${t.prioridad}, ${t.horasAbierto}h abierto)`).join('\\n');\n  return `Críticos/altos sin asignar:\\n${lineas}`;\n}\nfunction formatearCarga() {\n  if (!resumen.cargaPorTecnico.length) return 'Nadie tiene tickets activos ahora mismo.';\n  const lineas = resumen.cargaPorTecnico.map((t) => `${t.tecnico}: ${t.activos} activos, ${t.resueltosUltimos30Dias} resueltos (30d)`).join('\\n');\n  return `Carga por técnico:\\n${lineas}`;\n}\n\nlet mensaje = null;\nif (texto.includes('abiert')) mensaje = formatearAbiertos();\nelse if (texto.includes('sla')) mensaje = formatearSla();\nelse if (texto.includes('critic') || texto.includes('sin asignar')) mensaje = formatearCriticos();\nelse if (texto.includes('carga') || texto.includes('tecnico') || texto.includes('técnico')) mensaje = formatearCarga();\n\nif (!mensaje) {\n  const openaiKey = $env.OPENAI_API_KEY;\n  const prompt = `Sos un asistente que responde preguntas de un ${identidad.rol} de ${identidad.empresaNombre} sobre el estado de los tickets, usando SOLO estos datos (no inventes nada que no este aca):\\n${JSON.stringify(resumen)}\\n\\nPregunta: \"${identidad.texto}\"\\n\\nRespondé en texto plano, corto y directo, en español.`;\n  const respuesta = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.openai.com/v1/chat/completions',\n    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },\n    body: { model: 'gpt-4o-mini', messages: [{ role: 'system', content: prompt }] },\n    json: true,\n  });\n  mensaje = respuesta.choices[0].message.content;\n}\n\nreturn [{ json: { canal: identidad.canal, identificador: identidad.identificador, mensaje } }];"
       },
       "id": "responder-consulta-staff",
       "name": "Responder consulta",
@@ -378,6 +393,11 @@
             "node": "GET resumen",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Combinar identidad y resumen",
+            "type": "main",
+            "index": 1
           }
         ],
         [
@@ -390,6 +410,17 @@
       ]
     },
     "GET resumen": {
+      "main": [
+        [
+          {
+            "node": "Combinar identidad y resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combinar identidad y resumen": {
       "main": [
         [
           {
