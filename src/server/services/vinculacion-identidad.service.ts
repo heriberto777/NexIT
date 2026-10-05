@@ -108,12 +108,18 @@ export async function procesarMensajeVinculacion(input: {
   // Esperando código.
   const codigoIngresado = texto.trim();
   if (codigoIngresado !== existente.codigo) {
-    const intentos = existente.intentos + 1;
-    if (intentos >= INTENTOS_MAXIMOS) {
-      await prisma.verificacionIdentidadChat.delete({ where: { id: existente.id } });
+    // Incremento atómico condicionado por Postgres (igual criterio que stockActual en
+    // registrar-movimiento-inventario.ts) en vez de leer `intentos`, sumarle 1 en JS y
+    // recién ahí decidir — dos mensajes casi simultáneos con el código equivocado podían
+    // leer el mismo valor y perder un incremento, permitiendo un intento extra.
+    const { count } = await prisma.verificacionIdentidadChat.updateMany({
+      where: { id: existente.id, intentos: { lt: INTENTOS_MAXIMOS - 1 } },
+      data: { intentos: { increment: 1 } },
+    });
+    if (count === 0) {
+      await prisma.verificacionIdentidadChat.deleteMany({ where: { id: existente.id } });
       return { continuar: false, mensaje: "Demasiados intentos fallidos — escribime de nuevo tu correo para reintentar." };
     }
-    await prisma.verificacionIdentidadChat.update({ where: { id: existente.id }, data: { intentos } });
     return { continuar: false, mensaje: "Ese código no coincide — probá de nuevo." };
   }
 

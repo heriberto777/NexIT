@@ -176,10 +176,10 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
 
   useEffect(() => {
     if (!clienteId || !busqueda.trim() || busqueda.trim().length < 2) {
-      setResultados([]);
+      queueMicrotask(() => setResultados([]));
       return;
     }
-    setBuscando(true);
+    queueMicrotask(() => setBuscando(true));
     const timeout = setTimeout(() => {
       buscarContactosCliente({ clienteId, query: busqueda.trim() })
         .then((resultado) => setResultados(resultado.ok ? resultado.data : []))
