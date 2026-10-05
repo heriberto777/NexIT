@@ -20,7 +20,7 @@ export async function enviarCodigoVinculacionChat(usuario: { email: string; nomb
     from: config.smtpFromName ? `"${config.smtpFromName}" <${config.smtpFromEmail}>` : config.smtpFromEmail,
     to: usuario.email,
     subject: `Tu código de verificación — ${config.empresaNombre}`,
-    text: `Hola ${usuario.nombre},\n\nTu código para vincular tu chat de Telegram/WhatsApp con NexIT es: ${codigo}\n\nVence en 10 minutos. Si no lo pediste vos, ignorá este correo.`,
+    text: `Hola ${usuario.nombre},\n\nTu código para vincular tu chat de Telegram/WhatsApp con ${config.empresaNombre} es: ${codigo}\n\nVence en 10 minutos. Si no lo pediste vos, ignorá este correo.`,
   });
 }
 
@@ -59,7 +59,7 @@ export async function probarEnvioSmtp(): Promise<ResultadoPruebaSmtp> {
       from: config.smtpFromName ? `"${config.smtpFromName}" <${config.smtpFromEmail}>` : config.smtpFromEmail,
       to: config.smtpFromEmail,
       subject: `Prueba de correo — ${config.empresaNombre}`,
-      text: "Este es un correo de prueba enviado desde /admin/configuracion en NexIT. Si lo recibiste, tu configuración SMTP funciona correctamente.",
+      text: `Este es un correo de prueba enviado desde /admin/configuracion en ${config.empresaNombre}. Si lo recibiste, tu configuración SMTP funciona correctamente.`,
     });
     return { ok: true, mensaje: `Correo de prueba enviado a ${config.smtpFromEmail}.` };
   } catch (error) {

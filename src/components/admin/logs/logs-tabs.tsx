@@ -14,9 +14,10 @@ type TabId = (typeof TABS)[number]["id"];
 interface Props {
   auditoria: RegistroAuditoriaValue[];
   errores: RegistroErrorValue[];
+  localeFecha: string;
 }
 
-export function LogsTabs({ auditoria, errores }: Props) {
+export function LogsTabs({ auditoria, errores, localeFecha }: Props) {
   const [tab, setTab] = useState<TabId>("auditoria");
 
   return (
@@ -36,8 +37,8 @@ export function LogsTabs({ auditoria, errores }: Props) {
         ))}
       </div>
 
-      {tab === "auditoria" && <AuditoriaTabla registros={auditoria} />}
-      {tab === "errores" && <ErroresTabla registros={errores} />}
+      {tab === "auditoria" && <AuditoriaTabla registros={auditoria} localeFecha={localeFecha} />}
+      {tab === "errores" && <ErroresTabla registros={errores} localeFecha={localeFecha} />}
     </div>
   );
 }

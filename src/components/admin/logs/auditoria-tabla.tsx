@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TableScroll } from "@/components/ui/table-scroll";
 
 export interface RegistroAuditoriaValue {
@@ -14,12 +14,28 @@ export interface RegistroAuditoriaValue {
   detalle: string | null;
 }
 
-function formatearFecha(iso: string): string {
-  return new Date(iso).toLocaleString("es", { dateStyle: "short", timeStyle: "medium" });
+interface Props {
+  registros: RegistroAuditoriaValue[];
+  localeFecha: string;
 }
 
-export function AuditoriaTabla({ registros }: { registros: RegistroAuditoriaValue[] }) {
+export function AuditoriaTabla({ registros, localeFecha }: Props) {
   const [filtro, setFiltro] = useState("");
+  // La fecha/hora se muestra en la zona horaria LOCAL del navegador (a diferencia de
+  // una fecha de calendario como Contrato.fechaInicio, acá sí importa "cuándo pasó
+  // esto para vos") — pero el servidor (container, UTC) y el navegador casi nunca
+  // coinciden de zona horaria, así que formatear en el primer render (SSR) siempre
+  // iba a desalinearse del cliente. Se renderiza vacío hasta montar y recién ahí se
+  // calcula del lado del cliente, evitando el hydration mismatch.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => {
+    queueMicrotask(() => setMontado(true));
+  }, []);
+
+  function formatearFecha(iso: string): string {
+    if (!montado) return "";
+    return new Date(iso).toLocaleString(localeFecha, { dateStyle: "short", timeStyle: "medium" });
+  }
 
   const filtrados = registros.filter((r) => {
     if (!filtro.trim()) return true;

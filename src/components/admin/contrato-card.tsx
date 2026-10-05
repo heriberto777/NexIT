@@ -4,14 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cambiarEstadoContrato } from "@/server/actions/admin/cambiar-estado-contrato";
 
-// Forzar timeZone: "UTC" evita un hydration mismatch real: fechaInicio/fechaFin son
-// fechas de calendario (vienen de un <input type="date">), guardadas como medianoche
-// UTC — sin esto, el servidor (container en UTC) y el navegador (zona horaria local
-// del usuario) calculan días distintos para el mismo instante.
-function formatearFecha(iso: string): string {
-  return new Date(iso).toLocaleDateString("es", { timeZone: "UTC" });
-}
-
 const ETIQUETA_PRIORIDAD: Record<string, string> = { CRITICA: "Crítica", ALTA: "Alta", MEDIA: "Media", BAJA: "Baja" };
 const ESTILO_ESTADO: Record<string, string> = {
   ACTIVO: "bg-green-100 text-green-800",
@@ -35,13 +27,22 @@ interface Props {
     estado: "ACTIVO" | "VENCIDO" | "CANCELADO";
     slas: Sla[];
   };
+  localeFecha: string;
 }
 
-export function ContratoCard({ contrato }: Props) {
+export function ContratoCard({ contrato, localeFecha }: Props) {
   const router = useRouter();
   const [estado, setEstado] = useState(contrato.estado);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Forzar timeZone: "UTC" evita un hydration mismatch real: fechaInicio/fechaFin son
+  // fechas de calendario (vienen de un <input type="date">), guardadas como medianoche
+  // UTC — sin esto, el servidor (container en UTC) y el navegador (zona horaria local
+  // del usuario) calculan días distintos para el mismo instante.
+  function formatearFecha(iso: string): string {
+    return new Date(iso).toLocaleDateString(localeFecha, { timeZone: "UTC" });
+  }
 
   async function cambiarEstado(nuevoEstado: typeof estado) {
     if (nuevoEstado === estado) return;

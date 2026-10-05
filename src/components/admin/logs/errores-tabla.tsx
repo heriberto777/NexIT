@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface RegistroErrorValue {
   id: string;
@@ -11,12 +11,26 @@ export interface RegistroErrorValue {
   contexto: unknown;
 }
 
-function formatearFecha(iso: string): string {
-  return new Date(iso).toLocaleString("es", { dateStyle: "short", timeStyle: "medium" });
+interface Props {
+  registros: RegistroErrorValue[];
+  localeFecha: string;
 }
 
-export function ErroresTabla({ registros }: { registros: RegistroErrorValue[] }) {
+export function ErroresTabla({ registros, localeFecha }: Props) {
   const [filtro, setFiltro] = useState("");
+  // Mismo motivo que en AuditoriaTabla: la fecha/hora real (no de calendario) se
+  // muestra en la zona horaria del navegador, que nunca coincide con la del servidor
+  // (container, UTC) en el primer render — se difiere a después de montar para evitar
+  // el hydration mismatch.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => {
+    queueMicrotask(() => setMontado(true));
+  }, []);
+
+  function formatearFecha(iso: string): string {
+    if (!montado) return "";
+    return new Date(iso).toLocaleString(localeFecha, { dateStyle: "short", timeStyle: "medium" });
+  }
 
   const filtrados = registros.filter((r) => {
     if (!filtro.trim()) return true;

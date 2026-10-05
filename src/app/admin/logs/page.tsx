@@ -1,6 +1,7 @@
 import { getSesionActual } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
 import { LogsTabs } from "@/components/admin/logs/logs-tabs";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +21,10 @@ export default async function LogsPage() {
     );
   }
 
-  const [auditoria, errores] = await Promise.all([
+  const [auditoria, errores, config] = await Promise.all([
     prisma.registroAuditoria.findMany({ orderBy: { createdAt: "desc" }, take: LIMITE }),
     prisma.registroError.findMany({ orderBy: { createdAt: "desc" }, take: LIMITE }),
+    obtenerConfiguracion(),
   ]);
 
   return (
@@ -51,6 +53,7 @@ export default async function LogsPage() {
           stack: r.stack,
           contexto: r.contexto,
         }))}
+        localeFecha={config.localeFecha}
       />
     </div>
   );

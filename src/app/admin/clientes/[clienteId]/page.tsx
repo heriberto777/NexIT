@@ -6,6 +6,7 @@ import { EditarClienteForm } from "@/components/admin/editar-cliente-form";
 import { EditarSucursalRow } from "@/components/admin/editar-sucursal-form";
 import { NuevaContratoForm } from "@/components/admin/nueva-contrato-form";
 import { ContratoCard } from "@/components/admin/contrato-card";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +17,17 @@ interface PageProps {
 export default async function ClienteDetailPage({ params }: PageProps) {
   const { clienteId } = await params;
 
-  const cliente = await prisma.cliente.findUnique({
-    where: { id: clienteId },
-    include: {
-      sucursales: { include: { _count: { select: { activos: true } } }, orderBy: { nombre: "asc" } },
-      contratos: { include: { slas: true }, orderBy: { fechaInicio: "desc" } },
-      _count: { select: { tickets: true } },
-    },
-  });
+  const [cliente, config] = await Promise.all([
+    prisma.cliente.findUnique({
+      where: { id: clienteId },
+      include: {
+        sucursales: { include: { _count: { select: { activos: true } } }, orderBy: { nombre: "asc" } },
+        contratos: { include: { slas: true }, orderBy: { fechaInicio: "desc" } },
+        _count: { select: { tickets: true } },
+      },
+    }),
+    obtenerConfiguracion(),
+  ]);
 
   if (!cliente) notFound();
 
@@ -110,6 +114,7 @@ export default async function ClienteDetailPage({ params }: PageProps) {
                 tiempoResolucionMin: s.tiempoResolucionMin,
               })),
             }}
+            localeFecha={config.localeFecha}
           />
         ))}
         {cliente.contratos.length === 0 && (
