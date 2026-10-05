@@ -13,6 +13,7 @@ interface TicketConSla {
   estado: string;
   prioridad: Prioridad;
   fechaCreacion: Date;
+  fechaReapertura: Date | null;
   sla: { tiempoResolucionMin: number } | null;
 }
 
@@ -27,7 +28,11 @@ export function calcularEstadoSla(ticket: TicketConSla, defaultsHoras: Record<Pr
 
   const tiempoResolucionMin = ticket.sla?.tiempoResolucionMin ?? defaultsHoras[ticket.prioridad] * 60;
 
-  const minutosTranscurridos = (Date.now() - ticket.fechaCreacion.getTime()) / 60_000;
+  // fechaReapertura (si el ticket volvió de REABIERTO) reinicia el conteo — sin esto, un
+  // ticket reabierto días después de creado aparecía "vencido" al instante por tiempo ya
+  // consumido en un ciclo anterior, sin importar qué tan rápido se respondiera esta vez.
+  const inicio = ticket.fechaReapertura ?? ticket.fechaCreacion;
+  const minutosTranscurridos = (Date.now() - inicio.getTime()) / 60_000;
   const porcentaje = minutosTranscurridos / tiempoResolucionMin;
 
   if (porcentaje >= 1) return "vencido";
@@ -38,6 +43,7 @@ export function calcularEstadoSla(ticket: TicketConSla, defaultsHoras: Record<Pr
 interface TicketResuelto {
   prioridad: Prioridad;
   fechaCreacion: Date;
+  fechaReapertura: Date | null;
   fechaResolucion: Date | null;
   sla: { tiempoResolucionMin: number } | null;
 }
@@ -49,7 +55,8 @@ export function cumplioSla(ticket: TicketResuelto, defaultsHoras: Record<Priorid
   if (!ticket.fechaResolucion) return null;
 
   const tiempoResolucionMin = ticket.sla?.tiempoResolucionMin ?? defaultsHoras[ticket.prioridad] * 60;
-  const minutosReales = (ticket.fechaResolucion.getTime() - ticket.fechaCreacion.getTime()) / 60_000;
+  const inicio = ticket.fechaReapertura ?? ticket.fechaCreacion;
+  const minutosReales = (ticket.fechaResolucion.getTime() - inicio.getTime()) / 60_000;
 
   return minutosReales <= tiempoResolucionMin;
 }

@@ -45,6 +45,12 @@ export async function validarVisita(
         data: {
           estado: estadoNuevo,
           fechaResolucion: decision === "APROBAR" ? new Date() : null,
+          // Al reabrir: fechaReapertura reinicia el reloj del SLA (ver sla.ts) y
+          // fechaInicioAtencion vuelve a null para que calcularPasoInicial en
+          // execution-wizard.tsx mande al técnico de nuevo al paso 1 — sin esto, el
+          // wizard saltaba directo a un paso avanzado (incluso "firma") usando datos
+          // de la visita ya rechazada.
+          ...(estadoNuevo === "REABIERTO" ? { fechaReapertura: new Date(), fechaInicioAtencion: null } : {}),
         },
       });
 

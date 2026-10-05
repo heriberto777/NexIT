@@ -548,6 +548,11 @@ model Ticket {
   fechaInicioAtencion     DateTime?
   fechaResolucion         DateTime?
   fechaCierre             DateTime?
+  // Se setea al pasar a REABIERTO (el cliente rechazó la visita) — calcularEstadoSla/
+  // cumplioSla la usan como punto de partida en vez de fechaCreacion cuando existe, para
+  // que el SLA no aparezca "vencido" al instante por tiempo ya consumido en un ciclo
+  // anterior ya cerrado. null mientras el ticket nunca se reabrió.
+  fechaReapertura         DateTime?
 
   historial           TicketHistorial[]
   checklistRespuestas TicketChecklistRespuesta[]

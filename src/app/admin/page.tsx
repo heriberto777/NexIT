@@ -45,6 +45,7 @@ export default async function AdminDashboardPage() {
         estado: true,
         prioridad: true,
         fechaCreacion: true,
+        fechaReapertura: true,
         fechaResolucion: true,
         tecnicoAsignado: { select: { id: true, nombre: true } },
         sla: { select: { tiempoResolucionMin: true } },

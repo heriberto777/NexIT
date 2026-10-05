@@ -25,6 +25,7 @@ export async function obtenerResumenStaff() {
         estado: true,
         prioridad: true,
         fechaCreacion: true,
+        fechaReapertura: true,
         fechaResolucion: true,
         tecnicoAsignadoId: true,
         cliente: { select: { nombre: true } },
