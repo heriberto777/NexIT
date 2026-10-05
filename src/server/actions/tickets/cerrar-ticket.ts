@@ -28,7 +28,14 @@ export async function cerrarTicket(
     }
 
     return prisma.$transaction(async (tx) => {
-      const actualizado = await tx.ticket.update({ where: { id: ticketId }, data: { estado: "CERRADO" } });
+      // Re-verifica RESUELTO al momento de escribir, no el leído arriba — un doble clic
+      // (o una reapertura concurrente) no debería poder cerrar dos veces ni cerrar un
+      // ticket que mientras tanto se reabrió.
+      const { count } = await tx.ticket.updateMany({ where: { id: ticketId, estado: "RESUELTO" }, data: { estado: "CERRADO" } });
+      if (count === 0) {
+        throw new Error("El ticket cambió de estado mientras tanto — recargá la página e intentá de nuevo");
+      }
+      const actualizado = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
 
       await tx.ticketHistorial.create({
         data: {

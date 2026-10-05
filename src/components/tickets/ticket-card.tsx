@@ -4,6 +4,7 @@ import { PrioridadBadge } from "@/components/tickets/prioridad-badge";
 import { SlaBadge } from "@/components/tickets/sla-badge";
 import { ESTADOS_CON_WIZARD_ACTIVO } from "@/lib/utils/ticket-estado";
 import type { EstadoSla } from "@/lib/utils/sla";
+import type { EstadoTicket } from "@prisma/client";
 
 export interface TicketCardData {
   id: string;
@@ -52,7 +53,7 @@ export function TicketCard({ ticket, fecha, esMio }: { ticket: TicketCardData; f
 
       {esMio && (
         <div className="mt-3">
-          {ESTADOS_CON_WIZARD_ACTIVO.has(ticket.estado) ? (
+          {ESTADOS_CON_WIZARD_ACTIVO.has(ticket.estado as EstadoTicket) ? (
             <Link
               href={`/tickets/${ticket.id}/ejecucion`}
               className="block whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-center text-xs font-medium text-white hover:bg-blue-700"

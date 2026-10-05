@@ -41,24 +41,33 @@ export async function asignarTecnico(
     }
 
     const esPrimeraAsignacion = ticket.estado === "ABIERTO";
-    const estadoNuevo = esPrimeraAsignacion ? "ASIGNADO" : ticket.estado;
 
     const actualizado = await prisma.$transaction(async (tx) => {
-      const ticketActualizado = await tx.ticket.update({
-        where: { id: ticketId },
+      // El `where` re-verifica el estado al momento de escribir, no el leído arriba —
+      // sin esto, una cancelación concurrente (que sí corre entre la lectura y esta
+      // escritura) quedaría pisada: el ticket "resucitaría" como ASIGNADO. En
+      // reasignación (no es la primera vez) tampoco se toca `estado`, para no pisar con
+      // un valor stale un avance real del ticket ocurrido en ese mismo lapso.
+      const { count } = await tx.ticket.updateMany({
+        where: { id: ticketId, estado: esPrimeraAsignacion ? "ABIERTO" : { notIn: Array.from(ESTADOS_TERMINALES) } },
         data: {
           tecnicoAsignadoId: tecnicoId,
-          estado: estadoNuevo,
+          ...(esPrimeraAsignacion ? { estado: "ASIGNADO" as const } : {}),
           fechaAsignacion: ticket.fechaAsignacion ?? new Date(),
         },
       });
+      if (count === 0) {
+        throw new Error("El ticket cambió de estado mientras tanto — recargá la página e intentá de nuevo");
+      }
+
+      const ticketActualizado = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
 
       await tx.ticketHistorial.create({
         data: {
           ticketId,
           usuarioId: usuario.id,
           estadoAnterior: ticket.estado,
-          estadoNuevo,
+          estadoNuevo: ticketActualizado.estado,
           comentario: ticket.tecnicoAsignadoId
             ? `Reasignado a ${tecnico.nombre}`
             : `Asignado a ${tecnico.nombre}`,

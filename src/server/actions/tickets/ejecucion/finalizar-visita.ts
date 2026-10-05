@@ -8,6 +8,7 @@ import { finalizarVisitaSchema } from "@/lib/zod/evidencia.schema";
 import type { FinalizarVisitaInput } from "@/lib/zod/evidencia.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
+import { ESTADOS_CON_WIZARD_ACTIVO } from "@/lib/utils/ticket-estado";
 
 // Paso 6: cierre del wizard. Valida que existan firma y evidencias mínimas antes de
 // transicionar el ticket (a ESPERANDO_VALIDACION o RESUELTO, según config del contrato).
@@ -44,10 +45,17 @@ export async function finalizarVisita(
     const estadoNuevo = "ESPERANDO_VALIDACION" as const;
 
     const actualizado = await prisma.$transaction(async (tx) => {
-      const ticketActualizado = await tx.ticket.update({
-        where: { id: ticketId },
+      // Re-verifica que el wizard siga activo al momento de escribir, no el leído
+      // arriba — un doble clic en "Finalizar visita" (o una cancelación concurrente)
+      // no debería poder finalizar dos veces ni pisar un estado terminal.
+      const { count } = await tx.ticket.updateMany({
+        where: { id: ticketId, estado: { in: Array.from(ESTADOS_CON_WIZARD_ACTIVO) } },
         data: { estado: estadoNuevo, fechaResolucion: new Date() },
       });
+      if (count === 0) {
+        throw new Error("El ticket cambió de estado mientras tanto — recargá la página e intentá de nuevo");
+      }
+      const ticketActualizado = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
 
       await tx.ticketHistorial.create({
         data: {

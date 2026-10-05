@@ -1,8 +1,10 @@
+import type { EstadoTicket } from "@prisma/client";
+
 // Estados en los que el wizard de ejecución (/tickets/[id]/ejecucion) sigue siendo el
 // paso activo del técnico — antes de esperar validación del cliente o quedar cerrado.
 // Fuente única: se usa tanto en el listado (link directo al wizard) como en el detalle
 // (botón "Continuar atención") para que ambos decidan exactamente lo mismo.
-export const ESTADOS_CON_WIZARD_ACTIVO = new Set([
+export const ESTADOS_CON_WIZARD_ACTIVO = new Set<EstadoTicket>([
   "ASIGNADO",
   "EN_DIAGNOSTICO",
   "ESPERANDO_REPUESTO",
@@ -11,4 +13,4 @@ export const ESTADOS_CON_WIZARD_ACTIVO = new Set([
 ]);
 
 // Estados en los que ya no tiene sentido asignar, editar o cancelar un ticket.
-export const ESTADOS_TERMINALES = new Set(["RESUELTO", "CERRADO", "CANCELADO"]);
+export const ESTADOS_TERMINALES = new Set<EstadoTicket>(["RESUELTO", "CERRADO", "CANCELADO"]);

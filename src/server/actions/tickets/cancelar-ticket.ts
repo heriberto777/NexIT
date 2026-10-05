@@ -29,10 +29,18 @@ export async function cancelarTicket(
     }
 
     const actualizado = await prisma.$transaction(async (tx) => {
-      const ticketActualizado = await tx.ticket.update({
-        where: { id: ticketId },
+      // El `where` re-verifica que el ticket siga sin estado terminal al momento de
+      // escribir, no el leído arriba — evita cancelar "encima" de una transición
+      // concurrente (ej. asignación) que ya lo movió a un estado terminal distinto.
+      const { count } = await tx.ticket.updateMany({
+        where: { id: ticketId, estado: { notIn: Array.from(ESTADOS_TERMINALES) } },
         data: { estado: "CANCELADO" },
       });
+      if (count === 0) {
+        throw new Error("El ticket cambió de estado mientras tanto — recargá la página e intentá de nuevo");
+      }
+
+      const ticketActualizado = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
 
       await tx.ticketHistorial.create({
         data: {

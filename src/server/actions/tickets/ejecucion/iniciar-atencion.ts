@@ -6,6 +6,7 @@ import { requireUsuario } from "@/server/auth/session";
 import { emitirEvento } from "@/server/services/webhook.service";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
+import { ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
 
 const iniciarAtencionSchema = z.object({
   ticketId: z.string().cuid(),
@@ -33,10 +34,18 @@ export async function iniciarAtencion(
     }
 
     const actualizado = await prisma.$transaction(async (tx) => {
-      const ticketActualizado = await tx.ticket.update({
-        where: { id: ticketId },
+      // `fechaInicioAtencion: null` es la misma condición que ya usa calcularPasoInicial
+      // en execution-wizard.tsx para decidir si mostrar "Iniciar Atención" — reusarla acá
+      // como guardia atómica evita duplicar el check-in (doble clic) y, junto con el
+      // estado no terminal, evita revivir un ticket cancelado/cerrado concurrentemente.
+      const { count } = await tx.ticket.updateMany({
+        where: { id: ticketId, fechaInicioAtencion: null, estado: { notIn: Array.from(ESTADOS_TERMINALES) } },
         data: { estado: "EN_DIAGNOSTICO", fechaInicioAtencion: new Date() },
       });
+      if (count === 0) {
+        throw new Error("El ticket ya tiene un check-in registrado o cambió de estado — recargá la página");
+      }
+      const ticketActualizado = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
 
       await tx.ticketHistorial.create({
         data: {
