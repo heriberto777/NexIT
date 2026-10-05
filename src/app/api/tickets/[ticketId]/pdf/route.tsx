@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
+import { requireUsuario } from "@/server/auth/session";
 import { InformeServicioDocument } from "@/server/services/pdf/informe-servicio";
 import { storageService } from "@/server/services/storage.service";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+
+const ROLES_STAFF = ["TECNICO", "COORDINADOR", "ADMIN"];
 
 export const runtime = "nodejs";
 
@@ -25,6 +28,7 @@ async function keyToDataUri(key: string): Promise<string | null> {
 type RouteParams = { params: Promise<{ ticketId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
+  const usuario = await requireUsuario();
   const { ticketId } = await params;
 
   const ticket = await prisma.ticket.findUnique({
@@ -45,6 +49,15 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
   if (!ticket) {
     return NextResponse.json({ error: "Ticket no encontrado" }, { status: 404 });
+  }
+
+  // Sin esto, cualquiera con sesión (o, hasta hace poco, sin sesión siquiera) podía
+  // descargar el informe completo — con fotos y firma — de un ticket de otra empresa
+  // con solo conocer/adivinar el ticketId. Mismo criterio que el POST/GET de evidencias.
+  if (!ROLES_STAFF.includes(usuario.rol)) {
+    if (usuario.rol !== "CLIENTE" || usuario.clienteId !== ticket.clienteId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
   }
 
   const [fotosAntesRaw, fotosDespuesRaw, firmaUri, config, checklistFotos] = await Promise.all([

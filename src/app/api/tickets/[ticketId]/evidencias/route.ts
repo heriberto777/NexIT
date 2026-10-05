@@ -69,7 +69,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
+  const usuario = await requireUsuario();
   const { ticketId } = await params;
+
+  // Mismo criterio que el POST de este archivo: sin esto, cualquiera con sesión (o,
+  // hasta hace poco, sin sesión siquiera) podía leer las evidencias de un ticket de
+  // otra empresa con solo conocer el ticketId.
+  if (!ROLES_STAFF.includes(usuario.rol)) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId }, select: { clienteId: true } });
+    if (usuario.rol !== "CLIENTE" || usuario.clienteId !== ticket.clienteId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+  }
+
   const evidencias = await prisma.evidencia.findMany({
     where: { ticketId },
     orderBy: { fechaCarga: "asc" },
