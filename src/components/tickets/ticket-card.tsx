@@ -30,11 +30,11 @@ export function TicketCard({ ticket, fecha, esMio }: { ticket: TicketCardData; f
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-3">
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0 flex-1">
           <Link href={`/tickets/${ticket.id}`} className="font-medium text-blue-600 hover:underline">
             #{ticket.numeroTicket}
           </Link>
-          <p className="text-sm text-gray-700">{ticket.titulo}</p>
+          <p className="break-words text-sm text-gray-700">{ticket.titulo}</p>
         </div>
         <span className="shrink-0 text-xs text-gray-400">{fecha}</span>
       </div>
