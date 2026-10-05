@@ -12,22 +12,10 @@ import { ESTADOS_CON_WIZARD_ACTIVO, ESTADOS_TERMINALES } from "@/lib/utils/ticke
 import { TableScroll } from "@/components/ui/table-scroll";
 import { TicketCard } from "@/components/tickets/ticket-card";
 import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
+import { SelectorEstadosFiltro } from "@/components/tickets/selector-estados-filtro";
 import { tieneAccesoAlTicket } from "@/server/services/ticket-acceso.service";
 
 export const dynamic = "force-dynamic";
-
-const ETIQUETA_ESTADO: Record<string, string> = {
-  ABIERTO: "Abierto",
-  ASIGNADO: "Asignado",
-  EN_DIAGNOSTICO: "En diagnóstico",
-  ESPERANDO_REPUESTO: "Esperando repuesto",
-  EN_EJECUCION: "En ejecución",
-  ESPERANDO_VALIDACION: "Esperando validación",
-  RESUELTO: "Resuelto",
-  REABIERTO: "Reabierto",
-  CERRADO: "Cerrado",
-  CANCELADO: "Cancelado",
-};
 
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -230,16 +218,13 @@ export default async function TicketsPage({ searchParams }: PageProps) {
 
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">Estado (podés elegir varios)</label>
-          <div className="flex flex-wrap gap-1.5">
-            {estadoTicketSchema.options.map((e) => (
-              <label key={e} className="cursor-pointer">
-                <input type="checkbox" name="estado" value={e} defaultChecked={estados.includes(e)} className="peer sr-only" />
-                <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 peer-checked:border-blue-200 peer-checked:bg-blue-50 peer-checked:text-blue-700">
-                  {ETIQUETA_ESTADO[e] ?? e}
-                </span>
-              </label>
-            ))}
-          </div>
+          <SelectorEstadosFiltro />
+          {/* SelectorEstadosFiltro navega solo (router.push) fuera del ciclo de este form GET;
+              estos hidden inputs son lo que hace que "estado" sobreviva si el usuario después
+              toca "Filtrar" por otro campo (Prioridad, Técnico, etc.) sin perder la selección. */}
+          {estados.map((e) => (
+            <input key={e} type="hidden" name="estado" value={e} />
+          ))}
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
