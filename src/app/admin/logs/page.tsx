@@ -2,6 +2,7 @@ import { getSesionActual } from "@/server/auth/session";
 import { prisma } from "@/lib/prisma";
 import { LogsTabs } from "@/components/admin/logs/logs-tabs";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function LogsPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-4 py-6">
+    <PageContainer className="space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Logs del sistema</h1>
         <p className="text-sm text-gray-500">Últimos {LIMITE} registros de cada tipo.</p>
@@ -55,6 +56,6 @@ export default async function LogsPage() {
         }))}
         localeFecha={config.localeFecha}
       />
-    </div>
+    </PageContainer>
   );
 }

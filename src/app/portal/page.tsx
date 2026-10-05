@@ -5,6 +5,7 @@ import { calcularEstadoSla } from "@/lib/utils/sla";
 import { obtenerConfiguracion, slaHorasPorPrioridad } from "@/server/services/configuracion.service";
 import { EstadoBadge } from "@/components/tickets/estado-badge";
 import { PrioridadBadge } from "@/components/tickets/prioridad-badge";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function PortalDashboardPage() {
   const recientes = tickets.slice(0, 5);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
+    <PageContainer className="space-y-4">
       <h1 className="text-lg font-semibold text-gray-900">Hola, {sesion!.nombre.split(" ")[0]}</h1>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -81,6 +82,6 @@ export default async function PortalDashboardPage() {
           {recientes.length === 0 && <p className="py-6 text-center text-sm text-gray-400">Aún no tienes solicitudes registradas.</p>}
         </ul>
       </section>
-    </div>
+    </PageContainer>
   );
 }

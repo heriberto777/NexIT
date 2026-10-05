@@ -8,6 +8,7 @@ import { EstadoBadge } from "@/components/tickets/estado-badge";
 import { PrioridadBadge } from "@/components/tickets/prioridad-badge";
 import { SlaBadge } from "@/components/tickets/sla-badge";
 import type { Prisma, EstadoTicket } from "@prisma/client";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function PortalTicketsPage({ searchParams }: PageProps) {
   const hayFiltros = Boolean(q || sucursalId || estado);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
+    <PageContainer className="space-y-4">
       <h1 className="text-lg font-semibold text-gray-900">Mis tickets</h1>
 
       <form className="flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 bg-white p-3" method="GET">
@@ -131,6 +132,6 @@ export default async function PortalTicketsPage({ searchParams }: PageProps) {
           {tickets.length === 0 && <li className="px-4 py-8 text-center text-sm text-gray-400">No hay tickets que coincidan.</li>}
         </ul>
       </div>
-    </div>
+    </PageContainer>
   );
 }

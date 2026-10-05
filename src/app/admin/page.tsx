@@ -10,6 +10,7 @@ import { TicketsPrioridadChart } from "@/components/admin/dashboard/tickets-prio
 import { SlaCumplimientoChart, TiempoResolucionChart } from "@/components/admin/dashboard/sla-chart";
 import { CargaTecnicoChart } from "@/components/admin/dashboard/carga-tecnico-chart";
 import { PreventivosChart } from "@/components/admin/dashboard/preventivos-chart";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -119,7 +120,7 @@ export default async function AdminDashboardPage() {
   const valorInventario = repuestos.reduce((acc, r) => acc + r.stockActual * r.costoUnidad.toNumber(), 0);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 bg-gray-50 px-4 py-6">
+    <PageContainer size="xl" className="space-y-4 bg-gray-50">
       <h1 className="text-lg font-semibold text-gray-900">Dashboard</h1>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -137,7 +138,7 @@ export default async function AdminDashboardPage() {
         <CargaTecnicoChart data={cargaTecnico} />
         <PreventivosChart data={preventivosPorVigencia} />
       </div>
-    </div>
+    </PageContainer>
   );
 }
 

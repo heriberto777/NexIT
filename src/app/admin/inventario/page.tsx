@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatCurrency } from "@/lib/utils/currency";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function InventarioPage() {
   const criticos = repuestos.filter((r) => r.stockActual <= r.stockMinimo);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-4 py-6">
+    <PageContainer className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Inventario de repuestos</h1>
         <Link href="/admin/inventario/nuevo" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
@@ -91,6 +92,6 @@ export default async function InventarioPage() {
           </tbody>
         </table>
       </TableScroll>
-    </div>
+    </PageContainer>
   );
 }

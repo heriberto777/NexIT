@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown } from "lucide-react";
+import { TAMANOS } from "@/components/layout/page-container";
 
 export interface NavLinkItem {
   href: string;
@@ -65,7 +66,7 @@ export function MainNav({ brand, brandHref, links, children }: Props) {
 
   return (
     <nav className="border-b border-gray-200 bg-white px-4 py-3">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+      <div className={`mx-auto flex items-center justify-between gap-4 ${TAMANOS.lg}`}>
         <div className="flex min-w-0 items-center gap-4">
           <Link href={brandHref} className="max-w-[9rem] truncate text-sm font-semibold text-gray-900 hover:text-blue-600 sm:max-w-none">
             {brand}
@@ -94,7 +95,7 @@ export function MainNav({ brand, brandHref, links, children }: Props) {
       </div>
 
       {abierto && (
-        <div className="mx-auto mt-3 flex max-w-5xl flex-col gap-3 border-t border-gray-100 pt-3 md:hidden">
+        <div className={`mx-auto mt-3 flex flex-col gap-3 border-t border-gray-100 pt-3 md:hidden ${TAMANOS.lg}`}>
           {links.map((entry) =>
             esGrupo(entry) ? (
               <MobileAccordion

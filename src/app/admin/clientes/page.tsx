@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export default async function ClientesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-4 py-6">
+    <PageContainer className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Clientes</h1>
         <Link href="/admin/clientes/nuevo" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
@@ -62,6 +63,6 @@ export default async function ClientesPage() {
           </tbody>
         </table>
       </TableScroll>
-    </div>
+    </PageContainer>
   );
 }

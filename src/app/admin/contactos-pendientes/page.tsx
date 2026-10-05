@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { EliminarContactoPendienteButton } from "@/components/admin/eliminar-contacto-pendiente-button";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export default async function ContactosPendientesPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+    <PageContainer className="space-y-6">
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Contactos pendientes</h1>
         <p className="text-sm text-gray-500">
@@ -118,6 +119,6 @@ export default async function ContactosPendientesPage() {
           </TableScroll>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

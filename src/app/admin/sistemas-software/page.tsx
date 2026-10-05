@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { ComboboxBuscable } from "@/components/ui/combobox-buscable";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function SistemasSoftwarePage({ searchParams }: PageProps) 
   ]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-4 py-6">
+    <PageContainer className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Sistemas de software</h1>
@@ -98,6 +99,6 @@ export default async function SistemasSoftwarePage({ searchParams }: PageProps) 
           </tbody>
         </table>
       </TableScroll>
-    </div>
+    </PageContainer>
   );
 }

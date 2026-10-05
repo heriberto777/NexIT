@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function SedesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
+    <PageContainer className="space-y-4">
       <h1 className="text-lg font-semibold text-gray-900">Sedes</h1>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -54,6 +55,6 @@ export default async function SedesPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageContainer>
   );
 }

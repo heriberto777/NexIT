@@ -4,6 +4,7 @@ import { rolUsuarioSchema, estadoUsuarioSchema } from "@/lib/zod/usuario.schema"
 import { UsuarioFormModal } from "@/components/admin/usuario-form-modal";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { PageContainer } from "@/components/layout/page-container";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
   const hayFiltros = Boolean(rol || estado || q);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-4 py-6">
+    <PageContainer className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Usuarios</h1>
         <UsuarioFormModal
@@ -163,6 +164,6 @@ export default async function UsuariosPage({ searchParams }: PageProps) {
           </tbody>
         </table>
       </TableScroll>
-    </div>
+    </PageContainer>
   );
 }
