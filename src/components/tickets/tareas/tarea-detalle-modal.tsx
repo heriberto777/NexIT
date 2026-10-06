@@ -121,7 +121,7 @@ export function TareaDetalleModal({
   }
 
   return (
-    <Modal open onClose={onClose} title={tarea.titulo}>
+    <Modal open onClose={onClose} title={tarea.titulo} size="lg">
       <div className="max-h-[75vh] space-y-4 overflow-y-auto">
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 

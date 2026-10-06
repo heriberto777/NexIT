@@ -79,7 +79,7 @@ export function WebcamCaptureModal({ open, onClose, onCapture }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={detener} title="Tomar foto con la cámara">
+    <Modal open={open} onClose={detener} title="Tomar foto con la cámara" size="lg">
       <div className="space-y-3">
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {/* eslint-disable-next-line jsx-a11y/media-has-caption -- vista previa en vivo de la webcam, no un video con contenido */}
