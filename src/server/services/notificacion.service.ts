@@ -92,3 +92,51 @@ export async function notificarCambioEstadoCliente(
     ticketId: ticket.id,
   });
 }
+
+// --- Tareas dentro de un ticket (ver análisis "Tareas dentro de un ticket") ---
+
+export async function notificarTareaAsignada(
+  ticket: { id: string; numeroTicket: string },
+  tarea: { titulo: string },
+  asignadoAId: string,
+): Promise<void> {
+  await crearNotificacion({
+    usuarioId: asignadoAId,
+    tipo: "TAREA_ASIGNADA",
+    titulo: `Te asignaron una tarea en el ticket #${ticket.numeroTicket}`,
+    mensaje: tarea.titulo,
+    ticketId: ticket.id,
+  });
+}
+
+// El "otro lado" de la conversación de una tarea: quien comentó no se notifica a sí
+// mismo — el caller ya filtra eso antes de llamar (ver comentar-tarea.ts).
+export async function notificarComentarioTarea(
+  ticket: { id: string; numeroTicket: string },
+  tarea: { titulo: string },
+  comentaristaNombre: string,
+  destinatarioId: string,
+): Promise<void> {
+  await crearNotificacion({
+    usuarioId: destinatarioId,
+    tipo: "TAREA_COMENTARIO",
+    titulo: `${comentaristaNombre} comentó en una tarea del ticket #${ticket.numeroTicket}`,
+    mensaje: tarea.titulo,
+    ticketId: ticket.id,
+  });
+}
+
+export async function notificarMencionTarea(
+  ticket: { id: string; numeroTicket: string },
+  tarea: { titulo: string },
+  mencionadoPorNombre: string,
+  mencionadoId: string,
+): Promise<void> {
+  await crearNotificacion({
+    usuarioId: mencionadoId,
+    tipo: "TAREA_MENCION",
+    titulo: `${mencionadoPorNombre} te mencionó en una tarea del ticket #${ticket.numeroTicket}`,
+    mensaje: tarea.titulo,
+    ticketId: ticket.id,
+  });
+}

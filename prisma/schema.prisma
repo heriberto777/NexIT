@@ -123,6 +123,26 @@ enum OrigenTicket {
   CHATBOT
 }
 
+// Tareas: sub-ítems livianos dentro de un ticket (ej. "comprar licencia de Windows"),
+// cada uno asignable a su propio responsable (Admin/Coordinador/Técnico) sin heredar el
+// peso de un Ticket completo (SLA, wizard, checklist, evidencia) — ver TicketTarea.
+enum EstadoTarea {
+  PENDIENTE
+  EN_PROGRESO
+  COMPLETADA
+  CANCELADA
+}
+
+// Discriminador de TicketTareaActividad: permite que un cambio de estado generado por
+// el sistema y un comentario escrito a mano convivan en la misma línea de tiempo de la
+// tarea sin confundirse entre sí.
+enum TipoActividadTarea {
+  CREACION
+  CAMBIO_ESTADO
+  REASIGNACION
+  COMENTARIO
+}
+
 enum TipoEvidencia {
   FOTO_ANTES
   FOTO_DESPUES
@@ -223,10 +243,10 @@ model ConfiguracionSistema {
   // Ollama/LM Studio compatible con la API de OpenAI); para "OPENAI" es un override
   // opcional (proxies, Azure OpenAI). `iaApiKey` nunca se manda de vuelta al cliente —
   // mismo patrón que smtpPass/webhookSecret.
-  iaProveedor String?
-  iaApiKey    String?
-  iaModelo    String?
-  iaBaseUrl   String?
+  iaProveedor  String?
+  iaApiKey     String?
+  iaModelo     String?
+  iaBaseUrl    String?
   iaHabilitada Boolean @default(false)
 
   actualizadoEn DateTime @updatedAt
@@ -321,8 +341,8 @@ model Usuario {
   // Vínculo self-service (/perfil) para el workflow de n8n de chat con IA: sin esto,
   // n8n no tiene forma de resolver "quién escribió este mensaje de Telegram/WhatsApp"
   // a un Usuario/Cliente de NexIT.
-  telegramChatId   String? @unique
-  whatsappTelefono String? @unique
+  telegramChatId               String? @unique
+  whatsappTelefono             String? @unique
   // Algunos usuarios de WhatsApp activan la privacidad de "nombre de usuario" de Meta:
   // Twilio deja de mandar el teléfono real en el webhook y en su lugar manda un
   // identificador opaco estable (ver conversación de diseño) — se guarda acá, nunca en
@@ -348,6 +368,10 @@ model Usuario {
   verificacionesIdentidad    VerificacionIdentidadChat[]
   especialidades             UsuarioEspecialidad[]
   ticketsColaborador         TicketColaborador[]
+  tareasCreadas              TicketTarea[]                 @relation("TareaCreador")
+  tareasAsignadas            TicketTarea[]                 @relation("TareaAsignada")
+  tareaActividades           TicketTareaActividad[]
+  tareaMenciones             TicketTareaMencion[]
 
   @@index([clienteId])
   @@map("usuarios")
@@ -565,6 +589,7 @@ model Ticket {
   contactoPendiente   ContactoPendiente?
   notificaciones      Notificacion[]
   colaboradores       TicketColaborador[]
+  tareas              TicketTarea[]
 
   @@index([clienteId, estado])
   @@index([tecnicoAsignadoId, estado])
@@ -587,6 +612,68 @@ model TicketColaborador {
 
   @@id([ticketId, usuarioId])
   @@map("ticket_colaboradores")
+}
+
+// Sub-ítem liviano dentro de un ticket (ver análisis "Tareas dentro de un ticket") — sin
+// clienteId propio: el aislamiento multi-tenant lo hereda de ticket.clienteId, igual que
+// Cotizacion y TicketHistorial. No bloquea el cierre del ticket ni tiene SLA propio; es
+// organización interna del trabajo, no un nuevo flujo de atención.
+model TicketTarea {
+  id              String      @id @default(cuid())
+  ticketId        String
+  ticket          Ticket      @relation(fields: [ticketId], references: [id])
+  titulo          String
+  estado          EstadoTarea @default(PENDIENTE)
+  asignadoAId     String?
+  asignadoA       Usuario?    @relation("TareaAsignada", fields: [asignadoAId], references: [id])
+  creadoPorId     String
+  creadoPor       Usuario     @relation("TareaCreador", fields: [creadoPorId], references: [id])
+  fechaCreacion   DateTime    @default(now())
+  fechaCompletada DateTime?
+
+  actividad TicketTareaActividad[]
+
+  @@index([ticketId])
+  @@index([asignadoAId])
+  @@map("ticket_tareas")
+}
+
+// Línea de tiempo de una tarea puntual — mismo molde que TicketHistorial (estado
+// anterior/nuevo + comentario libre) con un discriminador `tipo` para que los cambios
+// generados por el sistema (CAMBIO_ESTADO, REASIGNACION) convivan con comentarios
+// escritos a mano (COMENTARIO) sin confundirse.
+model TicketTareaActividad {
+  id             String             @id @default(cuid())
+  tareaId        String
+  tarea          TicketTarea        @relation(fields: [tareaId], references: [id])
+  usuarioId      String
+  usuario        Usuario            @relation(fields: [usuarioId], references: [id])
+  tipo           TipoActividadTarea
+  comentario     String?
+  // Key del storage (igual que Evidencia.urlArchivo — nunca una URL ya resuelta). Solo
+  // aplica a tipo COMENTARIO; una foto por comentario en v1.
+  fotoArchivo    String?
+  estadoAnterior String?
+  estadoNuevo    String?
+  fecha          DateTime           @default(now())
+
+  menciones TicketTareaMencion[]
+
+  @@index([tareaId])
+  @@map("ticket_tarea_actividad")
+}
+
+// A quién se mencionó con "@" en un comentario puntual — mismo molde que
+// TicketColaborador (par actividad+usuario). Mencionar a alguien lo da de alta como
+// TicketColaborador si todavía no tenía acceso al ticket (ver notificacion.service.ts).
+model TicketTareaMencion {
+  actividadId String
+  actividad   TicketTareaActividad @relation(fields: [actividadId], references: [id])
+  usuarioId   String
+  usuario     Usuario              @relation(fields: [usuarioId], references: [id])
+
+  @@id([actividadId, usuarioId])
+  @@map("ticket_tarea_menciones")
 }
 
 model TicketHistorial {
@@ -897,6 +984,9 @@ enum TipoNotificacion {
   TICKET_ASIGNADO
   CONTACTO_PENDIENTE_NUEVO
   TICKET_CAMBIO_ESTADO
+  TAREA_ASIGNADA
+  TAREA_COMENTARIO
+  TAREA_MENCION
 }
 
 // Feed de la campanita de notificaciones (NotificationBell) — una fila por

@@ -13,6 +13,8 @@ import { formatCurrency } from "@/lib/utils/currency";
 import { obtenerConfiguracion } from "@/server/services/configuracion.service";
 import { ImageThumbnail } from "@/components/ui/image-thumbnail";
 import { tieneAccesoAlTicket } from "@/server/services/ticket-acceso.service";
+import { TareasTicketPanel } from "@/components/tickets/tareas/tareas-ticket-panel";
+import type { TareaUI } from "@/components/tickets/tareas/types";
 
 const ESTADOS_GESTIONABLES = new Set(["ABIERTO", "ASIGNADO", "EN_DIAGNOSTICO", "ESPERANDO_REPUESTO", "EN_EJECUCION", "REABIERTO"]);
 
@@ -53,6 +55,17 @@ export default async function TicketDetailPage({ params }: PageProps) {
       cotizaciones: { orderBy: { fecha: "desc" } },
       historial: { include: { usuario: true }, orderBy: { fecha: "asc" } },
       colaboradores: { include: { usuario: true } },
+      tareas: {
+        include: {
+          asignadoA: { select: { id: true, nombre: true } },
+          creadoPor: { select: { nombre: true } },
+          actividad: {
+            include: { usuario: { select: { nombre: true } }, menciones: { include: { usuario: { select: { nombre: true } } } } },
+            orderBy: { fecha: "asc" },
+          },
+        },
+        orderBy: { fechaCreacion: "asc" },
+      },
     },
   });
 
@@ -75,11 +88,16 @@ export default async function TicketDetailPage({ params }: PageProps) {
     );
   }
 
-  const puedeGestionar =
-    (sesion?.rol === "COORDINADOR" || sesion?.rol === "ADMIN") && ESTADOS_GESTIONABLES.has(ticket.estado);
+  const esAdminOCoordinador = sesion?.rol === "ADMIN" || sesion?.rol === "COORDINADOR";
+  const esStaff = esAdminOCoordinador || sesion?.rol === "TECNICO";
+  const puedeGestionar = esAdminOCoordinador && ESTADOS_GESTIONABLES.has(ticket.estado);
+  // Tareas no está acotado a ESTADOS_GESTIONABLES como "Gestionar ticket": a propósito
+  // sigue usable aunque el ticket ya esté RESUELTO (ej. terminar de comprar una licencia
+  // después de la visita) — ver análisis "Tareas dentro de un ticket".
+  const esResponsableDelTicket = Boolean(sesion && ticket.tecnicoAsignadoId === sesion.id);
   // Incluye Admin/Coordinador en el selector — un Admin a veces necesita atender él
   // mismo un ticket (ver asignar-tecnico.ts), no solo asignarlo a un Técnico.
-  const tecnicos = puedeGestionar
+  const tecnicos = esStaff
     ? await prisma.usuario.findMany({
         where: { rol: { in: ["TECNICO", "COORDINADOR", "ADMIN"] }, estado: "ACTIVO" },
         orderBy: { nombre: "asc" },
@@ -95,13 +113,36 @@ export default async function TicketDetailPage({ params }: PageProps) {
 
   // Las columnas urlArchivo/urlFirmaImagen guardan la KEY del storage, no una URL
   // usable directo — se resuelve aquí, una vez por carga de la página.
-  const [evidenciasResueltas, firmasResueltas, checklistConFoto] = await Promise.all([
+  const [evidenciasResueltas, firmasResueltas, checklistConFoto, tareasUI] = await Promise.all([
     Promise.all(ticket.evidencias.map(async (e) => ({ ...e, urlArchivo: await storageService.getPublicUrl(e.urlArchivo) }))),
     Promise.all(ticket.firmas.map(async (f) => ({ ...f, urlFirmaImagen: await storageService.getPublicUrl(f.urlFirmaImagen) }))),
     Promise.all(
       ticket.checklistRespuestas.map(async (r) => ({
         ...r,
         fotoUrl: r.fotoArchivo ? await storageService.getPublicUrl(r.fotoArchivo) : null,
+      })),
+    ),
+    Promise.all(
+      ticket.tareas.map(async (t): Promise<TareaUI> => ({
+        id: t.id,
+        titulo: t.titulo,
+        estado: t.estado,
+        asignadoA: t.asignadoA,
+        creadoPorNombre: t.creadoPor.nombre,
+        fechaCreacion: FORMATO_FECHA.format(t.fechaCreacion),
+        actividad: await Promise.all(
+          t.actividad.map(async (a) => ({
+            id: a.id,
+            tipo: a.tipo,
+            comentario: a.comentario,
+            fotoUrl: a.fotoArchivo ? await storageService.getPublicUrl(a.fotoArchivo) : null,
+            estadoAnterior: a.estadoAnterior,
+            estadoNuevo: a.estadoNuevo,
+            fecha: FORMATO_FECHA.format(a.fecha),
+            usuarioNombre: a.usuario.nombre,
+            mencionesNombres: a.menciones.map((m) => m.usuario.nombre),
+          })),
+        ),
       })),
     ),
   ]);
@@ -213,6 +254,17 @@ export default async function TicketDetailPage({ params }: PageProps) {
           tecnicos={tecnicos.map((t) => ({ id: t.id, nombre: t.nombre, rol: t.rol }))}
           colaboradoresIniciales={ticket.colaboradores.map((c) => c.usuarioId)}
           hayTrabajoEnProgreso={ticket.evidencias.length > 0 || ticket.checklistRespuestas.length > 0}
+        />
+      )}
+
+      {esStaff && sesion && (
+        <TareasTicketPanel
+          ticketId={ticket.id}
+          tareas={tareasUI}
+          candidatos={tecnicos.map((t) => ({ id: t.id, nombre: t.nombre }))}
+          usuarioActualId={sesion.id}
+          esAdminOCoordinador={esAdminOCoordinador}
+          esResponsableDelTicket={esResponsableDelTicket}
         />
       )}
 
