@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Play, Check, Ban } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
@@ -49,6 +49,22 @@ export function TareaDetalleModal({
   const [fotoKey, setFotoKey] = useState<string | null>(null);
   const [fotoUrlPreview, setFotoUrlPreview] = useState<string | null>(null);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
+
+  const actividadRef = useRef<HTMLDivElement>(null);
+  const primerScroll = useRef(true);
+
+  // Al abrir el modal (y cada vez que se suma una entrada nueva — comentario, cambio de
+  // estado, reasignación) el panel de Actividad arranca mostrando lo último, no lo más
+  // viejo — igual que WhatsApp/Slack: el orden cronológico se mantiene (ver análisis
+  // "orden de la Actividad"), pero la primera vista siempre es la más reciente. Sin
+  // animación la primera vez (se sentiría raro ver el scroll "viajar" al abrir), con
+  // scroll suave en las actualizaciones siguientes para notar que llegó algo nuevo.
+  useEffect(() => {
+    const el = actividadRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: primerScroll.current ? "auto" : "smooth" });
+    primerScroll.current = false;
+  }, [tarea.actividad.length]);
 
   const esAsignado = tarea.asignadoA?.id === usuarioActualId;
   const puedeGestionar = esAdminOCoordinador; // crear/reasignar — ver crear-tarea.ts (acá solo Admin/Coordinador o el responsable del ticket, ya filtrado por el panel padre)
@@ -209,7 +225,7 @@ export function TareaDetalleModal({
             {/* max-h + overflow propios: una tarea con mucho historial scrollea SOLO
                 acá — overscroll-contain evita que, al llegar al tope/fondo de esta
                 lista, el scroll "se escape" hacia la página de atrás del modal. */}
-            <div className="max-h-[50vh] space-y-3 overflow-y-auto overscroll-contain border-l border-gray-200 pl-3 pr-1">
+            <div ref={actividadRef} className="max-h-[50vh] space-y-3 overflow-y-auto overscroll-contain border-l border-gray-200 pl-3 pr-1">
               {tarea.actividad.map((a) => (
                 <div key={a.id}>
                   <p className="text-[11px] text-gray-400">{a.fecha}</p>
