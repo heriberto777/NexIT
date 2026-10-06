@@ -123,7 +123,11 @@ export function TareaDetalleModal({
 
   return (
     <Modal open onClose={onClose} title={tarea.titulo} size="xl">
-      <div className="max-h-[80vh] space-y-4 overflow-y-auto">
+      {/* El scroll "normal" del historial vive en la lista de Actividad misma (más
+          abajo, acotada a 50vh), no acá — así "escribir" nunca se arrastra con ella
+          (en desktop/tablet está al lado, no abajo). max-h-[90vh] acá es solo una red
+          de seguridad para pantallas muy bajas donde ni así entra todo junto. */}
+      <div className="max-h-[90vh] space-y-4 overflow-y-auto">
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
         <div>
@@ -202,7 +206,10 @@ export function TareaDetalleModal({
         <div className="grid items-start gap-4 border-t border-gray-100 pt-3 md:grid-cols-[1fr_340px]">
           <div className="min-w-0">
             <p className="mb-2 text-xs font-semibold text-gray-700">Actividad</p>
-            <div className="space-y-3 border-l border-gray-200 pl-3">
+            {/* max-h + overflow propios: una tarea con mucho historial scrollea SOLO
+                acá — overscroll-contain evita que, al llegar al tope/fondo de esta
+                lista, el scroll "se escape" hacia la página de atrás del modal. */}
+            <div className="max-h-[50vh] space-y-3 overflow-y-auto overscroll-contain border-l border-gray-200 pl-3 pr-1">
               {tarea.actividad.map((a) => (
                 <div key={a.id}>
                   <p className="text-[11px] text-gray-400">{a.fecha}</p>
