@@ -18,7 +18,8 @@ export async function crearCotizacion(input: CrearCotizacionInput): Promise<Acti
       throw new Error(`Tu rol (${usuario.rol}) no puede solicitar cotizaciones`);
     }
 
-    const { ticketId, monto, descripcion } = crearCotizacionSchema.parse(input);
+    const datos = crearCotizacionSchema.parse(input);
+    const { ticketId } = datos;
 
     const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
     if (ESTADOS_TERMINALES.has(ticket.estado)) {
@@ -30,9 +31,28 @@ export async function crearCotizacion(input: CrearCotizacionInput): Promise<Acti
 
     const { monedaSimbolo } = await obtenerConfiguracion();
 
+    // El monto de tipo PRODUCTO se recalcula acá contra el precio real del catálogo EN
+    // ESTE MOMENTO — nunca se usa un monto que venga del cliente, así nadie puede mandar
+    // uno manipulado a mano aunque conozca el repuestoId (ver crearCotizacionSchema).
+    let monto: number;
+    let descripcion: string;
+    let repuestoId: string | null = null;
+    let cantidad: number | null = null;
+
+    if (datos.tipo === "PRODUCTO") {
+      const repuesto = await prisma.repuesto.findUniqueOrThrow({ where: { id: datos.repuestoId } });
+      repuestoId = repuesto.id;
+      cantidad = datos.cantidad;
+      monto = repuesto.costoUnidad.mul(datos.cantidad).toNumber();
+      descripcion = `${repuesto.nombre} x${datos.cantidad}${repuesto.descripcion ? ` — ${repuesto.descripcion}` : ""}`;
+    } else {
+      monto = datos.monto;
+      descripcion = datos.descripcion;
+    }
+
     const cotizacion = await prisma.$transaction(async (tx) => {
       const nueva = await tx.cotizacion.create({
-        data: { ticketId, monto, descripcion },
+        data: { ticketId, monto, descripcion, repuestoId, cantidad },
       });
 
       await tx.ticketHistorial.create({

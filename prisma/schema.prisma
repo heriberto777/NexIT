@@ -757,8 +757,9 @@ model Repuesto {
   costoUnidad  Decimal @db.Decimal(10, 2)
   ubicacion    String?
 
-  consumos    TicketRepuesto[]
-  movimientos MovimientoInventario[]
+  consumos     TicketRepuesto[]
+  movimientos  MovimientoInventario[]
+  cotizaciones Cotizacion[]
 
   @@map("repuestos")
 }
@@ -813,6 +814,13 @@ model Cotizacion {
   aprobadoPorId String?
   aprobadoPor   Usuario?         @relation("CotizacionAprobador", fields: [aprobadoPorId], references: [id])
   fecha         DateTime         @default(now())
+  // Ancla el monto a un precio real del catálogo — nunca viaja desde el cliente, se
+  // recalcula server-side contra costoUnidad × cantidad al crear la cotización (ver
+  // análisis "¿de dónde sale el monto de la cotización?"). null cuando es de tipo libre
+  // (algo que no es un producto puntual, ej. horas de mano de obra adicional).
+  repuestoId    String?
+  repuesto      Repuesto?        @relation(fields: [repuestoId], references: [id])
+  cantidad      Int?
 
   @@index([ticketId])
   @@map("cotizaciones")

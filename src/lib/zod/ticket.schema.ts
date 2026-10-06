@@ -137,12 +137,25 @@ export const cancelarTicketSchema = z.object({
 });
 export type CancelarTicketInput = z.infer<typeof cancelarTicketSchema>;
 
-// Solicitud de cotización adicional (Técnico/Coordinador/Admin)
-export const crearCotizacionSchema = z.object({
-  ticketId: z.string().cuid(),
-  monto: z.coerce.number().positive("El monto debe ser mayor a 0").max(1_000_000),
-  descripcion: z.string().trim().min(10, "Describe con al menos 10 caracteres qué cubre este costo adicional").max(1000),
-});
+// Solicitud de cotización adicional (Técnico/Coordinador/Admin) — dos modos:
+// "PRODUCTO" ancla el monto a un repuesto real del catálogo (el servidor recalcula
+// costoUnidad × cantidad, nunca confía en un monto mandado desde el cliente — ver
+// análisis "¿de dónde sale el monto de la cotización?"); "LIBRE" es el modo anterior,
+// para costos que no son un producto puntual (ej. horas de mano de obra adicional).
+export const crearCotizacionSchema = z.discriminatedUnion("tipo", [
+  z.object({
+    tipo: z.literal("PRODUCTO"),
+    ticketId: z.string().cuid(),
+    repuestoId: z.string().cuid(),
+    cantidad: z.coerce.number().int().min(1, "Mínimo 1").max(999),
+  }),
+  z.object({
+    tipo: z.literal("LIBRE"),
+    ticketId: z.string().cuid(),
+    monto: z.coerce.number().positive("El monto debe ser mayor a 0").max(1_000_000),
+    descripcion: z.string().trim().min(10, "Describe con al menos 10 caracteres qué cubre este costo adicional").max(1000),
+  }),
+]);
 export type CrearCotizacionInput = z.infer<typeof crearCotizacionSchema>;
 
 // Aprobación/rechazo de cotización por el cliente

@@ -110,6 +110,13 @@ export default async function TicketDetailPage({ params }: PageProps) {
   const puedeSolicitarCotizacion =
     (sesion?.rol === "TECNICO" || sesion?.rol === "COORDINADOR" || sesion?.rol === "ADMIN") &&
     !ESTADOS_TERMINALES.has(ticket.estado);
+  // Catálogo para el modo "Un producto" del modal de cotización — el monto sale de acá,
+  // nunca se escribe a mano (ver análisis "¿de dónde sale el monto de la cotización?").
+  const productosCotizables = puedeSolicitarCotizacion
+    ? (await prisma.repuesto.findMany({ orderBy: { nombre: "asc" }, select: { id: true, nombre: true, costoUnidad: true, unidadMedida: true } })).map(
+        (p) => ({ id: p.id, nombre: p.nombre, costoUnidad: p.costoUnidad.toNumber(), unidadMedida: p.unidadMedida }),
+      )
+    : [];
 
   // Las columnas urlArchivo/urlFirmaImagen guardan la KEY del storage, no una URL
   // usable directo — se resuelve aquí, una vez por carga de la página.
@@ -289,7 +296,14 @@ export default async function TicketDetailPage({ params }: PageProps) {
               ))}
             </div>
           )}
-          {puedeSolicitarCotizacion && <SolicitarCotizacionModal ticketId={ticket.id} monedaSimbolo={config.monedaSimbolo} />}
+          {puedeSolicitarCotizacion && (
+            <SolicitarCotizacionModal
+              ticketId={ticket.id}
+              monedaSimbolo={config.monedaSimbolo}
+              productos={productosCotizables}
+              puedeCrearProducto={esAdminOCoordinador}
+            />
+          )}
         </section>
       )}
 
