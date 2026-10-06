@@ -90,8 +90,8 @@ export function EspecialidadesForm({ especialidades }: { especialidades: Especia
                   className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
                 />
               ) : (
-                <div>
-                  <p className="text-sm text-gray-800">{e.nombre}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-sm text-gray-800">{e.nombre}</p>
                   <p className="text-xs text-gray-400">{e.usuarios} usuario(s)</p>
                 </div>
               )}

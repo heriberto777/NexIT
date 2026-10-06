@@ -79,8 +79,8 @@ export default async function PortalTicketDetailPage({ params }: PageProps) {
             <EstadoBadge estado={ticket.estado} />
           </div>
         </div>
-        <p className="text-sm font-medium text-gray-900">{ticket.titulo}</p>
-        <p className="text-sm text-gray-600">{ticket.descripcion}</p>
+        <p className="break-words text-sm font-medium text-gray-900">{ticket.titulo}</p>
+        <p className="break-words text-sm text-gray-600">{ticket.descripcion}</p>
         <p className="text-xs text-gray-400">
           {ticket.sucursal.nombre} · Creado el {FORMATO_FECHA.format(ticket.fechaCreacion)}
         </p>
@@ -123,9 +123,9 @@ export default async function PortalTicketDetailPage({ params }: PageProps) {
             {ticket.cotizaciones.map((c) => (
               <div key={c.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900">{formatCurrency(c.monto.toNumber(), config.monedaSimbolo)}</p>
-                    <p className="text-sm text-gray-600">{c.descripcion}</p>
+                    <p className="break-words text-sm text-gray-600">{c.descripcion}</p>
                     <p className="text-xs text-gray-400">{FORMATO_FECHA.format(c.fecha)}</p>
                   </div>
                   <span className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COTIZACION_ESTILO[c.estado]}`}>
@@ -154,7 +154,7 @@ export default async function PortalTicketDetailPage({ params }: PageProps) {
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <h2 className="mb-2 text-sm font-semibold text-gray-900">Conformidad firmada</h2>
           {ticket.firmas.map((f) => (
-            <p key={f.id} className="text-sm text-gray-600">
+            <p key={f.id} className="break-words text-sm text-gray-600">
               {f.nombreFirmante}
               {f.cargoFirmante ? ` — ${f.cargoFirmante}` : ""} · {FORMATO_FECHA.format(f.fecha)}
             </p>
@@ -170,7 +170,7 @@ export default async function PortalTicketDetailPage({ params }: PageProps) {
               <p className="text-xs text-gray-400">
                 {h.usuario.nombre} · {FORMATO_FECHA.format(h.fecha)}
               </p>
-              {h.comentario && <p className="text-sm text-gray-700">{h.comentario}</p>}
+              {h.comentario && <p className="break-words text-sm text-gray-700">{h.comentario}</p>}
             </li>
           ))}
           {ticket.historial.length === 0 && <p className="text-sm text-gray-400">Aún no hay actividad.</p>}

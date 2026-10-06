@@ -90,8 +90,8 @@ export function CategoriasForm({ categorias }: { categorias: CategoriaActivoValu
                   className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
                 />
               ) : (
-                <div>
-                  <p className="text-sm text-gray-800">{c.nombre}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-sm text-gray-800">{c.nombre}</p>
                   <p className="text-xs text-gray-400">
                     {c.activos} activo(s) · {c.checklistTemplates} checklist(s)
                   </p>

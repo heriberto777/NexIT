@@ -12,9 +12,9 @@ export default async function TecnicoLayout({ children }: { children: ReactNode 
   return (
     <div className="min-h-screen">
       <nav className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-semibold text-gray-900">{config.empresaNombre}</span>
-          <Link href="/tickets" className="text-sm text-gray-600 hover:text-blue-600">
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="truncate text-sm font-semibold text-gray-900">{config.empresaNombre}</span>
+          <Link href="/tickets" className="shrink-0 text-sm text-gray-600 hover:text-blue-600">
             Tickets
           </Link>
         </div>

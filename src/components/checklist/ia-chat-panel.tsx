@@ -99,7 +99,7 @@ export function IaChatPanel({ ticketId, sugerenciaIA, mensajesIniciales, habilit
                         : "border border-violet-200 bg-violet-50 text-violet-900"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{m.contenido}</p>
+                  <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
                   {m.rol === "ASISTENTE" && (
                     <div className="mt-1.5 flex items-center justify-end">
                       {m.esSolucion ? (

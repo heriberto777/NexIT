@@ -50,8 +50,8 @@ export default async function RepuestoDetailPage({ params }: PageProps) {
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">{repuesto.nombre}</h1>
+        <div className="min-w-0">
+          <h1 className="break-words text-lg font-semibold text-gray-900">{repuesto.nombre}</h1>
           <p className="text-sm text-gray-500">{repuesto.codigo}</p>
           <p className="mt-1 text-sm">
             Stock actual:{" "}

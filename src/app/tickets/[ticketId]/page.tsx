@@ -137,8 +137,8 @@ export default async function TicketDetailPage({ params }: PageProps) {
         <p className="text-sm text-gray-600">
           {ticket.cliente.nombre} · {ticket.sucursal.nombre}, {ticket.sucursal.direccion}
         </p>
-        <p className="text-sm font-medium text-gray-900">{ticket.titulo}</p>
-        <p className="text-sm text-gray-700">{ticket.descripcion}</p>
+        <p className="break-words text-sm font-medium text-gray-900">{ticket.titulo}</p>
+        <p className="break-words text-sm text-gray-700">{ticket.descripcion}</p>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 pt-2 text-xs text-gray-500 sm:grid-cols-4">
           <div>
             <dt className="font-medium text-gray-400">Tipo</dt>
@@ -225,9 +225,9 @@ export default async function TicketDetailPage({ params }: PageProps) {
             <div className="divide-y divide-gray-100">
               {ticket.cotizaciones.map((c) => (
                 <div key={c.id} className="flex items-start justify-between gap-3 py-2">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900">{formatCurrency(c.monto.toNumber(), config.monedaSimbolo)}</p>
-                    <p className="text-sm text-gray-600">{c.descripcion}</p>
+                    <p className="break-words text-sm text-gray-600">{c.descripcion}</p>
                     <p className="text-xs text-gray-400">{FORMATO_FECHA.format(c.fecha)}</p>
                   </div>
                   <span className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COTIZACION_ESTILO[c.estado]}`}>
@@ -247,9 +247,9 @@ export default async function TicketDetailPage({ params }: PageProps) {
           <div className="divide-y divide-gray-100">
             {checklistOrdenado.map((r) => (
               <div key={r.id} className="flex items-start justify-between gap-4 py-2 text-sm">
-                <div>
-                  <p className="text-gray-800">{r.checklistItem.descripcion}</p>
-                  {r.observacion && <p className="text-xs text-gray-500">{r.observacion}</p>}
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-gray-800">{r.checklistItem.descripcion}</p>
+                  {r.observacion && <p className="break-words text-xs text-gray-500">{r.observacion}</p>}
                   {r.fotoUrl && (
                     <div className="mt-1.5">
                       <ImageThumbnail src={r.fotoUrl} alt="" className="h-16 w-16 rounded-md object-cover" />
@@ -326,7 +326,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
           <h2 className="mb-3 text-sm font-semibold text-gray-900">Firma de conformidad</h2>
           {firmasResueltas.map((f) => (
             <div key={f.id} className="space-y-2">
-              <p className="text-sm text-gray-700">
+              <p className="break-words text-sm text-gray-700">
                 {f.nombreFirmante}
                 {f.cargoFirmante ? ` — ${f.cargoFirmante}` : ""}
               </p>
@@ -354,7 +354,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
                   </>
                 )}
               </p>
-              {h.comentario && <p className="text-sm text-gray-600">{h.comentario}</p>}
+              {h.comentario && <p className="break-words text-sm text-gray-600">{h.comentario}</p>}
             </li>
           ))}
         </ol>

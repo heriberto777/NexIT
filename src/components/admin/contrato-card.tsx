@@ -64,8 +64,8 @@ export function ContratoCard({ contrato, localeFecha }: Props) {
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-gray-900">{contrato.tipoContrato}</p>
+        <div className="min-w-0">
+          <p className="break-words text-sm font-semibold text-gray-900">{contrato.tipoContrato}</p>
           <p className="text-xs text-gray-500">
             {formatearFecha(contrato.fechaInicio)} — {contrato.fechaFin ? formatearFecha(contrato.fechaFin) : "sin fecha de fin"}
             {contrato.horasIncluidas != null && ` · ${contrato.horasIncluidas}h incluidas`}

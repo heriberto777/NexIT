@@ -66,8 +66,8 @@ export default async function PortalDashboardPage() {
           {recientes.map((t) => (
             <li key={t.id}>
               <Link href={`/portal/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 hover:bg-gray-50">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-800">
                     #{t.numeroTicket} — {t.titulo}
                   </p>
                   <p className="text-xs text-gray-500">{t.sucursal.nombre}</p>

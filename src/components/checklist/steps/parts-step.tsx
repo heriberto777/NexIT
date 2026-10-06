@@ -44,9 +44,9 @@ export function PartsStep({
       {repuestosAgregados.length > 0 && (
         <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
           {repuestosAgregados.map((r, i) => (
-            <li key={i} className="flex justify-between px-3 py-2 text-sm">
-              <span>{r.nombre}</span>
-              <span className="text-gray-500">x{r.cantidad}</span>
+            <li key={i} className="flex justify-between gap-2 px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1 break-words">{r.nombre}</span>
+              <span className="shrink-0 text-gray-500">x{r.cantidad}</span>
             </li>
           ))}
         </ul>

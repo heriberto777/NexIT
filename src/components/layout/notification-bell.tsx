@@ -143,9 +143,9 @@ export function NotificationBell() {
               >
                 <div className="flex items-start gap-2">
                   {!n.leida && <span className="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-blue-600" />}
-                  <div className={n.leida ? "flex-1 pl-3.5" : "flex-1"}>
-                    <p className={`text-sm ${n.leida ? "text-gray-600" : "font-semibold text-gray-900"}`}>{n.titulo}</p>
-                    <p className="mt-0.5 text-xs text-gray-500">{n.mensaje}</p>
+                  <div className={n.leida ? "min-w-0 flex-1 pl-3.5" : "min-w-0 flex-1"}>
+                    <p className={`break-words text-sm ${n.leida ? "text-gray-600" : "font-semibold text-gray-900"}`}>{n.titulo}</p>
+                    <p className="mt-0.5 break-words text-xs text-gray-500">{n.mensaje}</p>
                     <p className="mt-1 text-[11px] text-gray-400">{formato.format(new Date(n.fechaCreacion))}</p>
                   </div>
                 </div>

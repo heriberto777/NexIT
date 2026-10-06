@@ -242,11 +242,11 @@ export function CrearTicketForm({ clientes, contactoInicial }: { clientes: Clien
 
           {contactoSeleccionado ? (
             <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-sm">
-              <div>
-                <p className="font-medium text-gray-900">{contactoSeleccionado.nombre}</p>
-                <p className="text-xs text-gray-600">{contactoSeleccionado.email}</p>
+              <div className="min-w-0 flex-1">
+                <p className="break-words font-medium text-gray-900">{contactoSeleccionado.nombre}</p>
+                <p className="break-words text-xs text-gray-600">{contactoSeleccionado.email}</p>
               </div>
-              <button type="button" onClick={resetContacto} className="text-xs text-blue-600 underline">
+              <button type="button" onClick={resetContacto} className="shrink-0 text-xs text-blue-600 underline">
                 Cambiar
               </button>
             </div>

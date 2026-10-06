@@ -181,11 +181,11 @@ export function ExecutionWizard({
             {ticket.estado.replaceAll("_", " ")}
           </span>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="break-words text-sm text-gray-600">
           {ticket.cliente.nombre} · {ticket.sucursal.nombre}
         </p>
         {ticket.activo && (
-          <p className="text-sm font-medium text-gray-900">
+          <p className="break-words text-sm font-medium text-gray-900">
             {ticket.activo.marca} {ticket.activo.modelo} — Serie #{ticket.activo.numeroSerie}
           </p>
         )}
