@@ -9,11 +9,13 @@ interface Props {
   title: string;
   children: ReactNode;
   // "md" (default, sin cambios) para formularios de pocos campos; "lg" para modales con
-  // más contenido (línea de tiempo + comentarios, vista previa de cámara).
-  size?: "md" | "lg";
+  // más contenido (vista previa de cámara); "xl" para layouts de dos columnas (detalle
+  // de tarea) — ancho fluido en vez de un breakpoint fijo, igual criterio que
+  // PageContainer: crece en pantallas grandes sin perder el gutter en mobile/tablet.
+  size?: "md" | "lg" | "xl";
 }
 
-const TAMANOS = { md: "max-w-md", lg: "max-w-2xl" } as const;
+const TAMANOS = { md: "max-w-md", lg: "max-w-2xl", xl: "max-w-[min(64rem,92vw)]" } as const;
 
 export function Modal({ open, onClose, title, children, size = "md" }: Props) {
   // Si el click (mousedown) que abre la selección de texto empieza DENTRO del modal
