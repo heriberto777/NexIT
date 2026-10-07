@@ -7,6 +7,7 @@ import { PrioridadBadge } from "@/components/tickets/prioridad-badge";
 import { ValidationActions } from "@/components/tickets/validation-actions";
 import { GestionTicketPanel } from "@/components/tickets/gestion-ticket-panel";
 import { SolicitarCotizacionModal } from "@/components/tickets/solicitar-cotizacion-modal";
+import { CrearTicketInstalacionButton } from "@/components/tickets/crear-ticket-instalacion-button";
 import { storageService } from "@/server/services/storage.service";
 import { ESTADOS_CON_WIZARD_ACTIVO, ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -52,7 +53,10 @@ export default async function TicketDetailPage({ params }: PageProps) {
       evidencias: { orderBy: { fechaCarga: "asc" } },
       firmas: { orderBy: { fecha: "asc" } },
       repuestos: { include: { repuesto: true } },
-      cotizaciones: { orderBy: { fecha: "desc" } },
+      cotizaciones: {
+        include: { repuesto: true, ticketInstalacion: { select: { id: true, numeroTicket: true } } },
+        orderBy: { fecha: "desc" },
+      },
       historial: { include: { usuario: true }, orderBy: { fecha: "asc" } },
       colaboradores: { include: { usuario: true } },
       tareas: {
@@ -113,9 +117,18 @@ export default async function TicketDetailPage({ params }: PageProps) {
   // Catálogo para el modo "Un producto" del modal de cotización — el monto sale de acá,
   // nunca se escribe a mano (ver análisis "¿de dónde sale el monto de la cotización?").
   const productosCotizables = puedeSolicitarCotizacion
-    ? (await prisma.repuesto.findMany({ orderBy: { nombre: "asc" }, select: { id: true, nombre: true, costoUnidad: true, unidadMedida: true } })).map(
-        (p) => ({ id: p.id, nombre: p.nombre, costoUnidad: p.costoUnidad.toNumber(), unidadMedida: p.unidadMedida }),
-      )
+    ? (
+        await prisma.repuesto.findMany({
+          orderBy: { nombre: "asc" },
+          select: { id: true, nombre: true, costoUnidad: true, precioVenta: true, unidadMedida: true },
+        })
+      ).map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        costoUnidad: p.costoUnidad.toNumber(),
+        precioVenta: p.precioVenta?.toNumber() ?? null,
+        unidadMedida: p.unidadMedida,
+      }))
     : [];
 
   // Las columnas urlArchivo/urlFirmaImagen guardan la KEY del storage, no una URL
@@ -283,15 +296,28 @@ export default async function TicketDetailPage({ params }: PageProps) {
           {ticket.cotizaciones.length > 0 && (
             <div className="divide-y divide-gray-100">
               {ticket.cotizaciones.map((c) => (
-                <div key={c.id} className="flex items-start justify-between gap-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">{formatCurrency(c.monto.toNumber(), config.monedaSimbolo)}</p>
-                    <p className="break-words text-sm text-gray-600">{c.descripcion}</p>
-                    <p className="text-xs text-gray-400">{FORMATO_FECHA.format(c.fecha)}</p>
+                <div key={c.id} className="space-y-2 py-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900">{formatCurrency(c.monto.toNumber(), config.monedaSimbolo)}</p>
+                      <p className="break-words text-sm text-gray-600">{c.descripcion}</p>
+                      <p className="text-xs text-gray-400">{FORMATO_FECHA.format(c.fecha)}</p>
+                    </div>
+                    <span className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COTIZACION_ESTILO[c.estado]}`}>
+                      {c.estado}
+                    </span>
                   </div>
-                  <span className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COTIZACION_ESTILO[c.estado]}`}>
-                    {c.estado}
-                  </span>
+                  {esAdminOCoordinador && c.estado === "APROBADO" && c.repuestoId && (
+                    <div>
+                      {c.ticketInstalacion ? (
+                        <Link href={`/tickets/${c.ticketInstalacion.id}`} className="text-xs text-blue-600 underline">
+                          Ver ticket de instalación ({c.ticketInstalacion.numeroTicket}) →
+                        </Link>
+                      ) : (
+                        <CrearTicketInstalacionButton cotizacionId={c.id} />
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

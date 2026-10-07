@@ -43,7 +43,8 @@ export async function crearCotizacion(input: CrearCotizacionInput): Promise<Acti
       const repuesto = await prisma.repuesto.findUniqueOrThrow({ where: { id: datos.repuestoId } });
       repuestoId = repuesto.id;
       cantidad = datos.cantidad;
-      monto = repuesto.costoUnidad.mul(datos.cantidad).toNumber();
+      const precioBase = repuesto.precioVenta ?? repuesto.costoUnidad;
+      monto = precioBase.mul(datos.cantidad).toNumber();
       descripcion = `${repuesto.nombre} x${datos.cantidad}${repuesto.descripcion ? ` — ${repuesto.descripcion}` : ""}`;
     } else {
       monto = datos.monto;

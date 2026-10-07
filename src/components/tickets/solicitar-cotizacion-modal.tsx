@@ -13,6 +13,7 @@ export interface ProductoCotizable {
   id: string;
   nombre: string;
   costoUnidad: number;
+  precioVenta: number | null;
   unidadMedida: string;
 }
 
@@ -50,10 +51,12 @@ export function SolicitarCotizacionModal({ ticketId, monedaSimbolo, productos: p
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevaUnidad, setNuevaUnidad] = useState("unidad");
   const [nuevoCosto, setNuevoCosto] = useState("");
+  const [nuevoPrecioVenta, setNuevoPrecioVenta] = useState("");
   const [guardandoProducto, setGuardandoProducto] = useState(false);
 
   const productoSeleccionado = productos.find((p) => p.id === repuestoId);
-  const montoCalculado = productoSeleccionado ? productoSeleccionado.costoUnidad * cantidad : 0;
+  const precioBase = productoSeleccionado ? (productoSeleccionado.precioVenta ?? productoSeleccionado.costoUnidad) : 0;
+  const montoCalculado = precioBase * cantidad;
 
   function cerrarYLimpiar() {
     setOpen(false);
@@ -64,6 +67,10 @@ export function SolicitarCotizacionModal({ ticketId, monedaSimbolo, productos: p
     setMonto("");
     setDescripcion("");
     setCreandoProducto(false);
+    setNuevoCodigo("");
+    setNuevoNombre("");
+    setNuevoCosto("");
+    setNuevoPrecioVenta("");
   }
 
   async function enviar() {
@@ -107,6 +114,7 @@ export function SolicitarCotizacionModal({ ticketId, monedaSimbolo, productos: p
       nombre: nuevoNombre.trim(),
       unidadMedida: nuevaUnidad.trim() || "unidad",
       costoUnidad: Number(nuevoCosto),
+      precioVenta: nuevoPrecioVenta ? Number(nuevoPrecioVenta) : undefined,
       stockMinimo: 0,
     });
     setGuardandoProducto(false);
@@ -118,6 +126,7 @@ export function SolicitarCotizacionModal({ ticketId, monedaSimbolo, productos: p
       id: resultado.data.id,
       nombre: nuevoNombre.trim(),
       costoUnidad: Number(nuevoCosto),
+      precioVenta: nuevoPrecioVenta ? Number(nuevoPrecioVenta) : null,
       unidadMedida: nuevaUnidad.trim() || "unidad",
     };
     setProductos((prev) => [...prev, nuevo]);
@@ -126,6 +135,7 @@ export function SolicitarCotizacionModal({ ticketId, monedaSimbolo, productos: p
     setNuevoCodigo("");
     setNuevoNombre("");
     setNuevoCosto("");
+    setNuevoPrecioVenta("");
   }
 
   return (
@@ -166,7 +176,7 @@ export function SolicitarCotizacionModal({ ticketId, monedaSimbolo, productos: p
                   emptyMessage="No hay productos en el catálogo"
                   options={productos.map((p) => ({
                     value: p.id,
-                    label: `${p.nombre} — ${formatCurrency(p.costoUnidad, monedaSimbolo)} / ${p.unidadMedida}`,
+                    label: `${p.nombre} — ${formatCurrency(p.precioVenta ?? p.costoUnidad, monedaSimbolo)} / ${p.unidadMedida}`,
                   }))}
                 />
               </div>
@@ -218,14 +228,25 @@ export function SolicitarCotizacionModal({ ticketId, monedaSimbolo, productos: p
                     placeholder="Nombre del producto"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={nuevoCosto}
-                    onChange={(e) => setNuevoCosto(e.target.value)}
-                    placeholder={`Costo unitario (${monedaSimbolo})`}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={nuevoCosto}
+                      onChange={(e) => setNuevoCosto(e.target.value)}
+                      placeholder={`Costo (${monedaSimbolo})`}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={nuevoPrecioVenta}
+                      onChange={(e) => setNuevoPrecioVenta(e.target.value)}
+                      placeholder={`Precio de venta (${monedaSimbolo})`}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400">Si dejás el precio de venta vacío, se cotiza al mismo costo.</p>
                   <div className="flex gap-2">
                     <Button type="button" variant="ghost" className="flex-1" onClick={() => setCreandoProducto(false)}>
                       Cancelar

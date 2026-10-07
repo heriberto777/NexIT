@@ -9,6 +9,9 @@ export const guardarRepuestoSchema = z.object({
   stockMinimo: z.coerce.number().int().min(0),
   unidadMedida: z.string().trim().min(1, "Requerido").max(40),
   costoUnidad: z.coerce.number().min(0),
+  // Lo que se le cobra al cliente — si se deja vacío, las cotizaciones usan
+  // costoUnidad como precio (ver crear-cotizacion.ts).
+  precioVenta: z.coerce.number().min(0).optional(),
   ubicacion: z.string().trim().max(120).optional(),
   // Solo aplica al crear un repuesto nuevo — en edición el stock se ajusta únicamente
   // vía movimientos (registrarMovimientoInventario), nunca escribiendo el campo directo.

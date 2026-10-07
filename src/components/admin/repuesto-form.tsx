@@ -76,7 +76,7 @@ export function RepuestoForm({ modoEdicion, valoresIniciales, monedaSimbolo }: P
           <textarea {...register("descripcion")} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Unidad de medida</label>
             <input {...register("unidadMedida")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="unidad" />
@@ -89,6 +89,11 @@ export function RepuestoForm({ modoEdicion, valoresIniciales, monedaSimbolo }: P
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Costo por unidad ({monedaSimbolo})</label>
             <input type="number" min={0} step="0.01" {...register("costoUnidad")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Precio de venta ({monedaSimbolo})</label>
+            <input type="number" min={0} step="0.01" {...register("precioVenta")} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder={monedaSimbolo + " 0.00"} />
+            <p className="mt-1 text-xs text-gray-500">Lo que se le cobra al cliente — si se deja vacío, se usa el costo como precio.</p>
           </div>
         </div>
 

@@ -82,6 +82,7 @@ export default async function RepuestoDetailPage({ params }: PageProps) {
               stockMinimo: repuesto.stockMinimo,
               unidadMedida: repuesto.unidadMedida,
               costoUnidad: repuesto.costoUnidad.toNumber(),
+              precioVenta: repuesto.precioVenta?.toNumber() ?? undefined,
               ubicacion: repuesto.ubicacion ?? undefined,
             }}
           />

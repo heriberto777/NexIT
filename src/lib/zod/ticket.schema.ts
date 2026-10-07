@@ -170,3 +170,11 @@ export const resolverCotizacionSchema = z
     path: ["comentario"],
   });
 export type ResolverCotizacionInput = z.infer<typeof resolverCotizacionSchema>;
+
+// Ticket de instalación/entrega generado a partir de una cotización de producto ya
+// aprobada (Coordinador/Admin) — ver análisis "cómo ve Admin/Coordinador esto para
+// cobrarle al cliente" y crear-ticket-instalacion.ts.
+export const crearTicketInstalacionSchema = z.object({
+  cotizacionId: z.string().cuid(),
+});
+export type CrearTicketInstalacionInput = z.infer<typeof crearTicketInstalacionSchema>;

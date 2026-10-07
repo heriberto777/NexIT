@@ -64,6 +64,15 @@ export const cambiarEstadoContratoSchema = z.object({
 });
 export type CambiarEstadoContratoInput = z.infer<typeof cambiarEstadoContratoSchema>;
 
+// Compartido por marcar-facturacion-cotizacion.ts y marcar-facturacion-repuesto.ts —
+// misma forma en ambos casos (ver /admin/facturacion). Permite ir de FACTURADO a
+// PENDIENTE también, para corregir un error, no es de una sola vía.
+export const marcarFacturacionSchema = z.object({
+  id: z.string().cuid(),
+  estadoFacturacion: z.enum(["PENDIENTE", "FACTURADO"]),
+});
+export type MarcarFacturacionInput = z.infer<typeof marcarFacturacionSchema>;
+
 export const crearCategoriaActivoSchema = z.object({
   nombre: z.string().trim().min(2, "Mínimo 2 caracteres").max(80),
 });

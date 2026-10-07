@@ -54,6 +54,7 @@ const NAV_BASE: NavEntryConfig[] = [
       { href: "/admin/checklists", label: "Checklists" },
       { href: "/admin/preventivos", label: "Preventivos" },
       { href: "/admin/inventario", label: "Inventario" },
+      { href: "/admin/facturacion", label: "Facturación" },
     ],
   },
   {

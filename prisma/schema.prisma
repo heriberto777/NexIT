@@ -121,6 +121,10 @@ enum OrigenTicket {
   TELEFONO
   PROGRAMADO
   CHATBOT
+  // Ticket de instalación/entrega generado automáticamente a partir de una cotización
+  // aprobada (ver crear-ticket-instalacion.ts) — nadie lo "reportó", a diferencia de
+  // TELEFONO (que hoy ya se usa para toda creación manual por staff).
+  SEGUIMIENTO
 }
 
 // Tareas: sub-ítems livianos dentro de un ticket (ej. "comprar licencia de Windows"),
@@ -154,6 +158,15 @@ enum EstadoAprobacion {
   PENDIENTE
   APROBADO
   RECHAZADO
+}
+
+// Deliberadamente separado de EstadoAprobacion: ese responde "¿se aprobó el gasto?",
+// este responde "¿ya se le cobró al cliente?" — son dos preguntas distintas sobre la
+// misma fila (ver análisis "cómo ve Admin/Coordinador esto para cobrarle al cliente").
+// Solo tiene sentido marcar FACTURADO sobre algo ya APROBADO.
+enum EstadoFacturacion {
+  PENDIENTE
+  FACTURADO
 }
 
 enum FrecuenciaMantenimiento {
@@ -590,6 +603,9 @@ model Ticket {
   notificaciones      Notificacion[]
   colaboradores       TicketColaborador[]
   tareas              TicketTarea[]
+  // Lado inverso de Cotizacion.ticketInstalacionId — este ticket existe porque se
+  // generó a partir de esa cotización aprobada en otro ticket.
+  cotizacionInstalacionDe Cotizacion?              @relation("CotizacionTicketInstalacion")
 
   @@index([clienteId, estado])
   @@index([tecnicoAsignadoId, estado])
@@ -746,15 +762,19 @@ enum TipoMovimientoInventario {
 }
 
 model Repuesto {
-  id           String  @id @default(cuid())
-  codigo       String  @unique
+  id           String   @id @default(cuid())
+  codigo       String   @unique
   nombre       String
   descripcion  String?
   marca        String?
-  stockActual  Int     @default(0)
-  stockMinimo  Int     @default(0)
+  stockActual  Int      @default(0)
+  stockMinimo  Int      @default(0)
   unidadMedida String
-  costoUnidad  Decimal @db.Decimal(10, 2)
+  costoUnidad  Decimal  @db.Decimal(10, 2)
+  // Lo que se le cobra al cliente (margen sobre costoUnidad) — null = sin definir,
+  // se usa costoUnidad como precio (ver crear-cotizacion.ts). Se define una vez acá,
+  // no cotización por cotización.
+  precioVenta  Decimal? @db.Decimal(10, 2)
   ubicacion    String?
 
   consumos     TicketRepuesto[]
@@ -787,16 +807,19 @@ model MovimientoInventario {
 }
 
 model TicketRepuesto {
-  id               String           @id @default(cuid())
+  id               String            @id @default(cuid())
   ticketId         String
-  ticket           Ticket           @relation(fields: [ticketId], references: [id])
+  ticket           Ticket            @relation(fields: [ticketId], references: [id])
   repuestoId       String
-  repuesto         Repuesto         @relation(fields: [repuestoId], references: [id])
+  repuesto         Repuesto          @relation(fields: [repuestoId], references: [id])
   cantidad         Int
-  costoTotal       Decimal          @db.Decimal(10, 2)
+  costoTotal       Decimal           @db.Decimal(10, 2)
   aprobadoPorId    String?
-  aprobadoPor      Usuario?         @relation("RepuestoAprobador", fields: [aprobadoPorId], references: [id])
-  estadoAprobacion EstadoAprobacion @default(PENDIENTE)
+  aprobadoPor      Usuario?          @relation("RepuestoAprobador", fields: [aprobadoPorId], references: [id])
+  estadoAprobacion EstadoAprobacion  @default(PENDIENTE)
+  // Solo relevante cuando estadoAprobacion = APROBADO (hubo consumo real) — ver
+  // /admin/facturacion y marcar-facturacion-repuesto.ts.
+  estadoFacturacion EstadoFacturacion @default(PENDIENTE)
 
   movimientoInventario MovimientoInventario?
 
@@ -805,22 +828,31 @@ model TicketRepuesto {
 }
 
 model Cotizacion {
-  id            String           @id @default(cuid())
+  id            String            @id @default(cuid())
   ticketId      String
-  ticket        Ticket           @relation(fields: [ticketId], references: [id])
-  monto         Decimal          @db.Decimal(10, 2)
+  ticket        Ticket            @relation(fields: [ticketId], references: [id])
+  monto         Decimal           @db.Decimal(10, 2)
   descripcion   String
-  estado        EstadoAprobacion @default(PENDIENTE)
+  estado        EstadoAprobacion  @default(PENDIENTE)
   aprobadoPorId String?
-  aprobadoPor   Usuario?         @relation("CotizacionAprobador", fields: [aprobadoPorId], references: [id])
-  fecha         DateTime         @default(now())
+  aprobadoPor   Usuario?          @relation("CotizacionAprobador", fields: [aprobadoPorId], references: [id])
+  fecha         DateTime          @default(now())
   // Ancla el monto a un precio real del catálogo — nunca viaja desde el cliente, se
-  // recalcula server-side contra costoUnidad × cantidad al crear la cotización (ver
-  // análisis "¿de dónde sale el monto de la cotización?"). null cuando es de tipo libre
-  // (algo que no es un producto puntual, ej. horas de mano de obra adicional).
+  // recalcula server-side contra precioVenta (o costoUnidad si no hay) × cantidad al
+  // crear la cotización (ver análisis "¿de dónde sale el monto de la cotización?").
+  // null cuando es de tipo libre (algo que no es un producto puntual, ej. horas de
+  // mano de obra adicional).
   repuestoId    String?
-  repuesto      Repuesto?        @relation(fields: [repuestoId], references: [id])
+  repuesto      Repuesto?         @relation(fields: [repuestoId], references: [id])
   cantidad      Int?
+  // Solo relevante cuando estado = APROBADO — ver /admin/facturacion y
+  // marcar-facturacion-cotizacion.ts.
+  estadoFacturacion EstadoFacturacion @default(PENDIENTE)
+  // Ticket de instalación/entrega generado a partir de esta cotización (cuando es de
+  // tipo producto y ya se aprobó) — único para no poder crear dos tickets de
+  // seguimiento para la misma cotización. Ver crear-ticket-instalacion.ts.
+  ticketInstalacionId String?  @unique
+  ticketInstalacion   Ticket?  @relation("CotizacionTicketInstalacion", fields: [ticketInstalacionId], references: [id])
 
   @@index([ticketId])
   @@map("cotizaciones")
