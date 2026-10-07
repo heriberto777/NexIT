@@ -24,3 +24,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* El placeholder por defecto de Tailwind (currentColor al 50% de opacidad) queda
+   demasiado claro para leerse cómodo en pantallas chicas/con brillo bajo — se usa en
+   decenas de inputs/textareas repetidos por todo el proyecto, así que se corrige acá
+   una sola vez en vez de en cada componente. */
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280; /* gray-500 */
+  opacity: 1;
+}
