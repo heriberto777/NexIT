@@ -23,7 +23,11 @@ interface Fila {
   fecha: Date;
   estadoFacturacion: "PENDIENTE" | "FACTURADO";
   ticketInstalacion: { id: string; numeroTicket: string } | null;
+  medioEnvio: "MENSAJERIA" | "UBER" | "OTRO" | null;
+  detalleEnvio: string | null;
 }
+
+const ETIQUETA_MEDIO: Record<string, string> = { MENSAJERIA: "Mensajería", UBER: "Uber", OTRO: "Otro" };
 
 export default async function FacturacionPage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -67,6 +71,8 @@ export default async function FacturacionPage({ searchParams }: PageProps) {
       fecha: c.fecha,
       estadoFacturacion: c.estadoFacturacion,
       ticketInstalacion: c.ticketInstalacion,
+      medioEnvio: c.medioEnvio,
+      detalleEnvio: c.detalleEnvio,
     })),
     ...repuestosConsumidos.map((r) => ({
       tipo: "REPUESTO" as const,
@@ -79,6 +85,8 @@ export default async function FacturacionPage({ searchParams }: PageProps) {
       fecha: r.ticket.fechaCreacion,
       estadoFacturacion: r.estadoFacturacion,
       ticketInstalacion: null,
+      medioEnvio: null,
+      detalleEnvio: null,
     })),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 
@@ -148,7 +156,7 @@ export default async function FacturacionPage({ searchParams }: PageProps) {
               <th className="px-3 py-2 font-medium">Monto</th>
               <th className="px-3 py-2 font-medium">Fecha</th>
               <th className="px-3 py-2 font-medium">Estado</th>
-              <th className="px-3 py-2 font-medium">Instalación</th>
+              <th className="px-3 py-2 font-medium">Seguimiento</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -167,11 +175,17 @@ export default async function FacturacionPage({ searchParams }: PageProps) {
                 <td className="px-3 py-2">
                   <ToggleFacturacion id={f.id} tipo={f.tipo} estadoInicial={f.estadoFacturacion} />
                 </td>
-                <td className="px-3 py-2">
-                  {f.ticketInstalacion && (
-                    <Link href={`/tickets/${f.ticketInstalacion.id}`} className="text-xs text-blue-600 underline">
+                <td className="max-w-[12rem] break-words px-3 py-2 text-xs">
+                  {f.ticketInstalacion ? (
+                    <Link href={`/tickets/${f.ticketInstalacion.id}`} className="text-blue-600 underline">
                       {f.ticketInstalacion.numeroTicket} →
                     </Link>
+                  ) : (
+                    f.medioEnvio && (
+                      <span className="text-gray-600">
+                        Enviado ({ETIQUETA_MEDIO[f.medioEnvio]}): {f.detalleEnvio}
+                      </span>
+                    )
                   )}
                 </td>
               </tr>

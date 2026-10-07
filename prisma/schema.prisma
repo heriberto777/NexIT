@@ -169,6 +169,14 @@ enum EstadoFacturacion {
   FACTURADO
 }
 
+// Medio externo por el que se envió un producto cotizado sin necesidad de visita
+// técnica — ver Cotizacion.medioEnvio.
+enum MedioEnvio {
+  MENSAJERIA
+  UBER
+  OTRO
+}
+
 enum FrecuenciaMantenimiento {
   SEMANAL
   MENSUAL
@@ -853,6 +861,13 @@ model Cotizacion {
   // seguimiento para la misma cotización. Ver crear-ticket-instalacion.ts.
   ticketInstalacionId String?  @unique
   ticketInstalacion   Ticket?  @relation("CotizacionTicketInstalacion", fields: [ticketInstalacionId], references: [id])
+  // Alternativa a ticketInstalacionId: cuando el producto no necesita visita técnica,
+  // se envía por un medio externo y se deja constancia de cómo. Mutuamente excluyente
+  // con ticketInstalacionId — una cotización de producto aprobada se resuelve de una
+  // forma o de la otra, nunca las dos. Ver marcar-envio-cotizacion.ts.
+  medioEnvio    MedioEnvio?
+  detalleEnvio  String?
+  enviadoEn     DateTime?
 
   @@index([ticketId])
   @@map("cotizaciones")

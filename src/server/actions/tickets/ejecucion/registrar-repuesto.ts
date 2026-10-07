@@ -6,18 +6,22 @@ import { registrarRepuestoSchema } from "@/lib/zod/evidencia.schema";
 import type { RegistrarRepuestoInput } from "@/lib/zod/evidencia.schema";
 import { ejecutarAccion, type ActionResult } from "@/server/actions/action-result";
 import { tieneAccesoAlTicket, INCLUDE_COLABORADORES } from "@/server/services/ticket-acceso.service";
+import { obtenerConfiguracion } from "@/server/services/configuracion.service";
+import { formatCurrency } from "@/lib/utils/currency";
 
-// Paso 4: registra el consumo de un repuesto de inventario en el ticket.
-// Si no hay stock suficiente, el repuesto queda PENDIENTE y el ticket pasa a ESPERANDO_REPUESTO
-// en vez de bloquear la operación.
-export async function registrarRepuesto(input: RegistrarRepuestoInput): Promise<
-  ActionResult<{
-    id: string;
-    cantidad: number;
-    costoTotal: number;
-    estadoAprobacion: string;
-  }>
-> {
+export type ResultadoRegistrarRepuesto =
+  | { tipo: "CONSUMIDO"; id: string; cantidad: number; costoTotal: number }
+  | { tipo: "COTIZADO"; cotizacionId: string; cantidad: number; monto: number };
+
+// Paso 4: registra el consumo de un repuesto de inventario en el ticket. Si hay stock
+// suficiente se descuenta y queda consumido de una vez (como siempre). Si NO hay
+// stock, en vez de dejar un TicketRepuesto PENDIENTE huérfano (que nunca se resolvía
+// solo, ni revertía el ticket de ESPERANDO_REPUESTO) se genera una Cotizacion tipo
+// PRODUCTO sobre este mismo ticket — así Admin/Coordinador la gestionan con el mismo
+// mecanismo que ya existe (aprobación del cliente, /admin/facturacion, ticket de
+// instalación o "marcar como enviado"). El ticket NO se bloquea: su estado no se
+// toca, el técnico sigue el wizard con normalidad.
+export async function registrarRepuesto(input: RegistrarRepuestoInput): Promise<ActionResult<ResultadoRegistrarRepuesto>> {
   return ejecutarAccion(async () => {
     // Sin restricción de rol acá: un Admin/Coordinador puede estar asignado como
     // "técnico" de este ticket (ver asignar-tecnico.ts) y ejecutar el wizard él mismo —
@@ -29,6 +33,8 @@ export async function registrarRepuesto(input: RegistrarRepuestoInput): Promise<
     if (!tieneAccesoAlTicket(ticket, usuario.id)) {
       throw new Error("Este ticket no está asignado a este técnico");
     }
+
+    const { monedaSimbolo } = await obtenerConfiguracion();
 
     return prisma.$transaction(async (tx) => {
       const repuesto = await tx.repuesto.findUniqueOrThrow({ where: { id: repuestoId } });
@@ -44,18 +50,18 @@ export async function registrarRepuesto(input: RegistrarRepuestoInput): Promise<
       });
       const hayStock = resultado.count > 0;
 
-      const ticketRepuesto = await tx.ticketRepuesto.create({
-        data: {
-          ticketId,
-          repuestoId,
-          cantidad,
-          costoTotal: repuesto.costoUnidad.mul(cantidad),
-          estadoAprobacion: hayStock ? "APROBADO" : "PENDIENTE",
-          aprobadoPorId: hayStock ? usuario.id : null,
-        },
-      });
-
       if (hayStock) {
+        const ticketRepuesto = await tx.ticketRepuesto.create({
+          data: {
+            ticketId,
+            repuestoId,
+            cantidad,
+            costoTotal: repuesto.costoUnidad.mul(cantidad),
+            estadoAprobacion: "APROBADO",
+            aprobadoPorId: usuario.id,
+          },
+        });
+
         // Kardex: el consumo del ticket también es un movimiento de inventario, en la
         // misma transacción que el descuento de stock — nunca uno sin el otro.
         await tx.movimientoInventario.create({
@@ -68,28 +74,44 @@ export async function registrarRepuesto(input: RegistrarRepuestoInput): Promise<
             ticketRepuestoId: ticketRepuesto.id,
           },
         });
-      } else {
-        await tx.ticket.update({ where: { id: ticketId }, data: { estado: "ESPERANDO_REPUESTO" } });
+
+        await tx.ticketHistorial.create({
+          data: {
+            ticketId,
+            usuarioId: usuario.id,
+            estadoNuevo: ticket.estado,
+            comentario: `Repuesto ${repuesto.nombre} x${cantidad} consumido`,
+          },
+        });
+
+        return {
+          tipo: "CONSUMIDO" as const,
+          id: ticketRepuesto.id,
+          cantidad: ticketRepuesto.cantidad,
+          costoTotal: ticketRepuesto.costoTotal.toNumber(),
+        };
       }
+
+      // Mismo cálculo que crear-cotizacion.ts: el precio sale del catálogo
+      // (precioVenta si está definido, si no costoUnidad), nunca se inventa acá.
+      const precioBase = repuesto.precioVenta ?? repuesto.costoUnidad;
+      const monto = precioBase.mul(cantidad).toNumber();
+      const descripcion = `${repuesto.nombre} x${cantidad} — sin stock disponible`;
+
+      const cotizacion = await tx.cotizacion.create({
+        data: { ticketId, monto, descripcion, repuestoId, cantidad },
+      });
 
       await tx.ticketHistorial.create({
         data: {
           ticketId,
           usuarioId: usuario.id,
-          estadoNuevo: hayStock ? "EN_EJECUCION" : "ESPERANDO_REPUESTO",
-          comentario: `Repuesto ${repuesto.nombre} x${cantidad} ${hayStock ? "consumido" : "pendiente de aprobación"}`,
+          estadoNuevo: ticket.estado,
+          comentario: `Repuesto ${repuesto.nombre} x${cantidad} sin stock — se generó una cotización de ${formatCurrency(monto, monedaSimbolo)} para reponerlo`,
         },
       });
 
-      // Server Actions serializan el valor de retorno hacia el Client Component que las
-      // invoca; Prisma.Decimal no es serializable ahí, así que nunca se devuelve el
-      // registro crudo — solo los campos planos que el wizard necesita.
-      return {
-        id: ticketRepuesto.id,
-        cantidad: ticketRepuesto.cantidad,
-        costoTotal: ticketRepuesto.costoTotal.toNumber(),
-        estadoAprobacion: ticketRepuesto.estadoAprobacion,
-      };
+      return { tipo: "COTIZADO" as const, cotizacionId: cotizacion.id, cantidad, monto };
     });
   });
 }

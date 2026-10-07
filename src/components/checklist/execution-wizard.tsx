@@ -72,7 +72,7 @@ export function ExecutionWizard({
   const [evidencias, setEvidencias] = useState<EvidenciaPlana[]>(evidenciasIniciales);
   const [evidenciaNoAplica, setEvidenciaNoAplica] = useState(ticket.evidenciaNoAplica);
   const [motivoNoAplica, setMotivoNoAplica] = useState(ticket.evidenciaNoAplicaMotivo);
-  const [repuestosAgregados, setRepuestosAgregados] = useState<{ nombre: string; cantidad: number }[]>([]);
+  const [repuestosAgregados, setRepuestosAgregados] = useState<{ nombre: string; cantidad: number; tipo: "CONSUMIDO" | "COTIZADO" }[]>([]);
   const [firmaCapturada, setFirmaCapturada] = useState(ticket.tieneFirma);
   const [finalizado, setFinalizado] = useState(false);
 
@@ -126,9 +126,9 @@ export function ExecutionWizard({
     const repuesto = repuestosDisponibles.find((r) => r.id === values.repuestoId);
     runAction(
       () => registrarRepuesto(values),
-      () => {
+      (resultado) => {
         if (repuesto) {
-          setRepuestosAgregados((prev) => [...prev, { nombre: repuesto.nombre, cantidad: values.cantidad }]);
+          setRepuestosAgregados((prev) => [...prev, { nombre: repuesto.nombre, cantidad: values.cantidad, tipo: resultado.tipo }]);
         }
       },
     );

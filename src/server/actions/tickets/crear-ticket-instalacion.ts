@@ -40,6 +40,9 @@ export async function crearTicketInstalacion(
     if (cotizacion.ticketInstalacionId) {
       throw new Error("Ya existe un ticket de instalación para esta cotización");
     }
+    if (cotizacion.medioEnvio) {
+      throw new Error("Esta cotización ya se marcó como enviada — no se puede generar un ticket de instalación");
+    }
 
     const ticketOrigen = cotizacion.ticket;
 

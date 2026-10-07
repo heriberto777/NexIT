@@ -178,3 +178,12 @@ export const crearTicketInstalacionSchema = z.object({
   cotizacionId: z.string().cuid(),
 });
 export type CrearTicketInstalacionInput = z.infer<typeof crearTicketInstalacionSchema>;
+
+// Alternativa a crear un ticket de instalación: cuando el producto no necesita visita
+// técnica, se envía por un medio externo — ver marcar-envio-cotizacion.ts.
+export const marcarEnvioCotizacionSchema = z.object({
+  cotizacionId: z.string().cuid(),
+  medioEnvio: z.enum(["MENSAJERIA", "UBER", "OTRO"]),
+  detalleEnvio: z.string().trim().min(3, "Agregá al menos un dato del envío (guía, código, etc.)").max(500),
+});
+export type MarcarEnvioCotizacionInput = z.infer<typeof marcarEnvioCotizacionSchema>;

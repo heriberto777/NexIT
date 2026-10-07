@@ -8,6 +8,7 @@ import { ValidationActions } from "@/components/tickets/validation-actions";
 import { GestionTicketPanel } from "@/components/tickets/gestion-ticket-panel";
 import { SolicitarCotizacionModal } from "@/components/tickets/solicitar-cotizacion-modal";
 import { CrearTicketInstalacionButton } from "@/components/tickets/crear-ticket-instalacion-button";
+import { MarcarEnvioCotizacionButton } from "@/components/tickets/marcar-envio-cotizacion-button";
 import { storageService } from "@/server/services/storage.service";
 import { ESTADOS_CON_WIZARD_ACTIVO, ESTADOS_TERMINALES } from "@/lib/utils/ticket-estado";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -308,13 +309,21 @@ export default async function TicketDetailPage({ params }: PageProps) {
                     </span>
                   </div>
                   {esAdminOCoordinador && c.estado === "APROBADO" && c.repuestoId && (
-                    <div>
+                    <div className="flex flex-wrap items-start gap-3">
                       {c.ticketInstalacion ? (
                         <Link href={`/tickets/${c.ticketInstalacion.id}`} className="text-xs text-blue-600 underline">
                           Ver ticket de instalación ({c.ticketInstalacion.numeroTicket}) →
                         </Link>
+                      ) : c.medioEnvio ? (
+                        <MarcarEnvioCotizacionButton
+                          cotizacionId={c.id}
+                          envioActual={{ medioEnvio: c.medioEnvio, detalleEnvio: c.detalleEnvio ?? "" }}
+                        />
                       ) : (
-                        <CrearTicketInstalacionButton cotizacionId={c.id} />
+                        <>
+                          <CrearTicketInstalacionButton cotizacionId={c.id} />
+                          <MarcarEnvioCotizacionButton cotizacionId={c.id} envioActual={null} />
+                        </>
                       )}
                     </div>
                   )}

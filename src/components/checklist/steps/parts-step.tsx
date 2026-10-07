@@ -10,7 +10,7 @@ import type { RepuestoPlano } from "@/types/ejecucion";
 interface Props {
   ticketId: string;
   repuestosDisponibles: RepuestoPlano[];
-  repuestosAgregados: { nombre: string; cantidad: number }[];
+  repuestosAgregados: { nombre: string; cantidad: number; tipo: "CONSUMIDO" | "COTIZADO" }[];
   isPending: boolean;
   onAgregar: (values: RegistrarRepuestoInput) => void;
   onContinue: () => void;
@@ -44,9 +44,17 @@ export function PartsStep({
       {repuestosAgregados.length > 0 && (
         <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
           {repuestosAgregados.map((r, i) => (
-            <li key={i} className="flex justify-between gap-2 px-3 py-2 text-sm">
-              <span className="min-w-0 flex-1 break-words">{r.nombre}</span>
-              <span className="shrink-0 text-gray-500">x{r.cantidad}</span>
+            <li key={i} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1 break-words">
+                {r.nombre} <span className="text-gray-500">x{r.cantidad}</span>
+              </span>
+              {r.tipo === "COTIZADO" ? (
+                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                  Sin stock — cotización enviada
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">Consumido</span>
+              )}
             </li>
           ))}
         </ul>
